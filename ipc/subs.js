@@ -3,12 +3,15 @@ const { ipcMain } = require('electron');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
+const forecastVoyages = require('../subs/voyage-forecast');
 const { partLetter, computeTargetRoute, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
 const rankUp = require('../subs/rank-up');
 const { columnsByKey } = require('./shopping');
 const { targetBuildAt } = require('./parts');
 
 const MEASURE_WINDOW_DAYS = 7;
+// How far back collections are looked at for a sub's bonus experience (its last few voyages).
+const BONUS_WINDOW_DAYS = 14;
 const DAY = 24 * 60 * 60 * 1000;
 const quote = (name) => `"${name.replace(/"/g, '""')}"`;
 
@@ -27,7 +30,7 @@ async function loadSubmarines(client) {
            s.points, s.return_time, s.updated_at, so.sort_index,
            coalesce((to_jsonb(s)->>'slot')::int, substring(s.sub_name FROM '^Submersible-([1-4])$')::int) AS slot,
            s.current_exp, s.next_level_exp,
-           c.name AS character_name, c.world, c.account_label,
+           c.name AS character_name, c.world, c.account_label, c.fc_id,
            ct.craft_enabled
     FROM companion_submarine_snapshot s
     LEFT JOIN character_sort_order so ON s.cid = so.cid
@@ -47,24 +50,7 @@ async function loadSubmarines(client) {
   const validRouteLetters = new Set(pointLetterById.values());
   const mapOfPoint = await loadSectorMaps(client);
 
-  const rankStatsResult = await client.query(`SELECT id, speed_bonus, range_bonus FROM ffxiv_submarinerank`);
-  const rankStatsById = new Map();
-  for (const row of rankStatsResult.rows) {
-    const rank = Number(row.id);
-    rankStatsById.set(rank, {
-      speed: row.speed_bonus === null || row.speed_bonus === '' ? null : Number(row.speed_bonus),
-      range: row.range_bonus === null || row.range_bonus === '' ? null : Number(row.range_bonus),
-    });
-  }
-
-  const partStatsResult = await client.query(`SELECT class, slot, speed, range FROM ffxiv_submarinepart`);
-  const partStatsByClassSlot = new Map();
-  for (const row of partStatsResult.rows) {
-    partStatsByClassSlot.set(`${row.class}|${row.slot}`, {
-      speed: Number(row.speed) || 0,
-      range: Number(row.range) || 0,
-    });
-  }
+  const { rankStatsById, partStatsByClassSlot } = await loadStatTables(client);
 
   const fightClubResult = await client.query(`
     SELECT route, hours, repair_times, gil_sub_day, gil_hr, rec_build_notes,
@@ -96,6 +82,8 @@ async function loadSubmarines(client) {
       character_name: row.character_name,
       world: row.world,
       account_label: row.account_label,
+      fc_id: row.fc_id,
+      part_letters: partLetters,
       rank,
       rank_progress_pct: rankProgressPct,
       current_setup: partLetters.join('-'),
@@ -117,6 +105,29 @@ async function loadSubmarines(client) {
   });
 
   return rows;
+}
+
+// Speed and range per rank (ffxiv_submarinerank) and per part (ffxiv_submarinepart), for computeStat.
+async function loadStatTables(client) {
+  const rankStatsResult = await client.query(`SELECT id, speed_bonus, range_bonus FROM ffxiv_submarinerank`);
+  const rankStatsById = new Map();
+  for (const row of rankStatsResult.rows) {
+    const rank = Number(row.id);
+    rankStatsById.set(rank, {
+      speed: row.speed_bonus === null || row.speed_bonus === '' ? null : Number(row.speed_bonus),
+      range: row.range_bonus === null || row.range_bonus === '' ? null : Number(row.range_bonus),
+    });
+  }
+
+  const partStatsResult = await client.query(`SELECT class, slot, speed, range FROM ffxiv_submarinepart`);
+  const partStatsByClassSlot = new Map();
+  for (const row of partStatsResult.rows) {
+    partStatsByClassSlot.set(`${row.class}|${row.slot}`, {
+      speed: Number(row.speed) || 0,
+      range: Number(row.range) || 0,
+    });
+  }
+  return { rankStatsById, partStatsByClassSlot };
 }
 
 // Which map (sea) each sector is on, from game data: sector id -> { id, name } (the game's own map
@@ -173,10 +184,37 @@ async function loadRankUpGameData(client) {
   return { expToNext, sectors, startingPoints };
 }
 
-// Adds each sub's rank-up estimate: rank_up = { method, perDay | voyage, nextRank, nextRankAt,
-// voyages, nextBuild: { rank, build, at, voyages } | null, maxRank } (see rank-up.js).
+// Each recorded voyage's sectors, from SubmarineTracker's loot (companion_voyage_loot) since `since`:
+// Map "fc_id|sub_name" -> [{ returnedAt (ms), sectors: [id, ...] }]. Empty without the table.
+async function loadVoyageRoutes(client, since) {
+  const out = new Map();
+  let rows;
+  try {
+    ({ rows } = await client.query(`
+      SELECT fc_id, sub_name, returned_at, array_agg(sector ORDER BY leg NULLS LAST, sector) AS sectors
+      FROM companion_voyage_loot
+      WHERE returned_at >= $1 AND sub_name IS NOT NULL
+      GROUP BY fc_id, sub_name, sub_register, returned_at`, [since]));
+  } catch (err) {
+    if (err.code === '42P01' || err.code === '42703') return out;
+    throw err;
+  }
+  for (const r of rows) {
+    const key = `${r.fc_id}|${r.sub_name}`;
+    if (!out.has(key)) out.set(key, []);
+    out.get(key).push({ returnedAt: new Date(r.returned_at).getTime(), sectors: r.sectors.map(Number) });
+  }
+  return out;
+}
+
+// Adds each sub's rank-up estimate: rank_up = { method, perDay | voyage, bonus, buildAhead, nextRank,
+// nextRankAt, voyages, nextBuild: { rank, build, at, voyages } | null, maxRank }. Worked out voyage by voyage
+// (voyage-forecast.js) when its route and speed are known: 'voyages' with its own measured bonus, or
+// 'calculated' from game data alone until it has a few collections recorded. Otherwise 'measured' from its
+// last week's experience (rank-up.js).
 async function addRankUps(client, subs) {
   const game = await loadRankUpGameData(client);
+  const stats = await loadStatTables(client);
   const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules')).rows;
   const fightClubRows = (await client.query('SELECT rec_build_notes, gil_hr FROM fight_club_routes')).rows;
   const top = rankUp.maxRank(game.expToNext);
@@ -184,9 +222,12 @@ async function addRankUps(client, subs) {
   // Recorded rank and experience per slot (plugin 0.7.0), over the window plus the value before it.
   const now = Date.now();
   const windowStart = new Date(now - MEASURE_WINDOW_DAYS * DAY);
+  const historyStart = new Date(now - BONUS_WINDOW_DAYS * DAY);
   const cids = [...new Set(subs.map((s) => String(s.cid)))];
   const metrics = [1, 2, 3, 4].flatMap((slot) => [`sub_rank:${slot}`, `sub_exp:${slot}`]);
-  const points = await metricWindow(client, 'character', metrics, windowStart, cids);
+  const points = await metricWindow(client, 'character', metrics, historyStart, cids);
+  const voyageRoutes = await loadVoyageRoutes(client, historyStart);
+  const routeExp = (ids) => (ids.length && ids.every((id) => game.sectors.has(id)) ? ids.reduce((sum, id) => sum + game.sectors.get(id).expReward, 0) : null);
 
   for (const sub of subs) {
     const cid = String(sub.cid);
@@ -199,23 +240,57 @@ async function addRankUps(client, subs) {
     const start = sectorIds.length ? rankUp.startFor(sectorIds[0], game.startingPoints) : null;
     const trip = typeof sub.speed === 'number' ? rankUp.voyage(sectors, start, sub.speed) : null;
     const returnAt = Number(sub.return_time) > 0 ? Number(sub.return_time) * 1000 : null;
-    const calculated = trip ? { ...trip, returnAt } : null;
-    const out = { returnAt, hours: trip ? trip.hours : null };
 
-    const method = measured ? 'measured' : calculated ? 'calculated' : null;
-    const rate = { measured: method === 'measured' ? measured : null, calculated: method === 'calculated' ? calculated : null };
-    const dateFor = (targetRank) => rankUp.rankDate({ rank: sub.rank, exp: sub.current_exp, targetRank, expToNext: game.expToNext, ...rate, out, now });
-
-    const next = sub.rank < top ? dateFor(sub.rank + 1) : null;
     const buildAt = (rank) => targetBuildAt({ rank, slot: sub.slot, cid, craftEnabled: sub.craft_enabled, rules, fightClubRows });
     const switchTo = rankUp.nextBuildRank(sub.rank, top, buildAt);
+    const untilRank = Math.min(top, Math.max(sub.rank + 1, switchTo ? switchTo.rank : 0));
+
+    // This sub's bonus: each collection against the route of the voyages collected (SubmarineTracker's
+    // loot), or its current route when those aren't recorded.
+    const recorded = voyageRoutes.get(`${sub.fc_id}|${sub.sub_name}`) || [];
+    const samples = forecastVoyages.collections(series).map((c) => {
+      const these = recorded.filter((v) => v.returnedAt > c.from && v.returnedAt <= c.at);
+      const bases = these.map((v) => routeExp(v.sectors));
+      const base = these.length ? (bases.every((b) => b !== null) ? bases.reduce((a, b) => a + b, 0) : null) : (trip ? trip.exp : null);
+      return { gained: c.gained, base };
+    });
+    const bonus = trip ? forecastVoyages.bonusFactor(samples) : null;
+
+    // Its parts now, then its Sub Rules builds from the rank it switches (a blank in a rule keeps the part).
+    const lettersAt = (rank) => {
+      if (!switchTo || rank < switchTo.rank) return sub.part_letters;
+      const build = buildAt(rank) || [];
+      return sub.part_letters.map((letter, i) => build[i] || letter);
+    };
+    const voyageAt = (rank) => {
+      const speed = computeStat(rank, lettersAt(rank), 'speed', stats.rankStatsById, stats.partStatsByClassSlot);
+      const v = typeof speed === 'number' ? rankUp.voyage(sectors, start, speed) : null;
+      return v ? { exp: v.exp * (bonus ? bonus.factor : 1), hours: v.hours } : null;
+    };
+    const reached = trip ? forecastVoyages.forecast({ rank: sub.rank, exp: sub.current_exp, untilRank, expToNext: game.expToNext, voyageAt, returnAt, now }) : new Map();
+
+    let method = null;
+    let dateFor = () => null;
+    if (reached.size) {
+      method = bonus ? 'voyages' : 'calculated';
+      dateFor = (rank) => reached.get(rank) || null;
+    } else if (measured) {
+      method = 'measured';
+      const out = { returnAt, hours: trip ? trip.hours : null };
+      dateFor = (rank) => rankUp.rankDate({ rank: sub.rank, exp: sub.current_exp, targetRank: rank, expToNext: game.expToNext, measured, out, now });
+    }
+
+    const next = sub.rank < top ? dateFor(sub.rank + 1) : null;
     const switchAt = switchTo ? dateFor(switchTo.rank) : null;
+    const firstVoyage = trip ? voyageAt(sub.rank) : null;
 
     sub.rank_up = {
       method,
       outAtSea: method === 'measured' && returnAt > now,
-      perDay: measured ? measured.perDay : null,
-      voyage: calculated ? { exp: calculated.exp, hours: calculated.hours } : null,
+      perDay: method === 'measured' ? measured.perDay : null,
+      voyage: firstVoyage && method !== 'measured' ? { exp: Math.round(firstVoyage.exp), hours: firstVoyage.hours } : null,
+      bonus: method === 'voyages' ? bonus : null,
+      buildAhead: method !== 'measured' && !!switchTo && !!switchAt,
       maxRank: top,
       nextRank: sub.rank < top ? sub.rank + 1 : null,
       nextRankAt: next && next.at ? next.at : null,
@@ -228,6 +303,7 @@ async function addRankUps(client, subs) {
       } : null,
     };
     delete sub.points;
+    delete sub.part_letters;
   }
   return subs;
 }

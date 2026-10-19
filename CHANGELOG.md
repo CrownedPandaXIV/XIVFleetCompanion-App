@@ -3,6 +3,20 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.1.0 - 2026-10-19
+
+No database or plugin change. More accurate with Submarine Tracker, but works without it.
+
+- **Next Rank and Next Build are worked out voyage by voyage,** the way the game gives experience, instead of from
+  the last week's average. Each voyage gives its route's experience (from game data) times the sub's own bonus,
+  measured from its last few voyages against the routes they ran (Submarine Tracker records those). Voyages get
+  shorter as the sub ranks up, and once its Sub Rules switch it to faster parts, so a sub that earns more and
+  more over time is followed instead of averaged. Right after a route change the date follows the new route
+  straight away; the 7-day average took a week to catch up. Hover shows the working, like "4,500 experience a
+  voyage on its route, including its bonus (×1.50 from its last 4 voyages), 14.9h each".
+- Until a sub has a few voyages recorded, its date is calculated from game data alone and marked ≈, as before.
+  The last week's average is only used when its route or speed can't be worked out.
+
 ## 1.0.1 - 2026-10-19
 
 No database or plugin change.

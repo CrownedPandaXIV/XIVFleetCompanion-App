@@ -2,10 +2,10 @@
 // test data), on route O-J: 3,000 experience a voyage, about 14.9 hours at their speed.
 //   Sub1 (rank 82, 1,000 in, back in about an hour): calculated, 9,000 more = 3 voyages, so about 1 hour +
 //        2 x 14.9 hours = "≈ in 1d 6h"
-//   Sub2 (rank 83, 2,000 in): measured from its recorded history, rank 82 with 0 five days ago, so 12,000
-//        in 5 days = 2,400 a day, and 8,000 more takes 3.3 days = "in 3d 8h" (no ≈)
-//   Sub4 (rank 85, 4,000 in, back in 5 days): measured, rank 84 with 0 five days ago, so 2,800 a day and
-//        6,000 more takes about 2.1 days, but it can't rank up before it is back, so "in 5d" (or 4d 23h)
+//   Sub2 (rank 83, 2,000 in, in port): its recorded collections gave 4,500 each, 1.5 times its route's 3,000,
+//        so voyage by voyage 8,000 more takes 2 voyages from now: "in 1d 5h" (no ≈, its own bonus measured)
+//   Sub4 (rank 85, 4,000 in, back in 5 days): no voyages recorded, so calculated: 3,000 when it is back and
+//        3,000 a voyage after, so 2 voyages: "≈ in 5d 14h", never before it is back
 //   Sub3 is set back an hour ago, waiting to be collected, for sorting by Status.
 // A Sub Rules rule for rank 88 (all Syldra) is added, so the next build for these subs is YYYY at 88.
 // Gus Kitteh 6's Sub4 is rank 90, the highest in the test data.
@@ -44,12 +44,13 @@ module.exports = async (t) => {
   check(sub1 && /^YYYY at 88 · ≈ in \d+d/.test(sub1[iBuild].text), 'next build from Sub Rules, with when: ' + (sub1 && sub1[iBuild].text));
 
   const sub2 = await subRow('Bex Kitteh 1', 'Sub2');
-  check(sub2 && /^in 3d [78]h$/.test(sub2[iRank].text), 'measured from recorded history, no ≈: ' + (sub2 && sub2[iRank].text));
-  check(sub2 && /From its experience over the last week: 2,4\d\d a day\. Assumes it carries on as now/.test(sub2[iRank].title), 'measured rate on hover, with what it assumes: ' + (sub2 && sub2[iRank].title));
+  check(sub2 && /^in 1d [45]h$/.test(sub2[iRank].text), 'voyage by voyage with its own bonus, no ≈: ' + (sub2 && sub2[iRank].text));
+  check(sub2 && /\(2 voyages\)\. Worked out voyage by voyage: 4,500 experience a voyage on its route, including its bonus \(×1\.50 from its last 4 voyages\)/.test(sub2[iRank].title),
+    'its bonus from its recorded voyages on hover: ' + (sub2 && sub2[iRank].title));
 
   const sub4 = await subRow('Bex Kitteh 1', 'Sub4');
-  check(sub4 && /^in (5d|4d 23h)$/.test(sub4[iRank].text), 'measured, out at sea: not before it is back: ' + (sub4 && sub4[iRank].text));
-  check(sub4 && / Experience comes in when a voyage is collected, so this is when it is back\.$/.test(sub4[iRank].title), 'and says so on hover: ' + (sub4 && sub4[iRank].title));
+  check(sub4 && /^≈ in 5d 1[345]h$/.test(sub4[iRank].text), 'out at sea: its experience comes when it is back, then a voyage at a time: ' + (sub4 && sub4[iRank].text));
+  check(sub4 && /\(2 voyages\)\. Calculated from its route/.test(sub4[iRank].title), 'counted in voyages on hover: ' + (sub4 && sub4[iRank].title));
 
   // Current Route: the map's number before the letters, its name on hover.
   const iRoute = heads.indexOf('current route');
@@ -84,8 +85,14 @@ module.exports.before = async (db) => {
   await db.query(`UPDATE companion_submarine_snapshot SET return_time = floor(extract(epoch FROM now() + interval '5 days')) WHERE cid = ${BEX} AND sub_name = 'Sub4'`);
   await db.query(`DELETE FROM companion_metric_history WHERE subject_id = ${BEX} AND metric LIKE 'sub\\_%'`);
   await db.query(`INSERT INTO companion_metric_history (recorded_at, subject_type, subject_id, metric, value) VALUES
-    (now() - interval '5 days', 'character', ${BEX}, 'sub_rank:2', 82),
-    (now() - interval '5 days', 'character', ${BEX}, 'sub_exp:2', 0),
+    (now() - interval '60 hours', 'character', ${BEX}, 'sub_rank:2', 81),
+    (now() - interval '60 hours', 'character', ${BEX}, 'sub_exp:2', 4000),
+    (now() - interval '45 hours', 'character', ${BEX}, 'sub_rank:2', 81),
+    (now() - interval '45 hours', 'character', ${BEX}, 'sub_exp:2', 8500),
+    (now() - interval '30 hours', 'character', ${BEX}, 'sub_rank:2', 82),
+    (now() - interval '30 hours', 'character', ${BEX}, 'sub_exp:2', 3000),
+    (now() - interval '15 hours', 'character', ${BEX}, 'sub_rank:2', 82),
+    (now() - interval '15 hours', 'character', ${BEX}, 'sub_exp:2', 7500),
     (now(), 'character', ${BEX}, 'sub_rank:2', 83),
     (now(), 'character', ${BEX}, 'sub_exp:2', 2000),
     (now() - interval '5 days', 'character', ${BEX}, 'sub_rank:4', 84),
