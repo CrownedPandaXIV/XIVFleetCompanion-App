@@ -1,10 +1,12 @@
-// Settings → Setup Help: the details another PC needs (never the password), a connection test to any
+// Settings → Setup Help: the details another PC needs, "Found a problem?" (the log folder and where to report) (never the password), a connection test to any
 // address using this PC's saved database name, username and password, and "Let other PCs connect" on the
 // database PC. Settings → Database: making a new database on this PC. The working out is in setup/.
+const fs = require('fs');
 const os = require('os');
-const { app, ipcMain } = require('electron');
+const path = require('path');
+const { app, ipcMain, shell } = require('electron');
 const { createPgClient, loadPostgresConfig, savePostgresConfig, recheckDatabase } = require('../db');
-const { PLUGIN_REPO, COMPANION_PLUGINS, pcAddresses, homeNetworkCidrs, connectionDetails, describeTestError } = require('../setup/help');
+const { PLUGIN_REPO, REPORT_PROBLEM_URL, COMPANION_PLUGINS, pcAddresses, homeNetworkCidrs, connectionDetails, describeTestError } = require('../setup/help');
 const { rangesToAllow } = require('../setup/remote-access');
 const { letOtherPcsConnect } = require('../setup/elevated');
 const { createDatabase } = require('../setup/create-database');
@@ -90,5 +92,22 @@ ipcMain.handle('setup:create-database', async (event, input) => {
   }
   savePostgresConfig({ host: 'localhost', port, database: input.database, user: input.user, password: input.password });
   recheckDatabase();
+  return { success: true };
+});
+
+// Found a problem?: what to put in a report, the app's log folder (app-log.js) and the page to report on.
+const logFolder = () => path.join(app.getPath('userData'), 'logs');
+ipcMain.handle('help:problem-info', () => ({
+  version: app.getVersion(),
+  system: `${process.platform === 'win32' ? 'Windows' : process.platform} ${os.release()}`,
+  logFolder: logFolder(),
+}));
+ipcMain.handle('help:open-log-folder', async () => {
+  fs.mkdirSync(logFolder(), { recursive: true });
+  const error = await shell.openPath(logFolder());
+  return error ? { success: false, error } : { success: true };
+});
+ipcMain.handle('help:report-problem', async () => {
+  await shell.openExternal(REPORT_PROBLEM_URL);
   return { success: true };
 });

@@ -20,6 +20,7 @@ const { findTools } = require('../backups/tools');
 const { backupNow } = require('../backups/run');
 const backupSchedule = require('../backups/schedule');
 const alertSchedule = require('../alerts/schedule');
+const { stepsText } = require('../app-log');
 
 const userData = () => app.getPath('userData');
 const localTime = (d = new Date()) => {
@@ -120,6 +121,7 @@ ipcMain.handle('setup:remove-everything', async (event, input) => {
     };
     const result = await removeEverything(input || {}, deps, (steps) => { if (!event.sender.isDestroyed()) event.sender.send('setup:remove-progress', steps); });
     removed = result.ok;
+    (result.ok ? console.log : console.error)(stepsText('Remove everything', result));
     return { ok: result.ok, error: result.error || null, steps: result.steps || [] };
   } catch (err) {
     return { ok: false, error: err.message, steps: [] };

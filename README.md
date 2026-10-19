@@ -170,8 +170,26 @@ PC is back on.
 - **Test** loads a backup into a temporary database and checks it's complete. Your real data isn't touched.
 - **Restore** puts everything back the way it was in that backup. It saves a backup of how things are right now first,
   so you can undo it.
+- **Restore from a file...** does the same with a backup kept anywhere else, such as a USB drive or another PC's backup
+  folder.
 
 If a backup fails, the Discord alerts tell you.
+
+### If the database PC dies
+
+Your backups are how you get everything back. Keep a second copy somewhere other than that PC (Settings → Backups →
+second copy folder), so losing the PC doesn't lose them too.
+
+1. On the PC that will hold the database from now on, install the app and run **Set up this PC** → **This PC keeps
+   the database for my other PCs**. Use the same database name, username and app password as before, so the plugins
+   only need the new address.
+2. Open **Settings → Backups**, choose and save a backup folder, then click **Restore from a file...** and pick your
+   newest backup.
+3. On every other PC, type the new address in the app (**Settings → Database**) and in the plugin's settings.
+   **Setup Help → Connect another PC** on the new database PC shows it.
+4. Turn on daily backups on the new PC.
+
+Anything recorded after that backup is lost, which is why the daily backup matters.
 
 ## Moving the database to another PC
 
@@ -218,6 +236,14 @@ too, and keep the app.
 - **"The database moved to ..., but this PC can't reach it yet":** the database was moved to another PC, and this
   one can't connect to its new address. Check Tailscale is running on both PCs. The app keeps trying every minute.
 - **Something else?** In the game, type `/xivfleet check` to see what the plugin can and can't see on that PC.
+
+### Found a problem?
+
+Report it on the app's [GitHub page](https://github.com/CrownedPandaXIV/XIVFleetCompanion-App/issues/new/choose), for
+the app and the plugin alike (a free GitHub account is needed). **Settings → Setup Help → Found a problem?** has a
+button that opens it, the app's version to copy, and **Open the log folder**: the app's log, `app.log`, says what
+the app did and any errors, and never has passwords in it. For the plugin, paste the **Copy results** of
+`/xivfleet check` too.
 
 ## License
 

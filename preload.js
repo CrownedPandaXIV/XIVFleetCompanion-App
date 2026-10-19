@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('api', {
   backUpNow: () => invoke('backups:run-now'),
   testBackup: (file) => invoke('backups:test', file),
   restoreBackup: (file) => invoke('backups:restore', file),
+  chooseBackupFile: () => invoke('backups:choose-file'),
+  restoreBackupFile: (file) => invoke('backups:restore-file', file),
   // Database updates (db/apply-updates.js): { ok, version, created, applied, newer } or { ok: false, message }.
   getDatabaseStatus: () => invoke('get-database-status'),
   checkDatabaseSpeed: () => invoke('database:speed-check'),
@@ -149,6 +151,9 @@ contextBridge.exposeInMainWorld('api', {
   installAlertSchedule: () => invoke('alerts:install-schedule'),
   removeAlertSchedule: () => invoke('alerts:remove-schedule'),
   getSetupDetails: () => invoke('setup:get-details'),
+  getProblemInfo: () => invoke('help:problem-info'),
+  openLogFolder: () => invoke('help:open-log-folder'),
+  reportProblem: () => invoke('help:report-problem'),
   testSetupAddress: (address) => invoke('setup:test-address', address),
   checkFromHere: (address) => invoke('setup:check-from-here', address),
   letOtherPcsConnect: () => invoke('setup:let-other-pcs-connect'),

@@ -5,9 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const { loadPostgresConfig, recheckDatabase } = require('../db');
 const { loadBackupSettings, validateBackupSettings, saveBackupSettings } = require('../backups/settings');
-const { listBackups } = require('../backups/files');
+const { listBackups, backupTime } = require('../backups/files');
 const { findTools } = require('../backups/tools');
-const { testBackup, restoreBackup } = require('../backups/run');
+const { testBackup, checkBackupFile, restoreBackup } = require('../backups/run');
 const { settingsFile, backupWithSettings } = require('../backups/app');
 const schedule = require('../backups/schedule');
 
@@ -111,15 +111,59 @@ ipcMain.handle('backups:test', (event, file) => exclusive('testing a backup', as
   return result.ok ? { success: true, ...result } : { success: false, error: result.message, rows: result.rows };
 }));
 
+// Restores one backup file over the database the app uses (it is backed up first).
+async function restoreFile(file) {
+  const { settings } = loadBackupSettings(settingsFile());
+  if (!settings.folder) return { success: false, error: 'Choose a backup folder first (the database is backed up there before restoring).' };
+  const tools = await findTools(settings.pgBin);
+  if (!tools.found) return { success: false, error: tools.error };
+  const result = await restoreBackup({ tools, config: loadPostgresConfig(), settings, file });
+  // The restored database may be on an older layout: check for database updates again.
+  if (result.ok) recheckDatabase();
+  (result.ok ? console.log : console.error)(`Restoring ${path.basename(file)}: ${result.message}`);
+  return result.ok ? { success: true, message: result.message } : { success: false, error: result.message };
+}
+
 ipcMain.handle('backups:restore', (event, file) => exclusive('restoring a backup', async () => {
   const { settings } = loadBackupSettings(settingsFile());
   const backup = knownBackup(settings, file);
   if (!backup) return { success: false, error: 'That backup is not in the backup folders.' };
-  if (!settings.folder) return { success: false, error: 'Choose a backup folder first (the database is backed up there before restoring).' };
-  const tools = await findTools(settings.pgBin);
-  if (!tools.found) return { success: false, error: tools.error };
-  const result = await restoreBackup({ tools, config: loadPostgresConfig(), settings, file: backup.file });
-  // The restored database may be on an older layout: check for database updates again.
-  if (result.ok) recheckDatabase();
-  return result.ok ? { success: true, message: result.message } : { success: false, error: result.message };
+  return restoreFile(backup.file);
+}));
+
+// "Restore from a file...": a backup anywhere (another PC's folder, a USB drive), for example after the PC
+// that had the database is lost. Only the file picked here can then be restored.
+let pickedFile = null;
+ipcMain.handle('backups:choose-file', async (event) => {
+  // The UI tests can't click through Windows' file window, so they name the file instead.
+  let file = process.env.XIV_FLEET_TEST_PICK_FILE || null;
+  if (!file) {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Choose a backup to restore',
+      properties: ['openFile'],
+      filters: [{ name: 'Backups', extensions: ['dump'] }, { name: 'All files', extensions: ['*'] }],
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    file = result.filePaths[0];
+  }
+  try {
+    const { settings } = loadBackupSettings(settingsFile());
+    const tools = await findTools(settings.pgBin);
+    if (!tools.found) return { success: false, error: tools.error };
+    const checked = await checkBackupFile({ tools, file });
+    if (!checked.ok) return { success: false, error: checked.message };
+    pickedFile = file;
+    const stat = fs.statSync(file);
+    return { success: true, file, name: path.basename(file), size: stat.size, takenAt: backupTime(path.basename(file)) || stat.mtimeMs };
+  } catch (err) {
+    return { success: false, error: `That file couldn't be checked: ${err.message}` };
+  }
+});
+
+ipcMain.handle('backups:restore-file', (event, file) => exclusive('restoring a backup', async () => {
+  if (!pickedFile || file !== pickedFile) return { success: false, error: 'Choose the backup again with Restore from a file.' };
+  const r = await restoreFile(pickedFile);
+  if (r.success) pickedFile = null;
+  return r;
 }));

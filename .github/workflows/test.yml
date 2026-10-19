@@ -86,6 +86,10 @@ jobs:
         MOVE_NEW_PORT: 5433
     - name: Verify the leftovers from a move
       run: node tests/db/verify-leftovers.js
+    - name: Verify restoring a backup onto a new PC's database (two servers)
+      run: node tests/db/verify-rebuild.js
+      env:
+        REBUILD_NEW_PORT: 5433
 
   ui:
     runs-on: ubuntu-24.04

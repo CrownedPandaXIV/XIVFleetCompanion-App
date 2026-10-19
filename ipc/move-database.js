@@ -14,6 +14,7 @@ const { downloadDir } = require('../setup/run-setup');
 const { recordInstalled } = require('../setup/remove-everything');
 const { findTools, run } = require('../backups/tools');
 const { addressChoices, checkOld, stepsFor, moveDatabase } = require('../setup/move-database');
+const { stepsText } = require('../app-log');
 
 function savedConfig() {
   try { return loadPostgresConfig(); } catch { return null; }
@@ -87,6 +88,7 @@ ipcMain.handle('move:run', async (event, input) => {
       saveConfig: savePostgresConfig,
       tmpDir: path.join(os.tmpdir(), 'xiv-fleet-move'),
     }, (steps) => { if (!event.sender.isDestroyed()) event.sender.send('move:progress', steps); });
+    (result.ok ? console.log : console.error)(stepsText('Moving the database here', result));
     return { ok: result.ok, error: result.error || null, steps: result.steps, to: result.to || null };
   } catch (err) {
     return { ok: false, error: err.message, steps: [] };

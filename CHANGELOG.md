@@ -3,6 +3,21 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 0.36.0 - 2026-10-19
+
+No database or plugin change.
+
+- **Restore from a file...** (Settings → Backups) restores a backup kept anywhere, such as a USB drive or another PC's
+  backup folder. It checks the file is really a backup of the app's database first, and backs up the database as it
+  is now before restoring, as Restore does.
+- **If the database PC dies:** the README says how to get everything back on another PC from a backup. Tested from
+  start to finish: a backup from one server restored onto a brand-new database on another, every table and row back.
+- **The app keeps a log:** what it does (database updates, Set up this PC, moving the database, Remove everything,
+  restores, update checks) and any errors go to `app.log` in its settings folder. Never more than two small files,
+  and never a password.
+- **Found a problem?** in Settings → Setup Help: a button to report it on the app's GitHub page, the app's version to
+  copy, what to include, and **Open the log folder**.
+
 ## 0.35.5 - 2026-10-19
 
 No database or plugin change.

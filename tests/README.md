@@ -31,6 +31,7 @@ node tests/db/verify-metric-window.js        # the Subs, Supplies and Income his
 node tests/db/verify-venture-totals.js       # venture rewards and their value worked out by the database (uses venture_totals_check)
 MOVE_NEW_PORT=5433 node tests/db/verify-database-move.js   # moving the database between two servers (uses move_db* and move_app)
 node tests/db/verify-leftovers.js           # finding and removing what a move leaves behind (uses lo_*)
+REBUILD_NEW_PORT=5433 node tests/db/verify-rebuild.js  # restoring a backup onto a new PC's database (uses rebuild_*)
 ```
 
 The move test needs a **second** test PostgreSQL on `localhost` at `MOVE_NEW_PORT` (5433 by default), with the same

@@ -5,6 +5,7 @@ const SETUP_HELP_PAGES = [
   { key: 'connect', label: 'Connect another PC' },
   { key: 'plugin', label: 'The plugin' },
   { key: 'tailscale', label: 'Tailscale' },
+  { key: 'problem', label: 'Found a problem?' },
 ];
 
 function SetupCopy({ text, label = 'Copy' }) {
@@ -44,8 +45,49 @@ function SetupHelpSection() {
       {details && page === 'connect' && <SetupConnect details={details} />}
       {details && page === 'plugin' && <SetupPlugin details={details} onConnect={() => setPage('connect')} />}
       {details && page === 'tailscale' && <SetupTailscale details={details} />}
+      {page === 'problem' && <SetupProblem />}
       <RemoveEverything />
     </section>
+  );
+}
+
+// Found a problem?: where to report it (the app's GitHub page), what to include, and the app's log
+// (app-log.js), which says what the app did and any errors.
+function SetupProblem() {
+  const [info, setInfo] = useState(null);
+  const [status, setStatus] = useState('');
+  useEffect(() => { window.api.getProblemInfo().then(setInfo); }, []);
+  if (!info) return <div className="status">Loading...</div>;
+  const summary = `XIV Fleet Companion ${info.version} on ${info.system}`;
+  const openLogs = async () => {
+    const r = await window.api.openLogFolder();
+    setStatus(r && r.success ? '' : (r && r.error) || 'The log folder could not be opened.');
+  };
+  return (
+    <div className="setup-steps setup-problem">
+      <p>If something isn't working, or looks wrong, report it on the app's GitHub page. It's for the app and the
+        plugin alike, and you'll need a free GitHub account.</p>
+      <div className="settings-row">
+        <button className="problem-report" onClick={() => window.api.reportProblem()}>Report a problem</button>
+      </div>
+      <h4>What to include</h4>
+      <ul>
+        <li>What you did, what you expected, and what happened instead.</li>
+        <li>
+          This app's version: <SetupLine text={summary} />
+        </li>
+        <li>The plugin's version on each PC: on the PCs tab, or in the title of the plugin's window in the game.</li>
+        <li>For something about the plugin or the game: type <code>/xivfleet check</code> in the game, click
+          <strong> Copy results</strong> and paste them in.</li>
+        <li>The app's log: <code>app.log</code> in the log folder. It says what the app did and any errors, and never
+          has passwords in it.</li>
+      </ul>
+      <div className="settings-row">
+        <button className="problem-logs" onClick={openLogs}>Open the log folder</button>
+        <span className="alerts-help">{info.logFolder}</span>
+        {status && <span className="save-status">{status}</span>}
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 // Settings → Backups: choose a folder, "Back up now" (with the real pg_dump, found on the PATH here), the
 // backup listed, Test (loads it into a temporary database), Restore (a change made after the backup is
-// undone, after a backup of how it was), and the command-line backup the daily scheduled task runs.
+// undone, after a backup of how it was), Restore from a file (a backup kept anywhere else; a file that isn't one
+// is turned down), and the command-line backup the daily scheduled task runs.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -59,6 +60,24 @@ module.exports = async (t) => {
   check(JSON.stringify(after) === JSON.stringify(before), 'and the rest is as it was');
   check(await rows() === 2, 'the database as it was before restoring is backed up first (two backups listed)');
 
+  // Restore from a file: Windows' file window is skipped here (XIV_FLEET_TEST_PICK_FILE names the file).
+  fs.writeFileSync(PICK, 'not a backup');
+  await click('Restore from a file...');
+  await waitStatus(/isn't a backup of the app's database, so it can't be restored/, 'a file that is not a backup is turned down', 30000);
+  check(!(await ev(`!!document.querySelector('.backups-confirm')`)), 'and nothing is asked or restored');
+  const oldest = fs.readdirSync(folder).filter((f) => f.endsWith('.dump')).sort()[0];
+  fs.copyFileSync(path.join(folder, oldest), PICK);
+  await t.query(`INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('ui_backup_marker', 'before the file restore')
+    ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value`);
+  await click('Restore from a file...');
+  await waitFor(`!!document.querySelector('.backups-confirm')`, 'the question for the picked file', 30000);
+  const asked = await ev(`document.querySelector('.backups-confirm h2').innerText`);
+  check(asked.startsWith(`Restore ${path.basename(PICK)} (`), `it names the file: ${asked}`);
+  await click('Restore', `document.querySelector('.backups-confirm')`);
+  await waitStatus(/^Restored\./, 'the restore from a file', 300000);
+  check((await t.query(`SELECT 1 FROM tier3_settings WHERE setting_key = 'ui_backup_marker'`)).length === 0, 'the file restore put the database back too');
+  check(await rows() === 3, 'and backed up how it was first');
+
   // The daily scheduled task's run: no window, one more backup, recorded for Settings.
   const code = await new Promise((resolve) => {
     const child = spawn(require('electron'), [path.join(__dirname, '..', 'launcher.js'), '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--fleet-backup'], {
@@ -68,9 +87,14 @@ module.exports = async (t) => {
     child.on('exit', (c) => { clearTimeout(timer); resolve(c); });
   });
   check(code === 0, `the command-line backup finishes by itself (exit ${code})`);
-  check(fs.readdirSync(folder).filter((f) => f.endsWith('.dump')).length === 3, 'and adds a backup');
+  check(fs.readdirSync(folder).filter((f) => f.endsWith('.dump')).length === 4, 'and adds a backup');
   const saved = JSON.parse(fs.readFileSync(path.join(t.profile, 'backups.json'), 'utf8'));
   check(saved.last && saved.last.ok === true && saved.folder === folder, 'its result is recorded for Settings');
   await t.shot('backups');
   fs.rmSync(folder, { recursive: true, force: true });
+  fs.rmSync(PICK, { force: true });
 };
+
+// The file "Restore from a file" picks, instead of Windows' file window.
+const PICK = path.join(os.tmpdir(), 'fleet-ui-picked backup.dump');
+module.exports.env = () => ({ XIV_FLEET_TEST_PICK_FILE: PICK });

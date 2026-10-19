@@ -166,6 +166,17 @@ async function testBackup({ tools, config, file }) {
   }
 }
 
+// Whether `file` is a backup pg_restore can read (any name, anywhere: for "Restore from a file", such as a
+// copy on a USB drive after the database PC is lost). Returns { ok } or { ok: false, message }.
+async function checkBackupFile({ tools, file }) {
+  if (!file || !fs.existsSync(file)) return { ok: false, message: `${file || 'That file'} is not there.` };
+  const r = await run(tools.restore, ['--list', file]);
+  if (!r.ok || !/companion_character_current/.test(r.stdout || '')) {
+    return { ok: false, message: `${path.basename(file)} isn't a backup of the app's database, so it can't be restored.` };
+  }
+  return { ok: true };
+}
+
 // Puts the database back as it was in `file`: first a backup of how it is now (so this can be undone),
 // then pg_restore --clean in one transaction, so a failure part way changes nothing. Tables made after
 // that backup are kept. Returns { ok, safety: <the backup made first>, message }.
@@ -181,4 +192,4 @@ async function restoreBackup({ tools, config, settings, file }) {
   return { ok: true, safety, message: `Restored. The database as it was just before is saved as ${path.basename(safety.file)}.` };
 }
 
-module.exports = { backupNow, testBackup, restoreBackup, writeLog, TEST_DATABASE };
+module.exports = { backupNow, testBackup, checkBackupFile, restoreBackup, writeLog, TEST_DATABASE };
