@@ -1,8 +1,9 @@
 {
   "name": "xiv-fleet-companion",
-  "version": "0.35.4",
+  "version": "0.35.5",
   "description": "XIV Fleet Companion: your FFXIV submarines, retainers and gil across every account",
   "main": "main.js",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "esbuild \"renderer/*.jsx\" --outdir=renderer --target=es2022 --sourcemap",
     "prestart": "npm run build",
@@ -40,6 +41,7 @@
       "!dist/**",
       "!.github/**",
       "!*.md",
+      "LICENSE.md",
       "!config.json"
     ],
     "win": {

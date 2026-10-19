@@ -219,6 +219,12 @@ too, and keep the app.
   one can't connect to its new address. Check Tailscale is running on both PCs. The app keeps trying every minute.
 - **Something else?** In the game, type `/xivfleet check` to see what the plugin can and can't see on that PC.
 
+## License
+
+XIV Fleet Companion is free software under the [GNU Affero General Public License v3](LICENSE.md), the same as the
+plugin. You can use it, share it and change it. If you share a changed version, share its code under the same license.
+It comes with no warranty.
+
 ---
 
 ## For developers
