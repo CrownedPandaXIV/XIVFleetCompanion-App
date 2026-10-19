@@ -3,6 +3,13 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 0.35.5 - 2026-10-19
+
+No database or plugin change.
+
+- The app is now free software under the GNU Affero General Public License v3, the same license as the plugin. The
+  license comes with the app and is in the README.
+
 ## 0.35.4 - 2026-10-19
 
 No database change. **Needs plugin 0.14.0 or newer:** the PCs tab now flags older ones, since they can't follow a
