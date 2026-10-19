@@ -35,12 +35,15 @@ module.exports = async (t) => {
     return tr ? Object.fromEntries([...tr.children].map((td, i) => [heads[i], td.innerText.trim()])) : null;
   })()`);
   const hull = await part('Whale-class Hull');
-  check(hull && hull['market board'] === '600,000 gil (Halicarnassus)', 'the cheapest on the data center, and its world: ' + JSON.stringify(hull));
+  // One hull is listed and 320 are wanted: the total counts that one, and the cell says so. Each part's
+  // listings (1 hull at 600,000, 1 bridge at 1, 99 of Bridge 2 at 100) add up to 609,901.
+  check(hull && hull['market board'] === '600,000 gil (Halicarnassus) · only 1 of 320 listed', 'the cheapest on the data center, its world, and too few listed: ' + JSON.stringify(hull));
   check(hull && /^[\d,]+ gil$/.test(hull['to make']) && hull.cheaper === 'Make', 'cheaper to make: ' + JSON.stringify(hull));
   const bridge = await part('Whale-class Bridge');
-  check(bridge && bridge['market board'] === '1 gil (Maduin)' && bridge.cheaper === 'Buy', 'cheaper to buy: ' + JSON.stringify(bridge));
+  check(bridge && bridge['market board'].startsWith('1 gil (Maduin)') && bridge.cheaper === 'Buy', 'cheaper to buy: ' + JSON.stringify(bridge));
   const note = await ev(`[...document.querySelectorAll('.shopping-list .shopping-note')].map(e => e.innerText).find(t => t.startsWith('Market board prices')) || ''`);
-  check(/^Market board prices from Dynamis/.test(note) && /Buying the parts not made yet: [\d,]+ gil/.test(note) && /Buying every material still short: [\d,]+ gil/.test(note),
+  check(/^Market board prices from Dynamis/.test(note) && /Totals go up the listings from the cheapest/.test(note)
+    && /Buying the parts not made yet: 609,901 gil \(3 with too few listed\)/.test(note) && /Buying every material still short: [\d,]+ gil/.test(note),
     'where the prices are from and the totals: ' + note);
   const gatherHeads = await ev(`[...document.querySelectorAll('.shopping-gather thead th')].map(th => th.innerText.trim().toLowerCase())`);
   check(gatherHeads.some((h) => h.startsWith('market board')), 'materials have a market board column too: ' + JSON.stringify(gatherHeads));
@@ -52,7 +55,7 @@ module.exports = async (t) => {
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'world:Maduin');
     s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor(`(() => { const s = document.querySelector('.shopping-list select'); return s && s.value === 'world:Maduin'; })()`, 'Maduin chosen', 30000);
-  await waitFor(`[...document.querySelectorAll('.shopping-parts tbody td')].some(td => td.innerText.trim() === '650,000 gil')`, "Maduin's price", 30000);
+  await waitFor(`[...document.querySelectorAll('.shopping-parts tbody td')].some(td => td.innerText.trim().startsWith('650,000 gil ·'))`, "Maduin's price", 30000);
   check(await ev(`localStorage.getItem('shoppingPriceScope')`) === 'world:Maduin', 'remembered');
   check(asked.some((u) => u.startsWith('/api/v2/Maduin/')), 'asked Universalis for Maduin');
 
@@ -60,7 +63,7 @@ module.exports = async (t) => {
   await ev(`(() => { const s = document.querySelector('.shopping-list select');
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'region:North-America');
     s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await waitFor(`[...document.querySelectorAll('.shopping-parts tbody td')].some(td => td.innerText.trim() === '550,000 gil (Siren)')`, 'the NA price', 30000);
+  await waitFor(`[...document.querySelectorAll('.shopping-parts tbody td')].some(td => td.innerText.trim().startsWith('550,000 gil (Siren)'))`, 'the NA price', 30000);
   check(asked.some((u) => u.startsWith('/api/v2/North-America/')), 'asked Universalis for North America');
   await shot('shopping-market-region');
 };

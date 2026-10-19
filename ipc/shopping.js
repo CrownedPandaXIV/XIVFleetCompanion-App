@@ -15,7 +15,7 @@ const { normalizeKey } = require('../db/game-data');
 const { buildShoppingList } = require('../subs/shopping-list');
 const { computePartsNeeded, partItemId, lookAheadDays } = require('./parts');
 const { liveUniversalis } = require('./universalis');
-const { ownRetainerKeys, cheapestListing } = require('../characters/universalis');
+const { ownRetainerKeys, sellingListings } = require('../characters/universalis');
 const { priceChoices, priceList } = require('../subs/shopping-prices');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -261,8 +261,8 @@ async function withMarketPrices(client, list, { scope, recipes, vendor, ids }) {
   const oneWorld = chosen.kind === 'world' ? chosen.scope : undefined;
   const market = new Map();
   for (const [id, listings] of answer.listings) {
-    const best = cheapestListing(listings, { exclude, world: oneWorld });
-    if (best) market.set(id, { price: best.price, world: best.world || oneWorld || null });
+    const selling = sellingListings(listings, { exclude, world: oneWorld });
+    if (selling.length) market.set(id, { price: selling[0].price, world: selling[0].world, listings: selling });
   }
   return { ...priceList(list, { market, vendor, recipes }), market: { ...info, stale: answer.stale } };
 }

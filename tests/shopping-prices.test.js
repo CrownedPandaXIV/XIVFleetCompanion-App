@@ -2,7 +2,7 @@
 // way to get each item, and a sub part's market price against what it costs to make.
 const test = require('node:test');
 const assert = require('node:assert');
-const { priceChoices, costs, priceList } = require('../subs/shopping-prices');
+const { priceChoices, costs, buyingCost, priceList } = require('../subs/shopping-prices');
 
 const place = (name, dc, region) => [name.toLowerCase(), { name, dc, region }];
 const places = new Map([
@@ -51,22 +51,37 @@ test('the cheapest way to get one: market board, vendor, or making it from the c
   assert.strictEqual(none.cheapest(10), null);
 });
 
+test('buying several goes up the listings, cheapest first, and says when too few are listed', () => {
+  const listings = [{ price: 600, quantity: 1 }, { price: 750, quantity: 2 }, { price: 900, quantity: 5 }];
+  assert.deepStrictEqual(buyingCost(listings, 1), { gil: 600, got: 1 });
+  assert.deepStrictEqual(buyingCost(listings, 4), { gil: 600 + 2 * 750 + 900, got: 4 }, 'not 4 x 600');
+  assert.deepStrictEqual(buyingCost(listings, 10), { gil: 600 + 1500 + 4500, got: 8 }, 'only 8 listed');
+  assert.deepStrictEqual(buyingCost([], 3), { gil: 0, got: 0 });
+});
+
 test('each part: buy or make, and the totals for buying instead', () => {
   const list = {
-    parts: [{ itemId: 22528, crafts: 3, made: 1 }, { itemId: 22526, crafts: 2, made: 0 }],
+    parts: [{ itemId: 22528, crafts: 3, made: 0 }, { itemId: 22526, crafts: 2, made: 0 }],
     craft: [{ itemId: 1, make: 6 }],
     gather: [{ itemId: 10, short: 18 }, { itemId: 11, short: 4 }, { itemId: 12, short: 0 }],
     crystals: [{ itemId: 3, short: 10 }],
   };
-  const market = new Map([[22528, { price: 600, world: 'Halicarnassus' }], [10, { price: 100, world: 'Maduin' }], [3, { price: 5, world: 'Maduin' }], [20, { price: 50, world: 'Maduin' }]]);
+  const listed = (price, world, more = []) => ({ price, world, listings: [{ price, quantity: 1, world }, ...more] });
+  const market = new Map([
+    // Two bows: one at 600, one at 800; three are wanted.
+    [22528, listed(600, 'Halicarnassus', [{ price: 800, quantity: 1, world: 'Maduin' }])],
+    [10, { price: 100, world: 'Maduin', listings: [{ price: 100, quantity: 10 }, { price: 120, quantity: 99 }] }],
+    [3, { price: 5, world: 'Maduin', listings: [{ price: 5, quantity: 999 }] }],
+    [20, { price: 50, world: 'Maduin', listings: [{ price: 50, quantity: 99 }] }],
+  ]);
   const priced = priceList(list, { market, vendor: new Map(), recipes });
   const bow = priced.parts[0];
-  assert.deepStrictEqual([bow.market, bow.makeCost, bow.cheaper], [{ price: 600, world: 'Halicarnassus' }, 670, 'buy'],
-    'listed at 600, 2 x 305 + 50 + 10 = 670 to make');
-  assert.deepStrictEqual([priced.parts[1].market, priced.parts[1].makeCost, priced.parts[1].cheaper], [null, null, null], 'not listed, no recipe here');
-  assert.deepStrictEqual(priced.gather.map((r) => r.market && r.market.price), [100, null, null]);
+  assert.deepStrictEqual([bow.market.price, bow.makeCost, bow.cheaper], [600, 670, 'buy'], 'listed at 600, 2 x 305 + 50 + 10 = 670 to make');
+  assert.deepStrictEqual(bow.buying, { gil: 1400, got: 2, wanted: 3 }, 'only two listed: 600 + 800');
+  assert.deepStrictEqual([priced.parts[1].market, priced.parts[1].makeCost, priced.parts[1].cheaper, priced.parts[1].buying], [null, null, null, null]);
+  assert.deepStrictEqual(priced.gather[0].buying, { gil: 10 * 100 + 8 * 120, got: 18, wanted: 18 });
   assert.deepStrictEqual(priced.marketTotals, {
-    parts: 2 * 600, partsUnlisted: 1,       // two bows not made yet; the hull isn't listed
-    materials: 18 * 100 + 10 * 5, materialsUnlisted: 1,  // item 11 isn't listed; item 12 isn't short
+    parts: 1400, partsUnlisted: 1, partsTooFew: 1,
+    materials: 1960 + 10 * 5, materialsUnlisted: 1, materialsTooFew: 0,  // item 11 isn't listed; item 12 isn't short
   });
 });

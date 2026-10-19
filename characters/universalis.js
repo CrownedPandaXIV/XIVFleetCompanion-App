@@ -75,6 +75,16 @@ function cheapestListing(listings, { hq, exclude, world } = {}) {
   return best;
 }
 
+// Listings someone else is selling, cheapest first: [{ price, quantity, world }], by the same rules as
+// cheapestListing (either quality). For working out what buying several costs (the Shopping List's totals).
+function sellingListings(listings, { exclude, world } = {}) {
+  return (listings || [])
+    .filter((l) => Number(l.pricePerUnit) > 0)
+    .filter((l) => !(exclude && l.retainerName && exclude.has(retainerKey(l.retainerName, l.worldName || world))))
+    .map((l) => ({ price: Number(l.pricePerUnit), quantity: Math.max(1, Number(l.quantity) || 1), world: l.worldName || world || null }))
+    .sort((a, b) => a.price - b.price);
+}
+
 function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now() } = {}) {
   const cache = new Map(); // `${scope}|${id}` -> { at, listings }
   let places = null;
@@ -187,4 +197,4 @@ function scopePrices(market, scope, vendor, exclude, { hq = false } = {}) {
   return prices;
 }
 
-module.exports = { SETTING_KEY, SCOPES, REGION_LABELS, KNOWN_DATA_CENTERS, worldPlaces, parseItems, ownRetainerKeys, cheapestListing, createUniversalis, scopePrices };
+module.exports = { SETTING_KEY, SCOPES, REGION_LABELS, KNOWN_DATA_CENTERS, worldPlaces, parseItems, ownRetainerKeys, cheapestListing, sellingListings, createUniversalis, scopePrices };
