@@ -3,6 +3,19 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.2.0 - 2026-10-19
+
+No database or plugin change.
+
+- **Next Build from Fight Club** when a sub's Sub Rules have no change ahead: the first rank where Fight Club's
+  best option needs a different build and makes more gil a day, after repair kits, than the sub does now. For
+  example "WSUC+ at 92 · in 6d 4h", or "· now" when it is already unlocked. Hover says the route, its gil a day
+  after repair kits, and how much more that is than now. Your Sub Rules still come first wherever they say
+  something.
+- **Target Route picks the most gil a day after repair kits,** at your repair kit price, instead of Fight Club's
+  Gil/Hr column, which leaves repair kits out. Target Route, Next Build and the parts a Craft? sub needs (Parts,
+  Shopping List) now always agree.
+
 ## 1.1.0 - 2026-10-19
 
 No database or plugin change. More accurate with Submarine Tracker, but works without it.

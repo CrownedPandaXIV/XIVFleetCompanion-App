@@ -4,10 +4,10 @@ const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-sy
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const forecastVoyages = require('../subs/voyage-forecast');
-const { partLetter, computeTargetRoute, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
+const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
 const rankUp = require('../subs/rank-up');
 const { columnsByKey } = require('./shopping');
-const { targetBuildAt } = require('./parts');
+const { targetBuildAt, repairKitCostFrom, FIGHT_CLUB_COLUMNS } = require('./parts');
 
 const MEASURE_WINDOW_DAYS = 7;
 // How far back collections are looked at for a sub's bonus experience (its last few voyages).
@@ -52,17 +52,9 @@ async function loadSubmarines(client) {
 
   const { rankStatsById, partStatsByClassSlot } = await loadStatTables(client);
 
-  const fightClubResult = await client.query(`
-    SELECT route, hours, repair_times, gil_sub_day, gil_hr, rec_build_notes,
-           unmod_min_rank, min_rank_build
-    FROM fight_club_routes
-  `);
-  const fightClubRows = fightClubResult.rows;
-
-  const repairKitResult = await client.query(
-    `SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'`
-  );
-  const repairKitCost = repairKitResult.rows.length > 0 ? Number(repairKitResult.rows[0].setting_value) : 0;
+  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`)).rows;
+  const repairKitCost = await repairKitCostFrom(client);
+  const topRank = Math.max(0, ...[...rankStatsById.keys()].filter((r) => rankStatsById.get(r).speed !== null));
 
   const rows = result.rows.map((row) => {
     const partLetters = [row.part1, row.part2, row.part3, row.part4].map(partLetter);
@@ -84,6 +76,11 @@ async function loadSubmarines(client) {
       account_label: row.account_label,
       fc_id: row.fc_id,
       part_letters: partLetters,
+      // Fight Club's next more profitable build, for Next Build when the Sub Rules have nothing ahead.
+      fc_next_build: nextFightClubBuild({
+        rank, top: topRank, currentParts: partLetters, currentNet: currentGilDay === '' ? null : currentGilDay,
+        fightClubRows, repairKitCost, validRouteLetters,
+      }),
       rank,
       rank_progress_pct: rankProgressPct,
       current_setup: partLetters.join('-'),
@@ -216,7 +213,8 @@ async function addRankUps(client, subs) {
   const game = await loadRankUpGameData(client);
   const stats = await loadStatTables(client);
   const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules')).rows;
-  const fightClubRows = (await client.query('SELECT rec_build_notes, gil_hr FROM fight_club_routes')).rows;
+  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`)).rows;
+  const repairKitCost = await repairKitCostFrom(client);
   const top = rankUp.maxRank(game.expToNext);
 
   // Recorded rank and experience per slot (plugin 0.7.0), over the window plus the value before it.
@@ -241,8 +239,12 @@ async function addRankUps(client, subs) {
     const trip = typeof sub.speed === 'number' ? rankUp.voyage(sectors, start, sub.speed) : null;
     const returnAt = Number(sub.return_time) > 0 ? Number(sub.return_time) * 1000 : null;
 
-    const buildAt = (rank) => targetBuildAt({ rank, slot: sub.slot, cid, craftEnabled: sub.craft_enabled, rules, fightClubRows });
-    const switchTo = rankUp.nextBuildRank(sub.rank, top, buildAt);
+    const buildAt = (rank) => targetBuildAt({ rank, slot: sub.slot, cid, craftEnabled: sub.craft_enabled, rules, fightClubRows, repairKitCost });
+    // The Sub Rules (or, for a Craft? sub, Fight Club's build at each rank); when they have nothing ahead,
+    // Fight Club's next more profitable build.
+    const fromRules = rankUp.nextBuildRank(sub.rank, top, buildAt);
+    const fightClub = !fromRules && sub.fc_next_build && sub.fc_next_build.rank <= top ? sub.fc_next_build : null;
+    const switchTo = fromRules || fightClub;
     const untilRank = Math.min(top, Math.max(sub.rank + 1, switchTo ? switchTo.rank : 0));
 
     // This sub's bonus: each collection against the route of the voyages collected (SubmarineTracker's
@@ -259,7 +261,7 @@ async function addRankUps(client, subs) {
     // Its parts now, then its Sub Rules builds from the rank it switches (a blank in a rule keeps the part).
     const lettersAt = (rank) => {
       if (!switchTo || rank < switchTo.rank) return sub.part_letters;
-      const build = buildAt(rank) || [];
+      const build = (fightClub ? fightClub.build : buildAt(rank)) || [];
       return sub.part_letters.map((letter, i) => build[i] || letter);
     };
     const voyageAt = (rank) => {
@@ -300,10 +302,12 @@ async function addRankUps(client, subs) {
         build: switchTo.build.map((letter) => letter || '·').join(''),
         at: switchAt && switchAt.at ? switchAt.at : null,
         voyages: switchAt && switchAt.voyages ? switchAt.voyages : null,
+        fightClub: fightClub ? { route: fightClub.route, net: fightClub.net, gain: fightClub.gain } : null,
       } : null,
     };
     delete sub.points;
     delete sub.part_letters;
+    delete sub.fc_next_build;
   }
   return subs;
 }

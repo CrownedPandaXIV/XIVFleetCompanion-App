@@ -2,7 +2,7 @@
 const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
 const fcChestShare = require('../characters/fc-chest');
-const { partLetter, parseRankBuild } = require('../subs/submarine-builds');
+const { partLetter, bestFightClubOption } = require('../subs/submarine-builds');
 const { matchNeeds } = require('../subs/parts-matching');
 
 // Item ID -> {class, slot, modified} decoding for submarine spare parts.
@@ -57,31 +57,22 @@ function ruleAppliesToSlot(subFilter, slotNumber) {
 }
 
 
-// Among every Fight Club row whose Rec Build threshold this rank clears,
-// picks whichever has the highest Gil/Hr - same selection rule the
-// Target Route economics engine used, so the crafting queue always
-// agrees with whatever Target Route is displayed elsewhere.
-function computeTargetRouteParts(rank, fightClubRows) {
-  if (rank < 85) return null;
-  let best = null;
-  for (const row of fightClubRows) {
-    const recBuild = parseRankBuild(row.rec_build_notes);
-    if (!recBuild) continue;
-    if (rank < recBuild.rank) continue;
-    const gilHr = Number(row.gil_hr) || 0;
-    if (!best || gilHr > best.gilHr) best = { recBuild, gilHr };
-  }
-  if (!best) return null;
-  return best.recBuild.parts.map((p) => (p.modified ? `${p.letter}+` : p.letter));
+// The repair kit price set in Settings (0 when not set), for Fight Club's gil a day after repair kits.
+async function repairKitCostFrom(client) {
+  const { rows } = await client.query(`SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'`);
+  return rows.length > 0 ? Number(rows[0].setting_value) || 0 : 0;
 }
+
+// The columns of fight_club_routes that Fight Club's best option needs (subs/submarine-builds.js).
+const FIGHT_CLUB_COLUMNS = 'route, hours, repair_times, gil_sub_day, gil_hr, rec_build_notes, unmod_min_rank, min_rank_build';
 
 // The build a sub should have at a rank, as [hull, stern, bow, bridge] letters ('' where a rule leaves a
 // slot alone), or null when nothing applies. A sub marked Craft? from rank 85 follows Fight Club's best
 // route build; otherwise the highest Sub Rules rule at or below the rank for its slot (and character).
-function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows }) {
+function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, repairKitCost }) {
   if (craftEnabled && rank >= 85) {
-    const targetParts = computeTargetRouteParts(rank, fightClubRows);
-    if (targetParts) return targetParts;
+    const best = bestFightClubOption(rank, fightClubRows, repairKitCost);
+    if (best) return best.parts;
   }
   const applicable = rules.filter((r) => {
     if (rank < r.rank) return false;
@@ -130,9 +121,8 @@ async function computePartsNeeded(client) {
     SELECT cid, sub_name, craft_enabled FROM sub_craft_toggle
   `);
 
-  const fightClubResult = await client.query(`
-    SELECT rec_build_notes, gil_hr FROM fight_club_routes
-  `);
+  const fightClubResult = await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`);
+  const repairKitCost = await repairKitCostFrom(client);
 
   // Personal + retainer spares, with real retainer names resolved
   // dynamically via companion_retainer_lookup (no hardcoded data).
@@ -246,7 +236,7 @@ async function computePartsNeeded(client) {
 
       const craftEnabled = craftByCidSub.get(`${character.cid}|${subName}`) === true;
 
-      const target = targetBuildAt({ rank, slot, cid: character.cid, craftEnabled, rules: rulesResult.rows, fightClubRows });
+      const target = targetBuildAt({ rank, slot, cid: character.cid, craftEnabled, rules: rulesResult.rows, fightClubRows, repairKitCost });
       if (!target) continue;
       SLOT_KEYS.forEach((slotKey, i) => {
         const targetLetter = target[i];
@@ -398,4 +388,4 @@ ipcMain.handle('delete-sub-build-rule', async (event, id) => {
   });
 });
 
-module.exports = { computePartsNeeded, partItemId, targetBuildAt };
+module.exports = { computePartsNeeded, partItemId, targetBuildAt, repairKitCostFrom, FIGHT_CLUB_COLUMNS };
