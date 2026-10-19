@@ -30,8 +30,8 @@ test('the cheapest listing: by quality, leaving out your own retainers', () => {
 
 test('worlds belong to their data center and region (built-in list)', () => {
   const places = worldPlaces(KNOWN_DATA_CENTERS);
-  assert.deepStrictEqual(places.get('maduin'), { dc: 'Dynamis', region: 'North-America' });
-  assert.deepStrictEqual(places.get('ragnarok'), { dc: 'Chaos', region: 'Europe' });
+  assert.deepStrictEqual(places.get('maduin'), { name: 'Maduin', dc: 'Dynamis', region: 'North-America' });
+  assert.deepStrictEqual(places.get('ragnarok'), { name: 'Ragnarok', dc: 'Chaos', region: 'Europe' });
 });
 
 function fakeFetch(answers, calls) {

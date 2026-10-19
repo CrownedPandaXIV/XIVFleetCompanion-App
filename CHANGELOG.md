@@ -3,6 +3,16 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.1 - 2026-10-19
+
+No database or plugin change.
+
+- **Prices from on the Shopping List lists every world, data center and region,** not only where your
+  characters are, so you can price parts on another data center you could travel to. Worlds show their data
+  center, like "Maduin (Dynamis)", and your own regions come first. The list comes from Universalis, so new
+  worlds and data centers appear by themselves. It still starts on the data center with the most of your
+  characters.
+
 ## 1.4.0 - 2026-10-19
 
 No database or plugin change.

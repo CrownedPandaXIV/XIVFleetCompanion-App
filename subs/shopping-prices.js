@@ -4,27 +4,40 @@
 
 const { REGION_LABELS } = require('../characters/universalis');
 
-// The choices for "Prices from": each world the characters are on, those worlds' data centers and their
-// regions. worlds: [{ world, characters }]; places: Map lowercase world -> { dc, region } (universalis.js).
-// Returns { choices: [{ value, label, kind, scope }], fallback } where `scope` is the name Universalis takes
-// and `fallback` the data center with the most characters (else the first choice).
+// The choices for "Prices from": every world, data center and region Universalis knows (places: Map
+// lowercase world -> { name, dc, region }, universalis.js), plus any world a character is on that it doesn't.
+// Worlds are listed region by region (yours first) and data center by data center, each with its data center
+// ("Maduin (Dynamis)"). worlds: [{ world, characters }] the characters' worlds, for the starting choice. Returns
+// { choices: [{ value, label, kind, scope }], fallback } where `scope` is the name Universalis takes and
+// `fallback` the data center with the most characters (else a character's world, else the first choice).
 function priceChoices(worlds, places) {
-  const dcCount = new Map();
-  const regions = new Set();
-  const worldChoices = [];
-  for (const { world, characters } of [...worlds].sort((a, b) => String(a.world).localeCompare(String(b.world)))) {
-    if (!world) continue;
-    worldChoices.push({ value: `world:${world}`, label: world, kind: 'world', scope: world });
-    const place = places.get(String(world).toLowerCase());
-    if (!place) continue;
-    if (place.dc) dcCount.set(place.dc, (dcCount.get(place.dc) || 0) + (Number(characters) || 0));
-    if (place.region) regions.add(place.region);
+  // Regions with the most of your characters first, then the rest alphabetically.
+  const regionCount = new Map();
+  for (const { world, characters } of worlds) {
+    const place = world ? places.get(String(world).toLowerCase()) : null;
+    if (place && place.region) regionCount.set(place.region, (regionCount.get(place.region) || 0) + (Number(characters) || 0));
   }
-  const dcChoices = [...dcCount.keys()].sort().map((dc) => ({ value: `dc:${dc}`, label: dc, kind: 'dc', scope: dc }));
-  const regionChoices = [...regions].sort().map((region) => ({ value: `region:${region}`, label: REGION_LABELS[region] || region, kind: 'region', scope: region }));
+  const byRegion = (a, b) => (regionCount.get(b) || 0) - (regionCount.get(a) || 0) || String(a).localeCompare(String(b));
+  const known = [...places.values()].filter((p) => p && p.name)
+    .sort((a, b) => byRegion(a.region, b.region) || String(a.dc).localeCompare(String(b.dc)) || a.name.localeCompare(b.name));
+  const worldChoices = known.map((p) => ({ value: `world:${p.name}`, label: p.dc ? `${p.name} (${p.dc})` : p.name, kind: 'world', scope: p.name }));
+  const unknown = worlds.map((w) => w.world).filter((w) => w && !places.has(String(w).toLowerCase())).sort();
+  for (const world of new Set(unknown)) worldChoices.push({ value: `world:${world}`, label: world, kind: 'world', scope: world });
+
+  const dcs = [...new Set(known.map((p) => p.dc).filter(Boolean))];
+  const regions = [...new Set(known.map((p) => p.region).filter(Boolean))];
+  const dcChoices = dcs.map((dc) => ({ value: `dc:${dc}`, label: dc, kind: 'dc', scope: dc }));
+  const regionChoices = regions.map((region) => ({ value: `region:${region}`, label: REGION_LABELS[region] || region, kind: 'region', scope: region }));
   const choices = [...worldChoices, ...dcChoices, ...regionChoices];
+
+  const dcCount = new Map();
+  for (const { world, characters } of worlds) {
+    const place = world ? places.get(String(world).toLowerCase()) : null;
+    if (place && place.dc) dcCount.set(place.dc, (dcCount.get(place.dc) || 0) + (Number(characters) || 0));
+  }
   const busiest = [...dcCount].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
-  return { choices, fallback: busiest ? `dc:${busiest[0]}` : (choices[0] ? choices[0].value : null) };
+  const ownWorld = unknown[0] ? `world:${unknown[0]}` : null;
+  return { choices, fallback: busiest ? `dc:${busiest[0]}` : (ownWorld || (choices[0] ? choices[0].value : null)) };
 }
 
 // Gil for one of each item, the cheapest way: a market board listing, a vendor, or making it from its recipe
