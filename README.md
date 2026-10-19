@@ -73,7 +73,9 @@ If Tailscale is involved, the app then opens Tailscale's sign-in page. Use the s
 At the end it shows what to type on your other PCs, and how to install the plugin.
 
 You can run it again any time from **Settings → Setup Help → Set up this PC**, for example to add Tailscale later.
-Uninstalling the app never removes PostgreSQL or your database.
+Uninstalling the app never removes PostgreSQL, your database or Tailscale, so you can take the app off the database
+PC and leave the database running for your other PCs. Uninstalling does remove the daily backup and Discord alert
+tasks on that PC, since they need the app; turn them on from another PC if you still want them.
 
 **Done with the app on a PC?** **Settings → Setup Help → Remove everything** takes it all off: the app, its settings,
 its scheduled tasks, and the database. It makes a final backup first if you want one, and asks you to type DELETE.
