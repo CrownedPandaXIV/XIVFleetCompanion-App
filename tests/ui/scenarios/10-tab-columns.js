@@ -3,7 +3,7 @@
 const columnTools = require('../columns-helpers');
 
 module.exports = async (t) => {
-  const { call, ev, sleep, waitFor, check, nav, clickText } = t;
+  const { call, ev, sleep, waitFor, check, nav } = t;
   const c = columnTools(t);
   await ev(`window.localStorage.clear()`);
   await call('Page.reload');
@@ -137,7 +137,6 @@ module.exports = async (t) => {
 
     // the tab's own controls still work in a moved layout
     if (spec.editTarget) {
-      const actionsDefault = (await c.headers()).indexOf('actions');
       await c.drag('actions', 'owner'); await sleep(300);
       check((await c.headers())[0] === 'actions', `${label}: the Actions column can be moved to the front`);
       await ev(`(() => {

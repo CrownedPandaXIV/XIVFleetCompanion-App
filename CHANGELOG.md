@@ -3,6 +3,19 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 0.36.2 - 2026-10-19
+
+No database change. Works with plugin 0.14.0 or newer.
+
+- **A tidier log:** the Discord alert check, which runs every 5 minutes, no longer writes two lines to the app's log
+  each time (it keeps its own alerts.log). Its warnings and errors still go to the app's log.
+- **Windows shows a publisher:** Installed apps lists the app as published by CrownedPandaXIV.
+- **"Report a problem" tags the report as a bug,** a label GitHub has, so reports are easy to find.
+- **Database Connection** instead of "Postgres Connection" in Settings → Database, as in the plugin and the guides.
+- Electron, the framework the app is built on, is updated to 44.9.0 with its latest security fixes.
+- Removed two leftover lookups nothing used any more, and unused names in the tests.
+- README: the Parts row says where the build rules are (**Show Rules**), and the developer notes list the newer files.
+
 ## 0.36.1 - 2026-10-19
 
 No database or plugin change.

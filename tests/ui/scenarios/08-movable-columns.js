@@ -30,7 +30,6 @@ module.exports = async (t) => {
       await sleep(200);
     }
   };
-  const shownInMenu = () => ev(`[...document.querySelectorAll('.column-chooser-row[data-column]')].map(r => r.querySelector('span').innerText.trim().toLowerCase())`);
   const addable = () => ev(`[...document.querySelectorAll('.column-chooser-row[data-add]')].map(r => r.querySelector('span').innerText.trim())`);
   const removeFromMenu = (key) => ev(`document.querySelector('.column-chooser-row[data-column=${JSON.stringify(key)}] button[title^="Remove"]').click()`);
   const addFromMenu = (key) => ev(`document.querySelector('.column-chooser-row[data-add=${JSON.stringify(key)}] button').click()`);

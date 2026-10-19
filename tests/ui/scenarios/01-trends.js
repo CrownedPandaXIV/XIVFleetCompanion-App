@@ -1,5 +1,5 @@
 module.exports = async (t) => {
-  const { call, ev, sleep, waitFor, shot, check, clickText, nav, setSelect, chartReady } = t;
+  const { call, ev, sleep, waitFor, shot, check, clickText, setSelect, chartReady } = t;
   await waitFor(`document.querySelectorAll('.sidebar-button').length>0`, 'sidebar');
   check((await ev(`[...document.querySelectorAll('.sidebar-button')].map(b=>b.innerText.trim()).includes('Trends')`)), 'Trends appears in the sidebar');
   await clickText('.sidebar-button', 'Trends');

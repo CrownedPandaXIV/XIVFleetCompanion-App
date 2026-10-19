@@ -1,6 +1,6 @@
 // Shared helpers for UI scenarios that exercise the column system (move, remove, add, reset) on any table.
 module.exports = function columnTools(t) {
-  const { call, ev, sleep, waitFor } = t;
+  const { ev, sleep, waitFor } = t;
   const clean = `.innerText.trim().toLowerCase().replace(/[\\u25B2\\u25BC]/g,'').trim()`;
   const q = JSON.stringify;
 

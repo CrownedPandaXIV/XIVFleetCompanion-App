@@ -95,7 +95,6 @@ contextBridge.exposeInMainWorld('api', {
   getRepairKitCost: () => invoke('settings:get-repair-kit-cost'),
   saveRepairKitCost: (value) => invoke('settings:save-repair-kit-cost', value),
   setCraftEnabled: (payload) => invoke('set-craft-enabled', payload),
-  getSpareParts: () => invoke('get-spare-parts'),
   getPartsNeeded: () => invoke('get-parts-needed'),
   getShoppingList: (options) => invoke('get-shopping-list', options),
   getSupplies: () => invoke('get-supplies'),
@@ -184,7 +183,6 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('setup:remove-progress', listener);
   },
   getMoveInfo: () => invoke('move:info'),
-  getMoveSteps: () => invoke('move:steps'),
   moveDatabase: (input) => invoke('move:run', input),
   onMoveProgress: (callback) => {
     const listener = (event, steps) => callback(steps);

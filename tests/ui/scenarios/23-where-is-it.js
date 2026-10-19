@@ -8,7 +8,7 @@ const CAL = '18014498578000002';
 const DARA = '18014498578000003';
 
 module.exports = async (t) => {
-  const { ev, sleep, waitFor, check, nav, clickText, shot } = t;
+  const { ev, sleep, waitFor, check, nav, shot } = t;
   await ev(`window.localStorage.clear()`);
   await nav('Inventory');
   await waitFor(`[...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Where Is It?' && b.disabled)`, 'Where Is It? to open first', 20000);

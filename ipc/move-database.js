@@ -13,7 +13,7 @@ const { DOWNLOADS, downloadFor, downloadOnce, postgresOptions } = require('../se
 const { downloadDir } = require('../setup/run-setup');
 const { recordInstalled } = require('../setup/remove-everything');
 const { findTools, run } = require('../backups/tools');
-const { addressChoices, checkOld, stepsFor, moveDatabase } = require('../setup/move-database');
+const { addressChoices, checkOld, moveDatabase } = require('../setup/move-database');
 const { stepsText } = require('../app-log');
 
 function savedConfig() {
@@ -45,7 +45,6 @@ ipcMain.handle('move:info', async () => {
   return { ...info, check: { ok: check.ok, error: check.error, blocking: check.blocking, notes: check.notes } };
 });
 
-ipcMain.handle('move:steps', async () => stepsFor({ installPostgres: !(await postgresHere()) }));
 
 let running = false;
 ipcMain.handle('move:run', async (event, input) => {

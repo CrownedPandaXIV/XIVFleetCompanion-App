@@ -54,3 +54,15 @@ test('console output goes to the log as well as being printed', () => {
   assert.deepStrictEqual(printed, [['log', 'hello', 1], ['error', 'Could not update the database:', 'no rights'], ['warn', 'careful']]);
   assert.deepStrictEqual(written, [['info', 'hello', 1], ['error', 'Could not update the database:', 'no rights'], ['warn', 'careful']]);
 });
+
+test('the alert check (every 5 minutes, with its own alerts.log) sends only warnings and errors to the log', () => {
+  const printed = [];
+  const fake = { log: (...a) => printed.push(['log', ...a]), info: (...a) => printed.push(['info', ...a]), warn: (...a) => printed.push(['warn', ...a]), error: (...a) => printed.push(['error', ...a]) };
+  const written = [];
+  captureConsole({ write: (level, args) => written.push([level, ...args]) }, fake, { onlyProblems: true });
+  fake.log('[alerts] Checked: nothing new.');
+  fake.info('more');
+  fake.error('Alert check failed:', 'no database');
+  assert.strictEqual(printed.length, 3);
+  assert.deepStrictEqual(written, [['error', 'Alert check failed:', 'no database']]);
+});
