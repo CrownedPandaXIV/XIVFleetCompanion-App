@@ -70,8 +70,41 @@ const SHOPPING_MARKET_DEF = {
   key: 'market', label: 'Market board', cell: (r, ctx) => <ShoppingMarketPrice listed={r.market} buying={r.buying} kind={ctx && ctx.marketKind} />,
   sort: (r) => (r.market ? r.market.price : Infinity),
 };
-const SHOPPING_CRAFT_MARKET_DEFS = [...SHOPPING_CRAFT_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_CRAFT_DEFS[SHOPPING_CRAFT_DEFS.length - 1]];
-const SHOPPING_GATHER_MARKET_DEFS = [...SHOPPING_GATHER_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_GATHER_DEFS[SHOPPING_GATHER_DEFS.length - 1]];
+// Live Market Prices on: the cheapest way to get one, as To make counts it.
+const SHOPPING_SOURCE_LABELS = { vendor: 'Vendor', market: 'Market board', make: 'Make' };
+const SHOPPING_CHEAPEST_DEF = {
+  key: 'cheapest', label: 'Cheapest',
+  cell: (r) => (r.cheapest ? SHOPPING_SOURCE_LABELS[r.cheapest] : <span className="shopping-note" title="Not sold by a vendor or listed there, and no price to make it from.">—</span>),
+  sort: (r) => r.cheapest || '',
+};
+const SHOPPING_CRAFT_MARKET_DEFS = [...SHOPPING_CRAFT_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_CHEAPEST_DEF, SHOPPING_CRAFT_DEFS[SHOPPING_CRAFT_DEFS.length - 1]];
+const SHOPPING_GATHER_MARKET_DEFS = [...SHOPPING_GATHER_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_CHEAPEST_DEF, SHOPPING_GATHER_DEFS[SHOPPING_GATHER_DEFS.length - 1]];
+
+// The To make hover: one line per ingredient and where it comes from, one level deeper for ones that are made.
+// "Test Ingot ×2: 305 gil each (make: Test Ore ×3 at 100 gil from the market board, Fire Shard ×1 at 5 gil from the vendor)"
+function shoppingAmount(n) {
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function shoppingWhere(line, kind) {
+  if (line.how === 'vendor') return 'from the vendor';
+  if (line.how === 'market') return `from the market board${kind !== 'world' && line.world ? ` (${line.world})` : ''}`;
+  return 'made';
+}
+function shoppingMakeTitle(breakdown, kind) {
+  if (!breakdown) return SHOPPING_MAKE_COST_TITLE;
+  const lines = breakdown.map((line) => {
+    const head = `${line.name} ×${shoppingAmount(line.amount)}`;
+    if (line.each === null) return `${head}: no price (not sold by a vendor or listed there)`;
+    if (line.how === 'make' && line.parts) {
+      const parts = line.parts.map((p) => (p.each === null
+        ? `${p.name} ×${shoppingAmount(p.amount)} with no price`
+        : `${p.name} ×${shoppingAmount(p.amount)} at ${shoppingGil(Math.round(p.each))} ${shoppingWhere(p, kind)}`));
+      return `${head}: ${shoppingGil(Math.round(line.each))} each (make: ${parts.join(', ')})`;
+    }
+    return `${head}: ${shoppingGil(Math.round(line.each))} each ${shoppingWhere(line, kind)}`;
+  });
+  return `${SHOPPING_MAKE_COST_TITLE}\n\n${lines.join('\n')}`;
+}
 
 // One section (tableKey keeps each section's columns apart).
 function ShoppingTable({ title, note, rows, kind, showHeld, className, tableKey, market }) {
@@ -185,8 +218,8 @@ const SHOPPING_PART_MARKET_DEFS = [
   SHOPPING_MARKET_DEF,
   {
     key: 'makeCost', label: 'To make',
-    cell: (p) => (p.makeCost !== null && p.makeCost !== undefined
-      ? <span title={SHOPPING_MAKE_COST_TITLE}>{shoppingGil(p.makeCost)}</span>
+    cell: (p, ctx) => (p.makeCost !== null && p.makeCost !== undefined
+      ? <span className="shopping-make-cost" title={shoppingMakeTitle(p.makeBreakdown, ctx && ctx.marketKind)}>{shoppingGil(p.makeCost)}</span>
       : <span className="shopping-note" title="Some of its materials have no price: not sold by a vendor or listed there.">—</span>),
     sort: (p) => (p.makeCost === null || p.makeCost === undefined ? Infinity : p.makeCost),
   },

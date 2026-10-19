@@ -85,3 +85,21 @@ test('each part: buy or make, and the totals for buying instead', () => {
     materials: 1960 + 10 * 5, materialsUnlisted: 1, materialsTooFew: 0,  // item 11 isn't listed; item 12 isn't short
   });
 });
+
+test('where each price comes from: vendor, market board or making it, and the To make breakdown', () => {
+  const { makeBreakdown } = require('../subs/shopping-prices');
+  const market = new Map([[10, { price: 100, world: 'Maduin' }], [3, { price: 5, world: 'Halicarnassus' }], [20, { price: 50, world: 'Maduin' }]]);
+  const vendor = new Map([[20, 40], [3, 5]]);
+  const { source } = costs({ market, vendor, recipes });
+  assert.deepStrictEqual(source(20), { gil: 40, how: 'vendor', world: null }, 'the vendor is cheaper');
+  assert.deepStrictEqual(source(3), { gil: 5, how: 'vendor', world: null }, 'a tie goes to the vendor');
+  assert.deepStrictEqual(source(10), { gil: 100, how: 'market', world: 'Maduin' });
+  assert.deepStrictEqual(source(1), { gil: 305, how: 'make', world: null }, 'an Ingot is only priced by making it');
+  const names = new Map([[1, 'Ingot'], [2, 'Lumber'], [3, 'Fire Shard'], [10, 'Ore'], [20, 'Log']]);
+  const lines = makeBreakdown(22528, { source, recipes, nameOf: (id) => names.get(id) });
+  assert.deepStrictEqual(lines.map((l) => [l.name, l.amount, l.each, l.how]), [['Ingot', 2, 305, 'make'], ['Lumber', 1, 40, 'make'], ['Fire Shard', 2, 5, 'vendor']]);
+  assert.deepStrictEqual(lines[0].parts.map((l) => [l.name, l.amount, l.each, l.how, l.world]), [['Ore', 3, 100, 'market', 'Maduin'], ['Fire Shard', 1, 5, 'vendor', null]]);
+  assert.deepStrictEqual(lines[1].parts.map((l) => [l.name, l.amount, l.how]), [['Log', 1, 'vendor']], '2 Logs make 2 Lumber: 1 Log each');
+  assert.strictEqual(lines[0].parts[0].parts, null, 'one level down only');
+  assert.strictEqual(makeBreakdown(10, { source, recipes, nameOf: String }), null, 'no recipe');
+});
