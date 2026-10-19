@@ -39,6 +39,20 @@ const PARTS_DETAIL_COLUMN_DEFS = [
   { key: 'needed', label: 'Needed', cell: (n) => needsLabel(n), sort: (r) => needsLabel(r) },
   { key: 'status', label: 'Status', cell: (n) => partStatus(n), sort: (r) => partStatus(r) }
 ];
+// With Look ahead on: when each part is due (its sub's next build), or now.
+const PARTS_DETAIL_AHEAD_COLUMN_DEFS = [
+  ...PARTS_DETAIL_COLUMN_DEFS,
+  { key: 'due', label: 'Due', cell: (n) => <PartDue need={n} />, sort: (r) => r.due_at || 0 }
+];
+
+// "now", or "in 4d 2h (Thu, Oct 23)" for a part of a build coming up.
+function PartDue({ need }) {
+  if (need.due_at === null || need.due_at === undefined) return <span title="Needed for the build it should have at its rank now.">now</span>;
+  const date = new Date(need.due_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  const until = formatTimeUntil(need.due_at);
+  const title = `For its next build at rank ${need.rank} (the Subs tab's Next Build)${until === 'now' ? ', which it can switch to already.' : `, about ${date}. An estimate: see Next Rank forecasts on the Subs tab for how close these come.`}`;
+  return <span title={title}>{until === 'now' ? 'now' : `${until} (${date})`}</span>;
+}
 const PARTS_DETAIL_DUPLICATE_EXTRAS = ['x_world'];
 
 function FlatPartsDetailTable({ needs, cols, sortColumn, sortDirection, onSortClick }) {
@@ -85,27 +99,35 @@ const PARTS_SUMMARY_COLUMN_DEFS = [
   { key: 'neededClass', label: 'Needed Class', cell: (e) => e.needed, sort: (e) => e.needed },
   { key: 'qty', label: 'Qty Still Needed', cell: (e) => e.qty, sort: (e) => e.qty }
 ];
+// With Look ahead on: what is needed now and what builds coming up need, side by side.
+const PARTS_SUMMARY_AHEAD_COLUMN_DEFS = [
+  ...PARTS_SUMMARY_COLUMN_DEFS.slice(0, 2),
+  { key: 'qty', label: 'Needed Now', cell: (e) => e.qty, sort: (e) => e.qty },
+  { key: 'ahead', label: 'Coming Up', cell: (e) => e.ahead, sort: (e) => e.ahead }
+];
 
-function PartsSummaryTable({ rows }) {
+function PartsSummaryTable({ rows, aheadDays }) {
   const partsSummarySort = useColumnSort();
-  const summaryCols = useTableColumns({ tableKey: 'partsSummary', ownDefs: PARTS_SUMMARY_COLUMN_DEFS, rows: null, idOf: () => null });
+  const summaryCols = useTableColumns({ tableKey: 'partsSummary', ownDefs: aheadDays ? PARTS_SUMMARY_AHEAD_COLUMN_DEFS : PARTS_SUMMARY_COLUMN_DEFS, rows: null, idOf: () => null });
 
   const craftNeeds = rows.filter((r) => !r.spare_location);
   const counts = new Map();
   for (const r of craftNeeds) {
     const key = `${r.slot}|${needsLabel(r)}`;
-    counts.set(key, (counts.get(key) || 0) + 1);
+    const entry = counts.get(key) || { qty: 0, ahead: 0 };
+    if (r.due_at === null || r.due_at === undefined) entry.qty += 1; else entry.ahead += 1;
+    counts.set(key, entry);
   }
-  let entries = Array.from(counts.entries()).map(([key, qty]) => {
+  let entries = Array.from(counts.entries()).map(([key, { qty, ahead }]) => {
     const [slot, needed] = key.split('|');
-    return { slot, needed, qty };
+    return { slot, needed, qty, ahead };
   });
 
   entries = partsSummarySort.sortColumn
     ? applyColumnSort(entries, partsSummarySort.sortColumn, partsSummarySort.sortDirection, summaryCols.accessors)
     : entries.sort((a, b) => {
         const slotDiff = SLOT_DISPLAY_ORDER.indexOf(a.slot) - SLOT_DISPLAY_ORDER.indexOf(b.slot);
-        return slotDiff !== 0 ? slotDiff : b.qty - a.qty;
+        return slotDiff !== 0 ? slotDiff : (b.qty + b.ahead) - (a.qty + a.ahead);
       });
 
   if (entries.length === 0) {
@@ -427,15 +449,32 @@ function SubRulesPanel() {
   );
 }
 
+const LOOK_AHEAD_CHOICES = [
+  { days: 0, label: 'Now only' },
+  { days: 3, label: '3 days' },
+  { days: 7, label: '7 days' },
+  { days: 14, label: '14 days' }
+];
+const LOOK_AHEAD_HELP = 'Also list the parts of each sub\'s next build (the Subs tab\'s Next Build) when it is due within this many days, ' +
+  'so they can be bought or crafted ahead of time. Spares go to what is needed now first. Applies to Summary, Detail and the Shopping List.';
+
 function PartsView({ refreshKey }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [subView, setSubView] = useState('summary'); // summary | detail | shopping
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
+  // Look ahead: also the parts of builds coming up within this many days (0: only what is needed now). Per PC.
+  const [aheadDays, setAheadDays] = useState(() => {
+    try { return LOOK_AHEAD_CHOICES.some((c) => c.days === Number(localStorage.getItem('partsLookAhead'))) ? Number(localStorage.getItem('partsLookAhead')) : 0; } catch { return 0; }
+  });
+  function chooseAhead(days) {
+    setAheadDays(days);
+    try { localStorage.setItem('partsLookAhead', String(days)); } catch { /* not remembered */ }
+  }
   const partsDetailSort = useColumnSort();
   const partsDetailCols = useTableColumns({
     tableKey: 'partsDetail',
-    ownDefs: PARTS_DETAIL_COLUMN_DEFS,
+    ownDefs: aheadDays ? PARTS_DETAIL_AHEAD_COLUMN_DEFS : PARTS_DETAIL_COLUMN_DEFS,
     subject: 'character',
     excludeExtras: PARTS_DETAIL_DUPLICATE_EXTRAS,
     rows,
@@ -465,14 +504,18 @@ function PartsView({ refreshKey }) {
   }, [rulesPanelWidth]);
 
   useEffect(() => {
-    window.api.getPartsNeeded().then((result) => {
+    let current = true;
+    window.api.getPartsNeeded({ aheadDays }).then((result) => {
+      if (!current) return;
       if (result.success) {
         setRows(sortRows(result.rows));
+        setError(null);
       } else {
         setError(result.error);
       }
     });
-  }, [refreshKey]);
+    return () => { current = false; };
+  }, [refreshKey, aheadDays]);
 
   // Plain mouse-drag resize, clamped so the panel can shrink enough to
   // avoid pushing the page into horizontal scroll, but not so far it
@@ -510,6 +553,12 @@ function PartsView({ refreshKey }) {
           <button onClick={() => setSubView('shopping')} disabled={subView === 'shopping'}>
             Shopping List
           </button>
+          <label style={{ marginLeft: '16px', whiteSpace: 'nowrap' }} title={LOOK_AHEAD_HELP}>
+            Look ahead{' '}
+            <select value={aheadDays} onChange={(e) => chooseAhead(Number(e.target.value))}>
+              {LOOK_AHEAD_CHOICES.map((c) => <option key={c.days} value={c.days}>{c.label}</option>)}
+            </select>
+          </label>
           {subView === 'detail' && !partsDetailSort.sortColumn && (
             <label style={{ marginLeft: '16px' }}>
               <input
@@ -533,12 +582,14 @@ function PartsView({ refreshKey }) {
           )}
         </div>
 
-        {subView === 'summary' && <PartsSummaryTable rows={rows} />}
+        {subView === 'summary' && <PartsSummaryTable rows={rows} aheadDays={aheadDays} />}
 
-        {subView === 'shopping' && <ShoppingListView refreshKey={refreshKey} />}
+        {subView === 'shopping' && <ShoppingListView refreshKey={refreshKey} aheadDays={aheadDays} />}
 
         {subView === 'detail' && rows.length === 0 && (
-          <div className="status">No needs found - every sub matches its target build.</div>
+          <div className="status">
+            {aheadDays ? 'No needs found - every sub matches its target build, with no new build due in that time.' : 'No needs found - every sub matches its target build.'}
+          </div>
         )}
 
         {subView === 'detail' && rows.length > 0 && partsDetailSort.sortColumn && (

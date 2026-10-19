@@ -9,11 +9,13 @@
 //   - with "buy from vendors" on, anything a gil shop sells (GilShopItem) is bought at its vendor price
 //     (Item.PriceMid) instead of being crafted or gathered.
 const { ipcMain } = require('electron');
-const { reconcileProgress, setProgress, parseProgress } = require('../subs/shopping-progress');
+const { reconcileByAhead, setProgress, parseProgress } = require('../subs/shopping-progress');
 const { withClient, snapshotFragments } = require('../db');
 const { normalizeKey } = require('../db/game-data');
 const { buildShoppingList } = require('../subs/shopping-list');
-const { computePartsNeeded, partItemId } = require('./parts');
+const { computePartsNeeded, partItemId, lookAheadDays } = require('./parts');
+
+const DAY = 24 * 60 * 60 * 1000;
 
 // Recipe.CraftType: which crafter makes it.
 const CRAFTERS = ['Carpenter', 'Blacksmith', 'Armorer', 'Goldsmith', 'Leatherworker', 'Weaver', 'Alchemist', 'Culinarian'];
@@ -228,23 +230,38 @@ async function writeProgress(client, progress) {
     [PROGRESS_KEY, JSON.stringify(progress)]);
 }
 
-// options: { buyFromVendors } - buy whatever a vendor sells instead of crafting or gathering it.
+// options: { buyFromVendors, aheadDays } - buy whatever a vendor sells instead of crafting or gathering it;
+// Look ahead on the Parts tab.
 ipcMain.handle('get-shopping-list', async (event, options = {}) => {
   return withClient(async (client) => {
-    // The sub parts the Parts tab says to craft (no spare, no old part to reuse).
-    const parts = new Map();
-    for (const need of await computePartsNeeded(client)) {
-      if (need.spare_location) continue;
-      const itemId = partItemId(need.needed_class, need.slot, need.needed_modified);
-      if (itemId) parts.set(itemId, (parts.get(itemId) || 0) + 1);
-    }
-    if (!parts.size) {
-      if (Object.keys(await readProgress(client)).length) await writeProgress(client, {});
+    // The sub parts the Parts tab says to craft (no spare, no old part to reuse). Ticks made with another
+    // look-ahead are checked against that look-ahead's list (shopping-progress.js), so parts are worked out
+    // once for the longest needed and each shorter list is the part of it due soon enough.
+    const ahead = lookAheadDays(options && options.aheadDays);
+    const stored = await readProgress(client);
+    const aheads = [...new Set([ahead, ...Object.values(stored).map((entry) => lookAheadDays(entry && entry.ahead))])];
+    const needs = await computePartsNeeded(client, { aheadDays: Math.max(...aheads) });
+    const now = Date.now();
+    const partsWithin = (days) => {
+      const parts = new Map();
+      for (const need of needs) {
+        if (need.spare_location) continue;
+        if (need.due_at !== null && need.due_at > now + days * DAY) continue;
+        const itemId = partItemId(need.needed_class, need.slot, need.needed_modified);
+        if (itemId) parts.set(itemId, (parts.get(itemId) || 0) + 1);
+      }
+      return parts;
+    };
+    const partsByAhead = new Map(aheads.map((days) => [days, partsWithin(days)]));
+    const parts = partsByAhead.get(ahead);
+    const longest = partsByAhead.get(Math.max(...aheads));
+    if (!longest.size) {
+      if (Object.keys(stored).length) await writeProgress(client, {});
       return { success: true, empty: true };
     }
 
     const columns = await recipeColumns(client);
-    const workshop = await loadWorkshopRecipes(client, [...parts.keys()]);
+    const workshop = await loadWorkshopRecipes(client, [...longest.keys()]);
     if (!columns || !workshop) {
       return {
         success: false,
@@ -254,14 +271,15 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
     const materials = new Set();
     for (const recipe of workshop.values()) recipe.ingredients.forEach((ing) => materials.add(ing.itemId));
     const recipes = new Map([...(await loadRecipes(client, columns, [...materials])), ...workshop]);
-    const allIds = new Set(parts.keys());
+    const allIds = new Set(longest.keys());
     for (const recipe of recipes.values()) recipe.ingredients.forEach((ing) => allIds.add(ing.itemId));
     const heldDetail = await loadHeld(client, [...allIds]);
     const held = new Map([...heldDetail].map(([id, entry]) => [id, entry.total]));
     const vendorPrices = await loadVendorPrices(client, [...allIds]);
     const buyFromVendors = !!(options && options.buyFromVendors) && !!vendorPrices;
     const buy = new Set(buyFromVendors ? vendorPrices.keys() : []);
-    const list = buildShoppingList({ parts, recipes, held, buy });
+    const lists = new Map([...partsByAhead].map(([days, these]) => [days, buildShoppingList({ parts: these, recipes, held, buy })]));
+    const list = lists.get(ahead);
 
     const names = await client.query('SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[])', [[...allIds].map(String)]);
     const nameById = new Map(names.rows.map((r) => [toInt(r.id), r.name]));
@@ -274,14 +292,15 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
     const bought = list.buy.map((entry) => ({ ...describe(entry), cost: entry.short * vendorPrices.get(entry.itemId) }));
 
     // Ticks for parts already crafted (shopping-progress.js), with any the plugin now sees taken back off.
-    const stored = await readProgress(client);
-    const progress = reconcileProgress(stored, list.parts);
+    const progress = reconcileByAhead(stored, new Map([...lists].map(([days, l]) => [days, l.parts])));
     if (JSON.stringify(progress) !== JSON.stringify(stored)) await writeProgress(client, progress);
+    if (!parts.size) return { success: true, empty: true };
+    const madeOf = (entry) => (progress[entry.itemId] ? Math.min(progress[entry.itemId].made, entry.crafts) : 0);
     return {
       success: true,
       vendorsLoaded: !!vendorPrices,
       buyFromVendors,
-      parts: list.parts.map((entry) => ({ ...describe(entry), made: progress[entry.itemId] ? progress[entry.itemId].made : 0 })),
+      parts: list.parts.map((entry) => ({ ...describe(entry), made: madeOf(entry) })),
       craft: list.craft.map(describe),
       gather: list.gather.map(describe),
       crystals: list.crystals.map(describe),
@@ -293,7 +312,7 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
   });
 });
 
-// { itemId, made, crafts }: how many of a part on the list have been crafted.
+// { itemId, made, crafts, aheadDays }: how many of a part on the list (looking that far ahead) have been crafted.
 ipcMain.handle('save-shopping-progress', async (event, input = {}) => {
   const itemId = Number(input.itemId);
   const crafts = Number(input.crafts);
@@ -302,7 +321,7 @@ ipcMain.handle('save-shopping-progress', async (event, input = {}) => {
     return { success: false, error: 'Not a part on the list.' };
   }
   return withClient(async (client) => {
-    await writeProgress(client, setProgress(await readProgress(client), itemId, made, crafts));
+    await writeProgress(client, setProgress(await readProgress(client), itemId, made, crafts, lookAheadDays(input.aheadDays)));
     return { success: true };
   }, (err) => ({ success: false, error: err.message }));
 });

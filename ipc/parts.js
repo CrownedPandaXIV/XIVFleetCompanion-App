@@ -3,7 +3,9 @@ const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
 const fcChestShare = require('../characters/fc-chest');
 const { partLetter, bestFightClubOption } = require('../subs/submarine-builds');
-const { matchNeeds } = require('../subs/parts-matching');
+const { takeSpare, matchFreed } = require('../subs/parts-matching');
+
+const DAY = 24 * 60 * 60 * 1000;
 
 // Item ID -> {class, slot, modified} decoding for submarine spare parts.
 // Real per-class item ID offset order, confirmed against the actual game
@@ -92,7 +94,9 @@ function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, re
 // flagged as an actual craft need. Port of the old n8n Parse Parts
 // Needed / Parse Spare Parts nodes, now reading real Postgres tables
 // instead of Sheets tabs and n8n cross-references.
-async function computePartsNeeded(client) {
+// aheadDays (Look ahead): also the parts of each sub's next build due within that many days, marked with
+// due_at; 0 for only what is needed now (the Summary, alerts and Discord always use 0).
+async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
   const { latestCharacter } = await snapshotFragments(client);
 
   const charactersResult = await client.query(`
@@ -204,14 +208,24 @@ async function computePartsNeeded(client) {
   }
 
   const fightClubRows = fightClubResult.rows;
-  const results = [];
+  const upcoming = aheadDays > 0 ? await upcomingBuilds(client, aheadDays) : new Map();
 
+  // Letter ('W', 'S+') -> { cls, modified }; null for anything that is not a known part.
+  const decode = (letter) => {
+    const text = String(letter || '');
+    const modified = text.endsWith('+');
+    const cls = SPARE_LETTER_TO_CLASS[modified ? text.slice(0, -1) : text];
+    return cls ? { cls, modified } : null;
+  };
+
+  const perCharacter = [];
   for (const character of charactersResult.rows) {
     const cidStr = String(character.cid);
     const subs = subsByCid.get(cidStr) || new Map();
     const numSlots = character.num_sub_slots || 0;
 
     const characterNeeds = [];
+    const aheadNeeds = [];
 
     for (let slot = 1; slot <= 4; slot++) {
       const sub = subs.get(slot);
@@ -237,13 +251,26 @@ async function computePartsNeeded(client) {
       const craftEnabled = craftByCidSub.get(`${character.cid}|${subName}`) === true;
 
       const target = targetBuildAt({ rank, slot, cid: character.cid, craftEnabled, rules: rulesResult.rows, fightClubRows, repairKitCost });
-      if (!target) continue;
+      // What the slot has once today's needs are met: the target build, or what is fitted where it says nothing.
+      const settled = {};
       SLOT_KEYS.forEach((slotKey, i) => {
-        const targetLetter = target[i];
+        const targetLetter = target ? target[i] : '';
+        settled[slotKey] = targetLetter || current[slotKey];
         if (targetLetter && current[slotKey] !== targetLetter) {
           characterNeeds.push({ subName, rank, slotKey, letter: targetLetter, current: current[slotKey] });
         }
       });
+
+      // Look ahead: its next build (the Subs tab's Next Build), when that is due within the window.
+      const next = upcoming.get(`${cidStr}|${slot}`);
+      if (next) {
+        SLOT_KEYS.forEach((slotKey, i) => {
+          const letter = next.parts[i];
+          if (letter && settled[slotKey] !== letter) {
+            aheadNeeds.push({ subName, rank: next.rank, slotKey, letter, current: settled[slotKey], ahead: true, dueAt: next.dueAt });
+          }
+        });
+      }
     }
 
     // Housed-but-fully-unbuilt starter parts: a character with a real
@@ -262,15 +289,9 @@ async function computePartsNeeded(client) {
     }
 
     characterNeeds.sort((a, b) => b.rank - a.rank);
+    aheadNeeds.sort((a, b) => a.dueAt - b.dueAt || b.rank - a.rank);
 
-    // Letter ('W', 'S+') -> { cls, modified }; null for anything that is not a known part.
-    const decode = (letter) => {
-      const text = String(letter || '');
-      const modified = text.endsWith('+');
-      const cls = SPARE_LETTER_TO_CLASS[modified ? text.slice(0, -1) : text];
-      return cls ? { cls, modified } : null;
-    };
-    const needs = characterNeeds.map((need) => {
+    const needs = [...characterNeeds, ...aheadNeeds].map((need) => {
       const wanted = decode(need.letter);
       return {
         ...need,
@@ -279,8 +300,22 @@ async function computePartsNeeded(client) {
         freed: decode(need.current),
       };
     });
-    const matched = matchNeeds(needs, poolByCid.get(cidStr) || []);
+    perCharacter.push({ character, needs, pool: poolByCid.get(cidStr) || [] });
+  }
 
+  // Spares go to what is needed now, across every character, before anything coming up (soonest first), so a
+  // shared FC chest serves the sub that needs it today; then each character's freed parts.
+  const spares = perCharacter.map(({ needs }) => new Array(needs.length));
+  const order = [];
+  perCharacter.forEach(({ needs }, c) => needs.forEach((need, i) => { if (!need.ahead) order.push([c, i]); }));
+  const later = [];
+  perCharacter.forEach(({ needs }, c) => needs.forEach((need, i) => { if (need.ahead) later.push([c, i]); }));
+  later.sort(([c1, i1], [c2, i2]) => perCharacter[c1].needs[i1].dueAt - perCharacter[c2].needs[i2].dueAt);
+  for (const [c, i] of [...order, ...later]) spares[c][i] = takeSpare(perCharacter[c].needs[i], perCharacter[c].pool);
+
+  const results = [];
+  perCharacter.forEach(({ character, needs }, c) => {
+    const matched = matchFreed(needs, spares[c]);
     needs.forEach((need, i) => {
       results.push({
         cid: character.cid,
@@ -294,17 +329,42 @@ async function computePartsNeeded(client) {
         needed_class: need.cls,
         needed_modified: need.modified,
         spare_location: matched[i].location,
-        recycled_from: matched[i].recycledFrom
+        recycled_from: matched[i].recycledFrom,
+        // Look ahead: when its build is due (ms; at or before now when it can switch already); null when needed now.
+        due_at: need.ahead ? need.dueAt : null
       });
     });
-  }
+  });
 
   return results;
 }
 
-ipcMain.handle('get-parts-needed', async () => {
+// Look ahead on the Parts tab: each sub's next build (the Subs tab's Next Build column) that is due within
+// `aheadDays`: Map "cid|slot" -> { rank, parts: [hull, stern, bow, bridge] ('' leaves a part), dueAt (ms) }.
+// One the sub can switch to already (a Fight Club build at its rank) is due now.
+async function upcomingBuilds(client, aheadDays) {
+  const { loadSubmarinesWithRankUps } = require('./subs');
+  const now = Date.now();
+  const until = now + aheadDays * DAY;
+  const out = new Map();
+  for (const sub of await loadSubmarinesWithRankUps(client)) {
+    const next = sub.rank_up && sub.rank_up.nextBuild;
+    if (!next || !sub.slot || !next.parts) continue;
+    const dueAt = next.rank <= sub.rank ? now : next.at;
+    if (!dueAt || dueAt > until) continue;
+    out.set(`${sub.cid}|${sub.slot}`, { rank: next.rank, parts: next.parts, dueAt });
+  }
+  return out;
+}
+
+// How far the Parts tab may look ahead: 0 (now only), 3, 7 or 14 days.
+const LOOK_AHEAD_DAYS = [0, 3, 7, 14];
+const lookAheadDays = (value) => (LOOK_AHEAD_DAYS.includes(Number(value)) ? Number(value) : 0);
+
+// options: { aheadDays } - Look ahead on the Parts tab.
+ipcMain.handle('get-parts-needed', async (event, options = {}) => {
   return withClient(async (client) => {
-    return { success: true, rows: await computePartsNeeded(client) };
+    return { success: true, rows: await computePartsNeeded(client, { aheadDays: lookAheadDays(options && options.aheadDays) }) };
   }, (err) => {
     return { success: false, error: err.message };
   });
@@ -388,4 +448,4 @@ ipcMain.handle('delete-sub-build-rule', async (event, id) => {
   });
 });
 
-module.exports = { computePartsNeeded, partItemId, targetBuildAt, repairKitCostFrom, FIGHT_CLUB_COLUMNS };
+module.exports = { computePartsNeeded, partItemId, targetBuildAt, repairKitCostFrom, lookAheadDays, FIGHT_CLUB_COLUMNS };

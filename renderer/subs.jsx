@@ -199,6 +199,42 @@ function FlatSubTable({ rows, cols, sortColumn, sortDirection, onSortClick, onTo
   );
 }
 
+// "3 hours", "40 minutes", "2.5 days": how far a Next Rank date was off.
+function forecastOffText(ms) {
+  const minutes = Math.round(Math.abs(ms) / 60000);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = minutes / 60;
+  if (hours < 48) {
+    const shown = hours < 10 ? Math.round(hours * 10) / 10 : Math.round(hours);
+    return `${shown} hour${shown === 1 ? '' : 's'}`;
+  }
+  return `${Math.round((hours / 24) * 10) / 10} days`;
+}
+
+// The line at the top of the Subs tab: how close the Next Rank dates (worked out a day or more before) came to
+// the real rank-ups, with each recent rank-up on hover. ipc/subs.js saves the dates while the app is open.
+function ForecastAccuracy({ refreshKey }) {
+  const [accuracy, setAccuracy] = useState(null);
+  useEffect(() => {
+    window.api.getForecastAccuracy().then((result) => setAccuracy(result && result.success ? result.accuracy : null)).catch(() => setAccuracy(null));
+  }, [refreshKey]);
+  if (!accuracy) return null;
+
+  const when = (ms) => new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const lines = accuracy.checks.map((c) => {
+    const off = Math.abs(c.off) < 60000 ? 'on time' : `${forecastOffText(c.off)} ${c.off > 0 ? 'late' : 'early'}`;
+    return `${c.subName}${c.characterName ? ` (${c.characterName})` : ''} rank ${c.rank}: said ${when(c.predictedAt)}, ranked up ${when(c.at)}, ${off}; ` +
+      `worked out ${forecastOffText(c.at - c.madeAt)} before`;
+  });
+  const how = 'The app saves each sub\'s Next Rank date every hour while it is open. The average counts dates worked out a day or more ' +
+    'before the rank-up, early or late; a rank-up counts from when its voyage came back.';
+  const title = lines.length ? `${how}\n\nRecent rank-ups:\n${lines.join('\n')}` : how;
+  const text = accuracy.count
+    ? `within ${forecastOffText(accuracy.averageOff)} on average over the last ${accuracy.count} rank-up${accuracy.count === 1 ? '' : 's'}`
+    : 'no rank-ups to check yet';
+  return <span className="save-status forecast-accuracy" title={title}>Next Rank forecasts: {text}</span>;
+}
+
 function SubmarinesView({ refreshKey }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
@@ -251,7 +287,7 @@ function SubmarinesView({ refreshKey }) {
 
   return (
     <div>
-      <div className="controls">
+      <div className="controls" style={{ display: 'flex', alignItems: 'center' }}>
         {!subSort.sortColumn && (
           <label>
             <input
@@ -268,6 +304,7 @@ function SubmarinesView({ refreshKey }) {
           </button>
         )}
         <span style={{ marginLeft: '16px' }}><ColumnPicker cols={subCols} /></span>
+        <span style={{ marginLeft: 'auto' }}><ForecastAccuracy refreshKey={refreshKey} /></span>
       </div>
 
       {subSort.sortColumn && (

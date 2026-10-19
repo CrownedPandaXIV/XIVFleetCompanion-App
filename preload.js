@@ -92,10 +92,11 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('open-settings', listener);
   },
   getSubmarines: () => invoke('get-submarines'),
+  getForecastAccuracy: () => invoke('get-forecast-accuracy'),
   getRepairKitCost: () => invoke('settings:get-repair-kit-cost'),
   saveRepairKitCost: (value) => invoke('settings:save-repair-kit-cost', value),
   setCraftEnabled: (payload) => invoke('set-craft-enabled', payload),
-  getPartsNeeded: () => invoke('get-parts-needed'),
+  getPartsNeeded: (options) => invoke('get-parts-needed', options),
   getShoppingList: (options) => invoke('get-shopping-list', options),
   getSupplies: () => invoke('get-supplies'),
   saveSupplySettings: (settings) => invoke('save-supply-settings', settings),

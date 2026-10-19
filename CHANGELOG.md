@@ -3,6 +3,24 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.3.0 - 2026-10-19
+
+Adds one database table, which the app sets up by itself (database update 11). No plugin change.
+
+- **How close the Next Rank dates come,** on one line at the top of the Subs tab, next to Columns: for example
+  "Next Rank forecasts: within 3 hours on average over the last 12 rank-ups". The app saves each sub's Next Rank
+  date every hour while it is open, then compares it with when the sub really ranked up (from the return of the
+  voyage that brought it, with Submarine Tracker; otherwise from when the plugin recorded the new rank). The
+  average counts dates worked out a day or more before, early or late. Hover lists each recent rank-up: what was
+  said, what happened, and how far ahead it was said. Dates are kept 30 days.
+- **Look ahead on the Parts tab,** so parts can be bought or crafted before a sub needs them: Now only (as
+  before), 3, 7 or 14 days. It adds the parts of each sub's next build (the Subs tab's Next Build) due within
+  that time. Summary splits the count into Needed Now and Coming Up; Detail has a Due column ("now", or "in 4d
+  2h (Thu, Oct 23)"); the Shopping List includes them. Spares go to what is needed now first, across every
+  character, and an old part a later upgrade frees is only counted for a need after it. Remembered on each PC.
+  The Discord alerts and summary still only count what is needed now.
+- Shopping List **Made** ticks are kept when Look ahead is changed.
+
 ## 1.2.0 - 2026-10-19
 
 No database or plugin change.

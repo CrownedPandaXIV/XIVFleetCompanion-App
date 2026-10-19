@@ -25,3 +25,15 @@ test('saved text is read safely', () => {
   assert.deepStrictEqual(parseProgress(null), {});
   assert.deepStrictEqual(parseProgress('[1]'), {});
 });
+
+test('Look ahead: ticks are kept per look-ahead, so changing it does not lose them', () => {
+  const { reconcileByAhead } = require('../subs/shopping-progress');
+  // Four made while looking 7 days ahead; looking at now only, the list asks for one.
+  const stored = setProgress({ 21802: { made: 1, outOf: 2 } }, 21800, 4, 4, 7);
+  assert.deepStrictEqual(stored[21800], { made: 4, outOf: 4, ahead: 7 });
+  const lists = new Map([[0, [{ itemId: 21800, crafts: 1 }, { itemId: 21802, crafts: 2 }]], [7, [{ itemId: 21800, crafts: 4 }]]]);
+  assert.deepStrictEqual(reconcileByAhead(stored, lists), stored, 'nothing changes: each tick is checked against its own list');
+  // Two of them reach a bag: the 7-day list asks for two fewer.
+  lists.set(7, [{ itemId: 21800, crafts: 2 }]);
+  assert.deepStrictEqual(reconcileByAhead(stored, lists)[21800], { made: 2, outOf: 2, ahead: 7 });
+});

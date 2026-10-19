@@ -110,10 +110,10 @@ You never need to run anything on the database by hand.
 | **Character Roster** | Every character with gil, ceruleum and repair kits. Drag to reorder; group by account. |
 | **Free Companies** | Each FC with its house and when it was last entered. |
 | **Salvage** | The salvage you're holding and what it's worth. |
-| **Subs** | Every sub, when it's back, and its next rank-up and build change. |
+| **Subs** | Every sub, when it's back, and its next rank-up and build change, with how close the rank-up dates have come. |
 | **Supplies** | How many days of ceruleum and repair kits are left. |
 | **Income** | What your subs and retainers actually earn, voyage by voyage, compared with what was expected. |
-| **Parts** | Which subs are ready for new parts, plus a shopping list of materials. **Show Rules** sets the build each sub should have at each rank. |
+| **Parts** | Which subs are ready for new parts, plus a shopping list of materials. **Look ahead** adds the parts of builds coming up in the next few days. **Show Rules** sets the build each sub should have at each rank. |
 | **Route Optimization** | Subs whose route isn't the best one for their rank. |
 | **Inventory** | Everything you own, with a fleet-wide "Where is it?" search. |
 | **Retainers** | Ventures, levels and gear. |
