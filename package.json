@@ -1,0 +1,64 @@
+{
+  "name": "xiv-fleet-companion",
+  "version": "0.35.4",
+  "description": "XIV Fleet Companion: your FFXIV submarines, retainers and gil across every account",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild \"renderer/*.jsx\" --outdir=renderer --target=es2022 --sourcemap",
+    "prestart": "npm run build",
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "npm run build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "papaparse": "^5.7.0",
+    "pg": "^8.23.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "sortablejs": "1.15.7",
+    "uplot": "1.6.32",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "com.crownedpanda.xivfleetcompanion",
+    "productName": "XIV Fleet Companion",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!tests/**",
+      "!renderer/*.jsx",
+      "!renderer/*.js.map",
+      "!db/**/*.md",
+      "!dist/**",
+      "!.github/**",
+      "!*.md",
+      "!config.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "submarine.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "XIV Fleet Companion",
+      "artifactName": "XIV-Fleet-Companion-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "CrownedPandaXIV",
+        "repo": "XIVFleetCompanion-Releases",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

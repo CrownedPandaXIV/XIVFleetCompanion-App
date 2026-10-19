@@ -1,0 +1,152 @@
+name: Tests
+
+# Runs on every pull request and every change to main.
+#   unit      the fast tests, plus a check that the interface files still build
+#   database  the trend-chart queries against a real Postgres, checked against an independent calculation
+#   ui        the real app, started against a scratch database, clicked through by a script
+#   installer the Windows installer builds (nothing is published here; see release.yml)
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci --ignore-scripts
+    - run: npm test
+    - run: npm run build
+    - name: Syntax check
+      run: |
+        for f in *.js ipc/*.js alerts/*.js backups/*.js db/*.js subs/*.js characters/*.js shared/*.js setup/*.js; do node --check "$f"; done
+
+  database:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: [ '5432:5432' ]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      # A second server, for moving the database from one PC to another.
+      postgres2:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: [ '5433:5432' ]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci --ignore-scripts
+    - name: Generate 30 days of synthetic history
+      run: psql -q -v ON_ERROR_STOP=1 -v days=30 -f tests/db/generate-metric-history.sql
+    - name: Verify the chart queries
+      run: node tests/db/verify-metric-series.js
+    - name: Verify the game data update
+      run: node tests/db/verify-game-data.js
+    - name: Verify the extra table columns
+      run: node tests/db/verify-column-catalog.js
+    - name: Verify the database updates
+      run: node tests/db/verify-database-updates.js
+    - name: Verify backups (with the runner's pg_dump and pg_restore)
+      run: node tests/db/verify-backups.js
+    - name: Verify making a new database
+      run: node tests/db/verify-create-database.js
+    - name: Verify the speed check
+      run: node tests/db/verify-speed-check.js
+    - name: Verify the history window without repeats
+      run: node tests/db/verify-metric-window.js
+    - name: Verify the venture reward totals
+      run: node tests/db/verify-venture-totals.js
+    - name: Verify moving the database to another PC (two servers, the runner's pg_dump and pg_restore)
+      run: node tests/db/verify-database-move.js
+      env:
+        MOVE_NEW_PORT: 5433
+    - name: Verify the leftovers from a move
+      run: node tests/db/verify-leftovers.js
+
+  ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: [ '5432:5432' ]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - run: npm run build
+    - name: Prepare the scratch database
+      run: |
+        psql -q -v ON_ERROR_STOP=1 -f db/schema.sql
+        psql -q -v ON_ERROR_STOP=1 -v days=30 -f tests/db/generate-metric-history.sql
+        psql -q -v ON_ERROR_STOP=1 -f tests/ui/fixtures.sql
+    - name: Click through the app
+      timeout-minutes: 10
+      run: xvfb-run --auto-servernum -s "-screen 0 1400x900x24" node tests/ui/run.js
+      env:
+        UI_TEST_SHOTS: ${{ runner.temp }}/ui-shots
+    - name: Keep the screenshots
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: ui-screenshots
+        path: ${{ runner.temp }}/ui-shots
+        if-no-files-found: ignore
+        retention-days: 7
+
+  installer:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - name: Build the installer
+      run: npm run dist
+    - name: Check it is there
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').version")
+        ls -l dist
+        test -f "dist/XIV-Fleet-Companion-Setup-${version}.exe"
+        test -f dist/latest.yml

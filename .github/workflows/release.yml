@@ -1,0 +1,73 @@
+name: Release
+
+# When a change lands on main with a version that has no release yet, create the tag and
+# the GitHub release (description taken from CHANGELOG.md), then build the Windows installer and
+# publish it to the public CrownedPandaXIV/XIVFleetCompanion-Releases repository, where installed
+# copies of the app look for updates. Does nothing for a version already published.
+#
+# Publishing needs the RELEASES_TOKEN secret (Settings → Secrets and variables → Actions): a
+# fine-grained token allowed only "Contents: read and write" on XIVFleetCompanion-Releases. Without
+# it the installer is not published (the step says so) and nothing fails.
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Tag and release a new version
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        version=$(node -p "require('./package.json').version")
+        echo "Version: $version"
+        bash .github/scripts/tag-release.sh "$version" "$GITHUB_SHA"
+
+  installer:
+    needs: tag-release
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Already published?
+      id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        version=$(node -p "require('./package.json').version")
+        if [ -z "$GH_TOKEN" ]; then
+          echo "No RELEASES_TOKEN secret yet: the installer for ${version} is not published."
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+        elif gh release view "v${version}" -R CrownedPandaXIV/XIVFleetCompanion-Releases --json assets --jq '.assets[].name' 2>/dev/null | grep -qx latest.yml; then
+          echo "v${version} is already published."
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - uses: actions/setup-node@v5
+      if: steps.check.outputs.publish == 'true'
+      with:
+        node-version: 22
+        cache: npm
+
+    - name: Build and publish the installer
+      if: steps.check.outputs.publish == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        npm ci
+        npm run dist
+        bash .github/scripts/publish-installer.sh "$(node -p "require('./package.json').version")"
