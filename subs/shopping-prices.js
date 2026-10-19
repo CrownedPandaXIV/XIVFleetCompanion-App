@@ -72,10 +72,25 @@ function costs({ market, vendor, recipes }) {
   return { cheapest, makeCost };
 }
 
+// What buying `wanted` costs, going up the listings cheapest first (listings: [{ price, quantity }], cheapest
+// first): { gil, got } where `got` is how many the listings cover (less than wanted when not enough are listed).
+function buyingCost(listings, wanted) {
+  let gil = 0;
+  let got = 0;
+  for (const l of listings || []) {
+    if (got >= wanted) break;
+    const take = Math.min(l.quantity, wanted - got);
+    gil += take * l.price;
+    got += take;
+  }
+  return { gil, got };
+}
+
 // Adds the prices to a shopping list (as get-shopping-list sends it): each part gets `market` ({ price,
-// world } or null), `makeCost` and `cheaper` ('buy', 'make' or null); each material `market`. Totals:
-// parts still to make (crafts less made) bought on the market board, and every material short bought there,
-// with how many of each have no listing.
+// world, listings } or null), `makeCost`, `cheaper` ('buy', 'make' or null) and `buying` (what buying the ones
+// not made yet costs, from buyingCost, with `wanted`); each material `market` and `buying` for what is short.
+// Totals: those parts, and every material short, bought on the market board going up the listings, with how
+// many of each have no listing and how many have too few listed (those count only what is listed).
 function priceList(list, { market, vendor, recipes }) {
   const { makeCost } = costs({ market, vendor, recipes });
   const round = (n) => (n === null ? null : Math.round(n));
@@ -83,15 +98,23 @@ function priceList(list, { market, vendor, recipes }) {
     const listed = market.get(p.itemId) || null;
     const make = round(makeCost(p.itemId));
     const cheaper = listed && make !== null ? (listed.price < make ? 'buy' : 'make') : null;
-    return { ...p, market: listed, makeCost: make, cheaper };
+    const wanted = Math.max(0, p.crafts - (p.made || 0));
+    const buying = listed && wanted > 0 ? { ...buyingCost(listed.listings, wanted), wanted } : null;
+    return { ...p, market: listed, makeCost: make, cheaper, buying };
   });
-  const withMarket = (rows) => rows.map((r) => ({ ...r, market: market.get(r.itemId) || null }));
+  const withMarket = (rows) => rows.map((r) => {
+    const listed = market.get(r.itemId) || null;
+    const wanted = r.short || 0;
+    return { ...r, market: listed, buying: listed && wanted > 0 ? { ...buyingCost(listed.listings, wanted), wanted } : null };
+  });
   const craft = withMarket(list.craft);
   const gather = withMarket(list.gather);
   const crystals = withMarket(list.crystals);
 
-  const partsLeft = parts.map((p) => ({ p, left: Math.max(0, p.crafts - (p.made || 0)) })).filter(({ left }) => left > 0);
+  const partsLeft = parts.filter((p) => p.crafts - (p.made || 0) > 0);
   const materialsShort = [...gather, ...crystals].filter((r) => r.short > 0);
+  const total = (rows) => rows.reduce((sum, r) => sum + (r.buying ? r.buying.gil : 0), 0);
+  const tooFew = (rows) => rows.filter((r) => r.buying && r.buying.got < r.buying.wanted).length;
   return {
     ...list,
     parts,
@@ -99,12 +122,14 @@ function priceList(list, { market, vendor, recipes }) {
     gather,
     crystals,
     marketTotals: {
-      parts: partsLeft.reduce((sum, { p, left }) => sum + (p.market ? p.market.price * left : 0), 0),
-      partsUnlisted: partsLeft.filter(({ p }) => !p.market).length,
-      materials: materialsShort.reduce((sum, r) => sum + (r.market ? r.market.price * r.short : 0), 0),
+      parts: total(partsLeft),
+      partsUnlisted: partsLeft.filter((p) => !p.market).length,
+      partsTooFew: tooFew(partsLeft),
+      materials: total(materialsShort),
       materialsUnlisted: materialsShort.filter((r) => !r.market).length,
+      materialsTooFew: tooFew(materialsShort),
     },
   };
 }
 
-module.exports = { priceChoices, costs, priceList };
+module.exports = { priceChoices, costs, buyingCost, priceList };

@@ -50,13 +50,24 @@ const SHOPPING_CRAFT_DEFS = shoppingItemDefs('craft');
 const SHOPPING_GATHER_DEFS = shoppingItemDefs('gather');
 
 // Live Market Prices on: the cheapest market board listing, with its world when prices are from a data
-// center or region ("45,000 gil (Halicarnassus)"), or "none listed".
-function ShoppingMarketPrice({ listed, kind }) {
+// center or region ("45,000 gil (Halicarnassus)"), or "none listed". When fewer are listed than needed, "only
+// 3 of 5 listed"; hover says what buying all those needed costs, going up the listings.
+function ShoppingMarketPrice({ listed, buying, kind }) {
   if (!listed) return <span className="shopping-note" title="Nobody is selling it there right now.">none listed</span>;
-  return <span>{shoppingGil(listed.price)}{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}</span>;
+  const short = buying && buying.got < buying.wanted;
+  const title = buying
+    ? `Buying ${buying.wanted === 1 ? 'it' : `all ${buying.wanted}`}: ${shoppingGil(buying.gil)}, going up the listings from the cheapest` +
+      (short ? `. Only ${buying.got} of ${buying.wanted} are listed there; that price is for those.` : '.')
+    : undefined;
+  return (
+    <span title={title}>
+      {shoppingGil(listed.price)}{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}
+      {short && <span className="shopping-note shopping-too-few"> · only {buying.got} of {buying.wanted} listed</span>}
+    </span>
+  );
 }
 const SHOPPING_MARKET_DEF = {
-  key: 'market', label: 'Market board', cell: (r, ctx) => <ShoppingMarketPrice listed={r.market} kind={ctx && ctx.marketKind} />,
+  key: 'market', label: 'Market board', cell: (r, ctx) => <ShoppingMarketPrice listed={r.market} buying={r.buying} kind={ctx && ctx.marketKind} />,
   sort: (r) => (r.market ? r.market.price : Infinity),
 };
 const SHOPPING_CRAFT_MARKET_DEFS = [...SHOPPING_CRAFT_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_CRAFT_DEFS[SHOPPING_CRAFT_DEFS.length - 1]];
@@ -207,12 +218,17 @@ function ShoppingPriceScope({ market, onChange }) {
 // Where the prices are from, the totals for buying instead, and anything that went wrong.
 function ShoppingMarketNote({ market, totals }) {
   if (market.error) return <div className="error">Market board prices are not shown: {market.error}</div>;
-  const unlisted = (n) => (n ? ` (${n} not listed)` : '');
+  // " (2 not listed, 1 with too few listed)"
+  const missing = (none, few) => {
+    const bits = [none && `${none} not listed`, few && `${few} with too few listed`].filter(Boolean);
+    return bits.length ? ` (${bits.join(', ')})` : '';
+  };
   return (
     <div className="shopping-note">
-      Market board prices from {market.label}: the cheapest listing of each, leaving out your own retainers'.
-      {totals && <> Buying the parts not made yet: <strong>{shoppingGil(totals.parts)}</strong>{unlisted(totals.partsUnlisted)}.
-        Buying every material still short: <strong>{shoppingGil(totals.materials)}</strong>{unlisted(totals.materialsUnlisted)}.</>}
+      Market board prices from {market.label}: the cheapest listing of each, leaving out your own retainers'. Totals go up
+      the listings from the cheapest, as buying them would.
+      {totals && <> Buying the parts not made yet: <strong>{shoppingGil(totals.parts)}</strong>{missing(totals.partsUnlisted, totals.partsTooFew)}.
+        Buying every material still short: <strong>{shoppingGil(totals.materials)}</strong>{missing(totals.materialsUnlisted, totals.materialsTooFew)}.</>}
       {market.stale && <span> Universalis did not answer ({market.stale.problem}), so some prices are from {new Date(market.stale.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</span>}
     </div>
   );

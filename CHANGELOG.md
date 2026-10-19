@@ -3,6 +3,16 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.3 - 2026-10-19
+
+No database or plugin change.
+
+- **The Shopping List's market board totals add up the listings, as buying would,** instead of multiplying the
+  cheapest price by how many are needed. Five hulls with one listed at 600,000 and the rest at 750,000 now total
+  3,600,000, not 3,000,000. When fewer are listed than needed, the part says "only 3 of 5 listed", the total
+  counts what is listed, and the note says how many have too few. Hover over a price for what buying all of them
+  costs. The Market board column still shows the cheapest single price.
+
 ## 1.4.2 - 2026-10-19
 
 No database or plugin change.
