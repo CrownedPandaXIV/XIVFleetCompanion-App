@@ -176,3 +176,5 @@ jobs:
         Start-Sleep -Seconds 5
         foreach ($t in $tasks) { if (Exists $t) { throw "Uninstalling left the task '$t'" } }
         Write-Output 'Tasks kept on update and removed on uninstall.'
+        # The last lookup above found nothing (exit code 1), which is the point; don't let it fail the step.
+        exit 0
