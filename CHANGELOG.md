@@ -3,6 +3,15 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.4 - 2026-10-19
+
+No database or plugin change.
+
+- **The Shopping List shows where each price comes from.** Hover over a part's To make price for one line per
+  ingredient: how many, the price each, and whether that is from a vendor, the market board (with its world) or
+  making it, with what goes into anything made. A new **Cheapest** column in Craft first, Gather or buy and
+  Crystals says Vendor, Market board or Make for each item. Both show with Live Market Prices on.
+
 ## 1.4.3 - 2026-10-19
 
 No database or plugin change.

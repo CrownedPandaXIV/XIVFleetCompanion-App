@@ -239,7 +239,7 @@ async function writeProgress(client, progress) {
 // player's own retainers are left out. `market` says where the prices are from and lists the choices; with
 // prices off it is { enabled: false } and the list is as before. Universalis not answering leaves the prices
 // out and says why.
-async function withMarketPrices(client, list, { scope, recipes, vendor, ids }) {
+async function withMarketPrices(client, list, { scope, recipes, vendor, ids, nameOf }) {
   const live = await liveUniversalis(client);
   if (!live) return { ...list, market: { enabled: false } };
   const { latestCharacter } = await snapshotFragments(client);
@@ -264,7 +264,7 @@ async function withMarketPrices(client, list, { scope, recipes, vendor, ids }) {
     const selling = sellingListings(listings, { exclude, world: oneWorld });
     if (selling.length) market.set(id, { price: selling[0].price, world: selling[0].world, listings: selling });
   }
-  return { ...priceList(list, { market, vendor, recipes }), market: { ...info, stale: answer.stale } };
+  return { ...priceList(list, { market, vendor, recipes, nameOf }), market: { ...info, stale: answer.stale } };
 }
 
 // options: { buyFromVendors, aheadDays, priceScope } - buy whatever a vendor sells instead of crafting or gathering it;
@@ -343,7 +343,10 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
       buy: bought,
       buyCost: bought.reduce((sum, entry) => sum + entry.cost, 0),
     };
-    const priced = await withMarketPrices(client, described, { scope: options && options.priceScope, recipes, vendor: vendorPrices || new Map(), ids: [...allIds] });
+    const priced = await withMarketPrices(client, described, {
+      scope: options && options.priceScope, recipes, vendor: vendorPrices || new Map(), ids: [...allIds],
+      nameOf: (id) => nameById.get(id) || `Item ${id}`,
+    });
     return { success: true, ...priced };
   }, (err) => {
     return { success: false, error: err.message };

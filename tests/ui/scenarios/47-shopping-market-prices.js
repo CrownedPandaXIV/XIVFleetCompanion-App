@@ -45,6 +45,26 @@ module.exports = async (t) => {
   check(/^Market board prices from Dynamis/.test(note) && /Totals go up the listings from the cheapest/.test(note)
     && /Buying the parts not made yet: 609,901 gil \(3 with too few listed\)/.test(note) && /Buying every material still short: [\d,]+ gil/.test(note),
     'where the prices are from and the totals: ' + note);
+  // To make: hover lists each ingredient and where it comes from. In the test data a vendor sells Test Ingot (100,
+  // the same as its listing, so the vendor) and Test Log (5); Test Lumber is cheapest made from Logs.
+  const makeTitle = await ev(`(() => { const tr = [...document.querySelectorAll('.shopping-parts tbody tr')].find(r => r.children[0].innerText.trim() === 'Whale-class Hull');
+    const e = tr && tr.querySelector('.shopping-make-cost'); return e ? e.title : ''; })()`);
+  const makeLines = makeTitle.split('\n').slice(2);
+  check(JSON.stringify(makeLines) === JSON.stringify([
+    'Test Ingot ×2: 100 gil each from the vendor',
+    'Test Lumber ×1: 5 gil each (make: Test Log ×1 at 5 gil from the vendor)',
+    'Fire Shard ×2: 100 gil each from the market board (Maduin)',
+  ]), 'To make says where each ingredient comes from: ' + JSON.stringify(makeLines));
+  const cheapest = (section) => ev(`(() => {
+    const table = document.querySelector('.${section} table'); if (!table) return {};
+    const heads = [...table.querySelectorAll('thead th')].map(th => th.innerText.trim().toLowerCase());
+    const col = heads.indexOf('cheapest');
+    return Object.fromEntries([...table.querySelectorAll('tbody tr')].map(tr => [tr.children[0].innerText.trim(), col < 0 ? null : tr.children[col].innerText.trim()]));
+  })()`);
+  const craftCheapest = await cheapest('shopping-craft');
+  const gatherCheapest = await cheapest('shopping-gather');
+  check(craftCheapest['Test Lumber'] === 'Make' && craftCheapest['Test Ingot'] === 'Vendor' && gatherCheapest['Test Ore'] === 'Market board' && gatherCheapest['Test Log'] === 'Vendor',
+    'Cheapest says vendor, market board or make: ' + JSON.stringify({ craftCheapest, gatherCheapest }));
   const gatherHeads = await ev(`[...document.querySelectorAll('.shopping-gather thead th')].map(th => th.innerText.trim().toLowerCase())`);
   check(gatherHeads.some((h) => h.startsWith('market board')), 'materials have a market board column too: ' + JSON.stringify(gatherHeads));
   check(asked.some((u) => u.startsWith('/api/v2/Dynamis/')), 'asked Universalis for Dynamis');
