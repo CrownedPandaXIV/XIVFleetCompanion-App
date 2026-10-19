@@ -1,6 +1,6 @@
 name: Report a problem
 description: Something in the app or the plugin isn't working, or looks wrong.
-labels: [problem]
+labels: [bug]
 body:
   - type: markdown
     attributes:

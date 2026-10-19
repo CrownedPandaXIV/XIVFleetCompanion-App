@@ -1,4 +1,4 @@
-// Settings window: Postgres connection, refresh and warning settings, game data update, Fight Club import.
+// Settings window: database connection, refresh and warning settings, game data update, Fight Club import.
 
 // One row of the Fight Club import preview. Flagged rows (issues.length > 0)
 // default UNCHECKED - the safer default, since these are exactly the "stray
@@ -368,7 +368,7 @@ function GameDataSection() {
   );
 }
 
-// Single scrolling Settings screen: Auto-Refresh, Postgres Connection,
+// Single scrolling Settings screen: Auto-Refresh, Database Connection,
 // and Fight Club Import, stacked top to bottom. Each section manages
 // its own load/save state independently, so a failure or slow load in
 // one section doesn't block the others from working.
@@ -665,7 +665,7 @@ function SettingsModal({ onClose, initialTab = null }) {
     setRefreshStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
-  // --- Postgres Connection section ---
+  // --- Database Connection section ---
   const [pgHost, setPgHost] = useState('');
   const [pgPort, setPgPort] = useState('');
   const [pgDatabase, setPgDatabase] = useState('');
@@ -875,7 +875,7 @@ function SettingsModal({ onClose, initialTab = null }) {
           {tab === 'database' && (
             <>
         <section className="settings-section">
-          <h3>Postgres Connection</h3>
+          <h3>Database Connection</h3>
           {!pgLoaded && <div className="status">Loading...</div>}
           {pgLoaded && (
             <div>

@@ -113,8 +113,8 @@ You never need to run anything on the database by hand.
 | **Subs** | Every sub, when it's back, and its next rank-up and build change. |
 | **Supplies** | How many days of ceruleum and repair kits are left. |
 | **Income** | What your subs and retainers actually earn, voyage by voyage, compared with what was expected. |
-| **Parts** | Which subs are ready for new parts, plus a shopping list of materials. |
-| **Route Optimization**, **Sub Rules** | Plan routes and the build each sub should have at each rank. |
+| **Parts** | Which subs are ready for new parts, plus a shopping list of materials. **Show Rules** sets the build each sub should have at each rank. |
+| **Route Optimization** | Subs whose route isn't the best one for their rank. |
 | **Inventory** | Everything you own, with a fleet-wide "Where is it?" search. |
 | **Retainers** | Ventures, levels and gear. |
 | **Gil & Market** | Gil per account, and listings that haven't sold or that someone undercut. |
@@ -285,7 +285,10 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
   Companies, inventories and the market. `shared/` has the pieces used all over (table columns, CSV, what you run).
 - `setup/` is "Set up this PC" (the downloads, with their checksums, in `setup/installers.js`), Setup Help, "Let
   other PCs connect", "New database on this PC" and "Remove everything".
-- `alerts/` is the Discord alerts, `backups/` the backups, `updater.js` the automatic updates.
+- `alerts/` is the Discord alerts, `backups/` the backups, `updater.js` the automatic updates (`update-status.js`
+  turns them into what Settings → General → Updates shows).
+- `app-log.js` writes the app's log (logs\app.log), and `user-data-folder.js` picks the folder the settings and
+  the log are kept in.
 
 ### Changing the database
 

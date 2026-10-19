@@ -1,7 +1,16 @@
 {
   "name": "xiv-fleet-companion",
-  "version": "0.36.1",
+  "version": "0.36.2",
   "description": "XIV Fleet Companion: your FFXIV submarines, retainers and gil across every account",
+  "author": "CrownedPandaXIV",
+  "homepage": "https://github.com/CrownedPandaXIV/XIVFleetCompanion-App",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CrownedPandaXIV/XIVFleetCompanion-App.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CrownedPandaXIV/XIVFleetCompanion-App/issues"
+  },
   "main": "main.js",
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -22,7 +31,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "electron": "^44.7.0",
+    "electron": "^44.9.0",
     "electron-builder": "26.15.3",
     "esbuild": "0.28.2"
   },

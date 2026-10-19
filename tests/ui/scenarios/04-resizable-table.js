@@ -1,5 +1,5 @@
 module.exports = async (t) => {
-  const { call, ev, sleep, waitFor, shot, check, clickText, nav, setSelect, chartReady } = t;
+  const { call, ev, sleep, waitFor, shot, check } = t;
   const openTable = async () => {
     await ev(`[...document.querySelectorAll('.sidebar-button')].find(b=>b.innerText.trim()==='Trends').click()`);
     await waitFor(`!!document.querySelector('.trend-chart-wrap canvas')`, 'chart');

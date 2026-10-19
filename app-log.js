@@ -52,9 +52,12 @@ function stepsText(what, result) {
   return `${what} ${result.ok ? 'finished' : `stopped: ${result.error || 'no reason given'}`}${steps ? `. Steps: ${steps}` : ''}`;
 }
 
-// Sends console.log/info/warn/error to the log too (they still print as before). Returns the log.
-function captureConsole(log, target = console) {
+// Sends console.log/info/warn/error to the log too (they still print as before). Returns the log. With
+// onlyProblems, only warnings and errors go to the log (the alert check every 5 minutes keeps the rest in
+// alerts.log).
+function captureConsole(log, target = console, { onlyProblems = false } = {}) {
   for (const [method, level] of [['log', 'info'], ['info', 'info'], ['warn', 'warn'], ['error', 'error']]) {
+    if (onlyProblems && level === 'info') continue;
     const original = target[method].bind(target);
     target[method] = (...args) => {
       log.write(level, args);

@@ -1,5 +1,5 @@
 module.exports = async (t) => {
-  const { call, ev, sleep, waitFor, shot, check, clickText, nav, setSelect, chartReady } = t;
+  const { call, ev, waitFor, shot, check } = t;
   const tiles = `[...document.querySelectorAll('.account-group')].filter(x=>[...x.querySelectorAll('button')].some(b=>b.innerText.trim()==='View trend'))`;
   await call('Page.reload'); const t0 = Date.now();
   await waitFor(`${tiles}.length===5 && ${tiles}.every(x=>x.querySelector('button') && !x.querySelector('button').disabled)`, 'five trend tiles');

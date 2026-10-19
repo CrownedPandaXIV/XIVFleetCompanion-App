@@ -1,5 +1,5 @@
 module.exports = async (t) => {
-  const { call, ev, sleep, waitFor, shot, check, clickText, nav, setSelect, chartReady } = t;
+  const { call, ev, sleep, waitFor, shot, check, nav } = t;
   const cardsReady = (n) => waitFor(`document.querySelectorAll('.trend-card canvas').length>=${n} && [...document.querySelectorAll('.trend-chart-wrap')].every(w=>w.style.opacity==='1')`, `${n} chart cards`);
   await ev(`window.localStorage.clear()`); await call('Page.reload');
   await waitFor(`document.querySelectorAll('.sidebar-button').length>0`, 'app');
