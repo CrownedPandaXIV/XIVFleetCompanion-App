@@ -77,19 +77,6 @@ test('measured date for a sub out at sea: never before it is back, then on a ret
   assert.strictEqual(atCollection(now + DAY, undefined, now), now + DAY);
 });
 
-test('calculated date: experience arrives when each voyage comes back', () => {
-  // 120 per 24h voyage, back in 5 hours: 150 needed = 2 voyages, the second a day after the first.
-  const calculated = { exp: 120, hours: 24, returnAt: now + 5 * HOUR };
-  const r = rankDate({ rank: 2, exp: 50, targetRank: 3, expToNext, calculated, now });
-  assert.deepStrictEqual(r, { at: now + 29 * HOUR, voyages: 2 });
-  // Back already, waiting to be collected: its experience counts straight away.
-  assert.deepStrictEqual(rankDate({ rank: 2, exp: 50, targetRank: 3, expToNext, calculated: { exp: 200, hours: 24, returnAt: now - HOUR }, now }),
-    { at: now, voyages: 1 });
-  // In port, not sent out (no return time): after a whole voyage from now.
-  assert.deepStrictEqual(rankDate({ rank: 2, exp: 50, targetRank: 3, expToNext, calculated: { exp: 200, hours: 24, returnAt: null }, now }),
-    { at: now + 24 * HOUR, voyages: 1 });
-});
-
 test('next build: the first rank above with a different build', () => {
   const buildAt = (rank) => (rank >= 90 ? ['W', 'W', 'U', 'C'] : rank >= 40 ? ['S', 'S', 'U', 'C'] : ['S', 'S', 'S', 'S']);
   assert.deepStrictEqual(nextBuildRank(35, 125, buildAt), { rank: 40, build: ['S', 'S', 'U', 'C'] });

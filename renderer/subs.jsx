@@ -69,16 +69,22 @@ function formatTimeUntil(at, now = Date.now()) {
   return hours % 24 ? `in ${days}d ${hours % 24}h` : `in ${days}d`;
 }
 
-// How a sub's rank-up date was worked out, for the hover text. Neither way looks ahead to better routes.
+// How a sub's rank-up date was worked out, for the hover text. None of them looks ahead to better routes.
 const RANK_UP_AHEAD = 'Assumes it carries on as now: moving to higher-experience routes as they unlock, or a faster build, would make it sooner.';
+const RANK_UP_ROUTE = 'Assumes it stays on its current route: moving to a higher-experience route would make it sooner.';
 function rankUpBasis(r) {
+  const later = r.buildAhead ? ' Voyages get shorter as it ranks up and once it switches to its next build.' : ' Voyages get shorter as it ranks up.';
+  if (r.method === 'voyages') {
+    return `Worked out voyage by voyage: ${r.voyage.exp.toLocaleString()} experience a voyage on its route, ` +
+      `including its bonus (×${r.bonus.factor.toFixed(2)} from its last ${r.bonus.voyages} voyages), ${r.voyage.hours.toFixed(1)}h each.${later} ${RANK_UP_ROUTE}`;
+  }
   if (r.method === 'measured') {
     return `From its experience over the last week: ${Math.round(r.perDay).toLocaleString()} a day. ${RANK_UP_AHEAD}` +
       (r.outAtSea ? ' Experience comes in when a voyage is collected, so this is when it is back.' : '');
   }
   if (r.method === 'calculated') {
     return `Calculated from its route: ${r.voyage.exp.toLocaleString()} experience per ${r.voyage.hours.toFixed(1)}h voyage, ` +
-      `without bonus experience. ${RANK_UP_AHEAD} Measured instead once the plugin (0.7.0+) has a day of its history.`;
+      `without bonus experience.${later} ${RANK_UP_ROUTE} Its own bonus is used once the plugin (0.7.0+) has recorded a few of its voyages.`;
   }
   return '';
 }

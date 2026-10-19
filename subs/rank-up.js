@@ -1,14 +1,10 @@
-// Sub rank-up dates: how fast a sub gains experience and when it reaches its next rank (and the rank of
-// its next build). No Electron or pg here, so it can be tested on its own (tests/rank-up.test.js).
+// Sub rank-up dates: the pieces voyage-forecast.js uses (experience totals, one route's voyage, the rank
+// table), and the fallback when a sub's route or speed can't be worked out: how fast it gained experience
+// over the last week (measured, from the rank and experience the plugin records, 0.7.0 and later). No
+// Electron or pg here, so it can be tested on its own (tests/rank-up.test.js).
 //
-// Two ways to know how fast a sub gains experience:
-//   measured   from the rank and experience the plugin records over time (plugin 0.7.0 and later). It
-//              includes bonus experience and time spent in port, so it is used whenever there is a day
-//              or more of it.
-//   calculated from game data for the route the sub is on now: the experience each sector gives
-//              (SubmarineExploration.ExpReward, without bonus experience) and the voyage length worked
-//              out from the sectors' positions and survey times and the sub's speed. Bonus experience
-//              (up to double) is left out, so these dates are on the late side.
+// A voyage's experience is the sectors' SubmarineExploration.ExpReward; its length is worked out from the
+// sectors' positions and survey times and the sub's speed.
 // The voyage length formula is the one the SubmarineTracker plugin uses (MIT licence).
 
 const { DAY } = require('./supply-runway');
@@ -97,15 +93,11 @@ function atCollection(at, { returnAt, hours } = {}, now) {
   return returnAt + Math.ceil((at - returnAt) / (hours * HOUR)) * hours * HOUR;
 }
 
-// When a sub reaches `targetRank`.
-//   measured:  { perDay }   experience comes in at this rate from `now`, lined up with the sub's
-//              collections by `out` ({ returnAt, hours }, see atCollection)
-//   calculated: { exp, hours, returnAt }  experience arrives when each voyage is collected: the one
-//              out now at returnAt (straight away if it is already back), then every `hours`. A sub in
-//              port (no returnAt) earns its first after a whole voyage from now.
-// Returns { at (ms), voyages (calculated only) }, { reached: true } when the sub is already there, or
-// null when it never gets there at this rate or the rank table runs out.
-function rankDate({ rank, exp, targetRank, expToNext, measured, calculated, out, now }) {
+// When a sub reaches `targetRank` at a `measured` rate ({ perDay }): experience comes in at this rate from
+// `now`, lined up with the sub's collections by `out` ({ returnAt, hours }, see atCollection).
+// Returns { at (ms) }, { reached: true } when the sub is already there, or null when it never gets there at
+// this rate or the rank table runs out.
+function rankDate({ rank, exp, targetRank, expToNext, measured, out, now }) {
   if (rank >= targetRank) return { reached: true };
   let needed = -Number(exp || 0);
   for (let r = rank; r < targetRank; r++) {
@@ -116,11 +108,6 @@ function rankDate({ rank, exp, targetRank, expToNext, measured, calculated, out,
   if (measured) {
     if (!(measured.perDay > 0)) return null;
     return { at: atCollection(now + (needed / measured.perDay) * DAY, out, now) };
-  }
-  if (calculated && calculated.exp > 0 && calculated.hours > 0) {
-    const voyages = Math.max(1, Math.ceil(needed / calculated.exp));
-    const firstReturn = !calculated.returnAt ? now + calculated.hours * HOUR : Math.max(now, calculated.returnAt);
-    return { at: firstReturn + (voyages - 1) * calculated.hours * HOUR, voyages };
   }
   return null;
 }
