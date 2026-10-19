@@ -4,29 +4,28 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { priceChoices, costs, priceList } = require('../subs/shopping-prices');
 
+const place = (name, dc, region) => [name.toLowerCase(), { name, dc, region }];
 const places = new Map([
-  ['maduin', { dc: 'Dynamis', region: 'North-America' }],
-  ['halicarnassus', { dc: 'Dynamis', region: 'North-America' }],
-  ['gilgamesh', { dc: 'Aether', region: 'North-America' }],
-  ['odin', { dc: 'Light', region: 'Europe' }],
+  place('Maduin', 'Dynamis', 'North-America'), place('Halicarnassus', 'Dynamis', 'North-America'),
+  place('Gilgamesh', 'Aether', 'North-America'), place('Odin', 'Light', 'Europe'), place('Bahamut', 'Gaia', 'Japan'),
 ]);
 
-test('Prices from: each world the characters are on, their data centers and regions; the busiest data center first', () => {
+test('Prices from: every world, data center and region, with the busiest data center of yours to start', () => {
   const { choices, fallback } = priceChoices([
-    { world: 'Maduin', characters: 30 }, { world: 'Gilgamesh', characters: 40 }, { world: 'Halicarnassus', characters: 20 }, { world: 'Odin', characters: 1 },
+    { world: 'Maduin', characters: 30 }, { world: 'Gilgamesh', characters: 40 }, { world: 'Halicarnassus', characters: 20 },
   ], places);
-  assert.deepStrictEqual(choices.map((c) => c.value), [
-    'world:Gilgamesh', 'world:Halicarnassus', 'world:Maduin', 'world:Odin',
-    'dc:Aether', 'dc:Dynamis', 'dc:Light',
-    'region:Europe', 'region:North-America',
-  ]);
-  assert.deepStrictEqual(choices.filter((c) => c.kind === 'region').map((c) => [c.label, c.scope]), [['EU', 'Europe'], ['NA', 'North-America']]);
-  assert.strictEqual(fallback, 'dc:Dynamis', 'Dynamis has 50 characters, Aether 40');
-  // A world Universalis doesn't know: still a world choice, and the fallback.
-  assert.deepStrictEqual(priceChoices([{ world: 'Newworld', characters: 3 }], places), {
-    choices: [{ value: 'world:Newworld', label: 'Newworld', kind: 'world', scope: 'Newworld' }], fallback: 'world:Newworld',
-  });
-  assert.deepStrictEqual(priceChoices([], places), { choices: [], fallback: null });
+  assert.deepStrictEqual(choices.filter((c) => c.kind === 'world').map((c) => c.label), [
+    'Gilgamesh (Aether)', 'Halicarnassus (Dynamis)', 'Maduin (Dynamis)', 'Odin (Light)', 'Bahamut (Gaia)',
+  ], 'your region first, then the rest; data center by data center, including ones none of your characters are on');
+  assert.deepStrictEqual(choices.filter((c) => c.kind === 'dc').map((c) => c.value), ['dc:Aether', 'dc:Dynamis', 'dc:Light', 'dc:Gaia']);
+  assert.deepStrictEqual(choices.filter((c) => c.kind === 'region').map((c) => [c.label, c.scope]), [['NA', 'North-America'], ['EU', 'Europe'], ['JP', 'Japan']]);
+  assert.strictEqual(choices.find((c) => c.value === 'world:Maduin').scope, 'Maduin');
+  assert.strictEqual(fallback, 'dc:Dynamis', 'Dynamis has 50 of your characters, Aether 40');
+  // A world Universalis doesn't know: still listed, and the start when nothing else is yours.
+  const odd = priceChoices([{ world: 'Newworld', characters: 3 }], places);
+  assert.deepStrictEqual(odd.choices.filter((c) => c.kind === 'world').pop(), { value: 'world:Newworld', label: 'Newworld', kind: 'world', scope: 'Newworld' });
+  assert.strictEqual(odd.fallback, 'world:Newworld');
+  assert.deepStrictEqual(priceChoices([], new Map()), { choices: [], fallback: null });
 });
 
 // A Whale bow (22528) is made from 1 Ingot + 1 Lumber in phase 1 and 1 Ingot + 2 Fire Shards in phase 2. An

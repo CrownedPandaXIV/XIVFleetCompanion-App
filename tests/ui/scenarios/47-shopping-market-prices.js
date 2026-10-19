@@ -21,8 +21,11 @@ module.exports = async (t) => {
     return { value: s.value, groups: [...s.querySelectorAll('optgroup')].map(g => [g.label, [...g.querySelectorAll('option')].map(o => o.innerText)]) }; })()`);
   const first = await select();
   check(first.value === 'dc:Dynamis', 'starts on the data center with the most characters: ' + first.value);
-  // The test characters are on Behemoth, Cuchulainn and Maduin; the stand-in Universalis only knows Dynamis.
-  check(JSON.stringify(first.groups) === JSON.stringify([['World', ['Behemoth', 'Cuchulainn', 'Maduin']], ['Data center', ['Dynamis']], ['Region', ['NA']]]),
+  // Every world, data center and region the stand-in Universalis knows (Dynamis, and Light in Europe, where no
+  // test character is), yours first; the test characters' Behemoth and Cuchulainn it doesn't know come after.
+  check(JSON.stringify(first.groups) === JSON.stringify([
+    ['World', ['Halicarnassus (Dynamis)', 'Maduin (Dynamis)', 'Odin (Light)', 'Behemoth', 'Cuchulainn']],
+    ['Data center', ['Dynamis', 'Light']], ['Region', ['NA', 'EU']]]),
     'worlds, data centers and regions to pick from: ' + JSON.stringify(first.groups));
 
   const part = (name) => ev(`(() => {
@@ -67,8 +70,8 @@ module.exports.setup = () => new Promise((resolve) => {
   server = http.createServer((req, res) => {
     asked.push(req.url);
     const send = (body) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
-    if (req.url.startsWith('/api/v2/data-centers')) return send([{ name: 'Dynamis', region: 'North-America', worlds: [1, 2] }]);
-    if (req.url.startsWith('/api/v2/worlds')) return send([{ id: 1, name: 'Maduin' }, { id: 2, name: 'Halicarnassus' }]);
+    if (req.url.startsWith('/api/v2/data-centers')) return send([{ name: 'Dynamis', region: 'North-America', worlds: [1, 2] }, { name: 'Light', region: 'Europe', worlds: [3] }]);
+    if (req.url.startsWith('/api/v2/worlds')) return send([{ id: 1, name: 'Maduin' }, { id: 2, name: 'Halicarnassus' }, { id: 3, name: 'Odin' }]);
     const m = /^\/api\/v2\/([^/]+)\/([\d,]+)/.exec(req.url);
     if (!m) { res.writeHead(404); return res.end(); }
     const scope = decodeURIComponent(m[1]).toLowerCase();

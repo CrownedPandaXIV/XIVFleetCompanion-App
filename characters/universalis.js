@@ -14,7 +14,7 @@ const LISTINGS = 20; // listings per item, cheapest first
 const KEEP_MS = 30 * 60 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
 
-const REGION_LABELS = { 'North-America': 'NA', Europe: 'EU', Japan: 'JP', Oceania: 'OCE' };
+const REGION_LABELS = { 'North-America': 'NA', Europe: 'EU', Japan: 'JP', Oceania: 'OCE', 中国: 'CN', 한국: 'KR' };
 
 // Used when Universalis's own list of data centers cannot be read.
 const KNOWN_DATA_CENTERS = [
@@ -31,11 +31,11 @@ const KNOWN_DATA_CENTERS = [
   ['Meteor', 'Japan', 'Belias Mandragora Ramuh Shinryu Unicorn Valefor Yojimbo Zeromus'],
 ].map(([name, region, worlds]) => ({ name, region, worlds: worlds.split(' ') }));
 
-// World name -> { dc, region } from a list of { name, region, worlds: [world names] }.
+// Lowercase world name -> { name, dc, region } from a list of { name, region, worlds: [world names] }.
 function worldPlaces(dataCenters) {
   const places = new Map();
   for (const dc of dataCenters) {
-    for (const world of dc.worlds) places.set(String(world).toLowerCase(), { dc: dc.name, region: dc.region });
+    for (const world of dc.worlds) places.set(String(world).toLowerCase(), { name: String(world), dc: dc.name, region: dc.region });
   }
   return places;
 }
