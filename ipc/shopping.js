@@ -14,6 +14,9 @@ const { withClient, snapshotFragments } = require('../db');
 const { normalizeKey } = require('../db/game-data');
 const { buildShoppingList } = require('../subs/shopping-list');
 const { computePartsNeeded, partItemId, lookAheadDays } = require('./parts');
+const { liveUniversalis } = require('./universalis');
+const { ownRetainerKeys, cheapestListing } = require('../characters/universalis');
+const { priceChoices, priceList } = require('../subs/shopping-prices');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -230,8 +233,42 @@ async function writeProgress(client, progress) {
     [PROGRESS_KEY, JSON.stringify(progress)]);
 }
 
-// options: { buyFromVendors, aheadDays } - buy whatever a vendor sells instead of crafting or gathering it;
-// Look ahead on the Parts tab.
+// With Live Market Prices on (Settings → General): the list with market board prices from the world, data
+// center or region chosen in "Prices from" (`scope`, like 'dc:Dynamis'; the data center with the most
+// characters when not given or not one of the choices), worked out in shopping-prices.js. Listings by the
+// player's own retainers are left out. `market` says where the prices are from and lists the choices; with
+// prices off it is { enabled: false } and the list is as before. Universalis not answering leaves the prices
+// out and says why.
+async function withMarketPrices(client, list, { scope, recipes, vendor, ids }) {
+  const live = await liveUniversalis(client);
+  if (!live) return { ...list, market: { enabled: false } };
+  const { latestCharacter } = await snapshotFragments(client);
+  const worlds = (await client.query(
+    `SELECT world, count(*)::int AS characters FROM ${latestCharacter} c WHERE world IS NOT NULL AND world <> '' GROUP BY world`)).rows;
+  const { choices, fallback } = priceChoices(worlds, await live.placesOf());
+  const chosen = choices.find((c) => c.value === scope) || choices.find((c) => c.value === fallback);
+  if (!chosen) return { ...list, market: { enabled: true, choices, error: 'No character has a world yet.' } };
+  const info = { enabled: true, choices, scope: chosen.value, label: chosen.label, kind: chosen.kind };
+  let answer;
+  try {
+    answer = await live.listingsIn(chosen.scope, ids);
+  } catch (err) {
+    return { ...list, market: { ...info, error: err.message } };
+  }
+  const retainers = (await client.query(
+    `SELECT r.name, c.world FROM companion_retainer_lookup r LEFT JOIN ${latestCharacter} c ON c.cid = r.owner_cid`)).rows;
+  const exclude = ownRetainerKeys(retainers);
+  const oneWorld = chosen.kind === 'world' ? chosen.scope : undefined;
+  const market = new Map();
+  for (const [id, listings] of answer.listings) {
+    const best = cheapestListing(listings, { exclude, world: oneWorld });
+    if (best) market.set(id, { price: best.price, world: best.world || oneWorld || null });
+  }
+  return { ...priceList(list, { market, vendor, recipes }), market: { ...info, stale: answer.stale } };
+}
+
+// options: { buyFromVendors, aheadDays, priceScope } - buy whatever a vendor sells instead of crafting or gathering it;
+// Look ahead on the Parts tab; where market board prices are from (withMarketPrices).
 ipcMain.handle('get-shopping-list', async (event, options = {}) => {
   return withClient(async (client) => {
     // The sub parts the Parts tab says to craft (no spare, no old part to reuse). Ticks made with another
@@ -296,8 +333,7 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
     if (JSON.stringify(progress) !== JSON.stringify(stored)) await writeProgress(client, progress);
     if (!parts.size) return { success: true, empty: true };
     const madeOf = (entry) => (progress[entry.itemId] ? Math.min(progress[entry.itemId].made, entry.crafts) : 0);
-    return {
-      success: true,
+    const described = {
       vendorsLoaded: !!vendorPrices,
       buyFromVendors,
       parts: list.parts.map((entry) => ({ ...describe(entry), made: madeOf(entry) })),
@@ -307,6 +343,8 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
       buy: bought,
       buyCost: bought.reduce((sum, entry) => sum + entry.cost, 0),
     };
+    const priced = await withMarketPrices(client, described, { scope: options && options.priceScope, recipes, vendor: vendorPrices || new Map(), ids: [...allIds] });
+    return { success: true, ...priced };
   }, (err) => {
     return { success: false, error: err.message };
   });

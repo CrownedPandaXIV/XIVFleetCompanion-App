@@ -128,7 +128,9 @@ Handy everywhere:
 - **Settings → General → What do you run?** Choose subs only or retainers only, and the app hides everything you
   don't use.
 - **Live market prices** (Settings → General): turn this on to see Universalis market prices next to vendor prices,
-  and to spot listings someone sells cheaper. Only item numbers and world names are sent.
+  to spot listings someone sells cheaper, and to see on the Shopping List whether each sub part is cheaper to buy or
+  to make, from the world, data center or region you pick. Only item numbers and world, data center or region names
+  are sent.
 
 ## Discord alerts
 

@@ -161,7 +161,16 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     return result;
   }
 
-  return { marketFor, placesOf };
+  // One world, data center or region (the Shopping List's "Prices from"): { listings: Map itemId -> listings,
+  // stale: { problem, since } | null }.
+  async function listingsIn(scope, ids) {
+    const stale = {};
+    const itemIds = [...new Set(ids.map(Number).filter((id) => id > 0))];
+    const listings = scope && itemIds.length ? await listingsFor(scope, itemIds, stale) : new Map();
+    return { listings, stale: stale.problem ? { problem: stale.problem, since: stale.since } : null };
+  }
+
+  return { marketFor, placesOf, listingsIn };
 }
 
 // Gil for each item at the cheapest listing in one scope, falling back to `vendor` (Map) for items not on the
