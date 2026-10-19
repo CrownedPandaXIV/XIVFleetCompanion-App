@@ -86,14 +86,26 @@ function startFor(sectorId, startingPoints) {
   return found;
 }
 
+// A measured date moved to when the sub is collected: experience is only given when a voyage is collected,
+// so a sub out at sea (returnAt in the future) can't rank up before it is back. A date before its return
+// becomes the return; a later one the first return after it, a voyage of `hours` at a time (as it is
+// when the voyage length isn't known). A sub in port or already back keeps the date.
+function atCollection(at, { returnAt, hours } = {}, now) {
+  if (!(returnAt > now)) return at;
+  if (at <= returnAt) return returnAt;
+  if (!(hours > 0)) return at;
+  return returnAt + Math.ceil((at - returnAt) / (hours * HOUR)) * hours * HOUR;
+}
+
 // When a sub reaches `targetRank`.
-//   measured:  { perDay }   experience arrives steadily from `now`
+//   measured:  { perDay }   experience comes in at this rate from `now`, lined up with the sub's
+//              collections by `out` ({ returnAt, hours }, see atCollection)
 //   calculated: { exp, hours, returnAt }  experience arrives when each voyage is collected: the one
 //              out now at returnAt (straight away if it is already back), then every `hours`. A sub in
 //              port (no returnAt) earns its first after a whole voyage from now.
 // Returns { at (ms), voyages (calculated only) }, { reached: true } when the sub is already there, or
 // null when it never gets there at this rate or the rank table runs out.
-function rankDate({ rank, exp, targetRank, expToNext, measured, calculated, now }) {
+function rankDate({ rank, exp, targetRank, expToNext, measured, calculated, out, now }) {
   if (rank >= targetRank) return { reached: true };
   let needed = -Number(exp || 0);
   for (let r = rank; r < targetRank; r++) {
@@ -103,7 +115,7 @@ function rankDate({ rank, exp, targetRank, expToNext, measured, calculated, now 
   }
   if (measured) {
     if (!(measured.perDay > 0)) return null;
-    return { at: now + (needed / measured.perDay) * DAY };
+    return { at: atCollection(now + (needed / measured.perDay) * DAY, out, now) };
   }
   if (calculated && calculated.exp > 0 && calculated.hours > 0) {
     const voyages = Math.max(1, Math.ceil(needed / calculated.exp));
@@ -132,5 +144,5 @@ function nextBuildRank(rank, top, buildAt) {
 }
 
 module.exports = {
-  MIN_MEASURED_DAYS, totalExp, totalExpSeries, measuredRate, voyage, startFor, rankDate, maxRank, nextBuildRank,
+  MIN_MEASURED_DAYS, totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, nextBuildRank,
 };

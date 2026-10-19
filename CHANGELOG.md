@@ -3,6 +3,19 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.0.1 - 2026-10-19
+
+No database or plugin change.
+
+- **Next Rank and Next Build line up with the sub's return.** A sub only gains experience when its voyage is
+  collected, so one out at sea can't rank up before it is back. A date worked out from the last week's experience
+  is now the sub's return when that comes later, or the first return after it; hover says so. Before, a sub back
+  in 37 hours could show "in 14h".
+- **Current Route shows its map:** a dimmed number before the letters, like "1 · O-J", with the map's name on hover
+  (every map uses the same letters). Needs the game data's Map column, which a game data update brings.
+- **Sorting by Status goes by return time,** across the whole fleet: subs back and waiting first (longest waiting
+  first), then subs out at sea (soonest back first), then subs in port. Before, it sorted by the words.
+
 ## 1.0.0 - 2026-10-19
 
 The first stable release. Nothing changed since 0.36.2; works with plugin 0.14.0 or newer, and with plugin 1.0.0.

@@ -1,16 +1,5 @@
 // Subs tab: each submarine's status, build, rank and route, with the Craft? toggle.
 
-// Real submarine data, written directly by the plugin - no n8n
-// involved. Vessel status is computed here from return_time vs "now,"
-// since that's a display-time calculation, not something to store.
-// Target Route / Current Route / Gil-Day economics aren't built yet -
-// this shows what's actually available today (build, rank, status).
-function vesselStatus(returnTime) {
-  if (!returnTime) return 'In Port';
-  const nowEpoch = Math.floor(Date.now() / 1000);
-  return returnTime > nowEpoch ? 'Deployed' : 'Returned / Awaiting Collection';
-}
-
 function formatCountdown(secondsRemaining) {
   const clamped = Math.max(0, secondsRemaining);
   const h = Math.floor(clamped / 3600);
@@ -19,10 +8,9 @@ function formatCountdown(secondsRemaining) {
   return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
-// Status cell for a sub row: same three states as vesselStatus (In
-// Port / Deployed / Returned), but Deployed is replaced with a live,
-// ticking HH:MM:SS countdown to return_time. Only ticks while actually
-// deployed - no timer runs for In Port or Returned rows.
+// Status cell for a sub row: In Port, Returned / Awaiting Collection, or
+// while it is out, a live HH:MM:SS countdown to return_time. Only ticks
+// while it is out - no timer runs for In Port or Returned rows.
 function SubStatusCell({ returnTime }) {
   const [nowEpoch, setNowEpoch] = useState(() => Math.floor(Date.now() / 1000));
   const returnEpoch = returnTime ? Number(returnTime) : 0;
@@ -84,7 +72,10 @@ function formatTimeUntil(at, now = Date.now()) {
 // How a sub's rank-up date was worked out, for the hover text. Neither way looks ahead to better routes.
 const RANK_UP_AHEAD = 'Assumes it carries on as now: moving to higher-experience routes as they unlock, or a faster build, would make it sooner.';
 function rankUpBasis(r) {
-  if (r.method === 'measured') return `From its experience over the last week: ${Math.round(r.perDay).toLocaleString()} a day. ${RANK_UP_AHEAD}`;
+  if (r.method === 'measured') {
+    return `From its experience over the last week: ${Math.round(r.perDay).toLocaleString()} a day. ${RANK_UP_AHEAD}` +
+      (r.outAtSea ? ' Experience comes in when a voyage is collected, so this is when it is back.' : '');
+  }
   if (r.method === 'calculated') {
     return `Calculated from its route: ${r.voyage.exp.toLocaleString()} experience per ${r.voyage.hours.toFixed(1)}h voyage, ` +
       `without bonus experience. ${RANK_UP_AHEAD} Measured instead once the plugin (0.7.0+) has a day of its history.`;
@@ -103,6 +94,18 @@ function RankUpWhen({ rankUp, at, voyages, label }) {
   return (
     <span title={`${label} about ${date}${count}. ${rankUpBasis(rankUp)}`}>
       {rankUp.method === 'calculated' ? '≈ ' : ''}{formatTimeUntil(at)}
+    </span>
+  );
+}
+
+// "2 · O-J": the map's number (dimmed, its name on hover) before the route's letters, which every map reuses.
+function RouteCell({ sub }) {
+  if (!sub.current_route) return '—';
+  const map = sub.current_map;
+  if (!map) return sub.current_route;
+  return (
+    <span>
+      <span className="subs-dim route-map" title={map.name || `Map ${map.id}`}>{map.id} · </span>{sub.current_route}
     </span>
   );
 }
@@ -132,14 +135,14 @@ const SUB_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', locked: true, cell: (s) => s.sub_name, sort: (r) => r.sub_name },
   { key: 'character', label: 'Character', default: false, cell: (s) => s.character_name, sort: (r) => r.character_name },
   { key: 'world', label: 'World', default: false, cell: (s) => s.world, sort: (r) => r.world },
-  { key: 'status', label: 'Status', cell: (s) => <SubStatusCell returnTime={s.return_time} />, sort: (r) => vesselStatus(r.return_time) },
+  { key: 'status', label: 'Status', cell: (s) => <SubStatusCell returnTime={s.return_time} />, sort: (r) => (Number(r.return_time) > 0 ? Number(r.return_time) : null) },
   { key: 'rank', label: 'Rank', cell: (s) => formatRank(s.rank, s.rank_progress_pct), sort: (r) => r.rank + (Number(r.rank_progress_pct) || 0) / 100 },
   { key: 'nextRank', label: 'Next Rank', cell: (s) => <NextRankCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextRankAt) || null },
   { key: 'nextBuild', label: 'Next Build', cell: (s) => <NextBuildCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextBuild && r.rank_up.nextBuild.at) || null },
   { key: 'currentSetup', label: 'Current Setup', cell: (s) => s.current_setup, sort: (r) => r.current_setup },
   { key: 'speed', label: 'Speed', cell: (s) => (s.speed === '' ? '—' : s.speed), sort: (r) => (r.speed === '' ? null : r.speed) },
   { key: 'range', label: 'Range', cell: (s) => (s.range === '' ? '—' : s.range), sort: (r) => (r.range === '' ? null : r.range) },
-  { key: 'currentRoute', label: 'Current Route', cell: (s) => s.current_route || '—', sort: (r) => r.current_route || null },
+  { key: 'currentRoute', label: 'Current Route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },
   { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => formatGilDay(s.current_gil_day), sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
   { key: 'targetRoute', label: 'Target Route', cell: (s) => s.target_route || '—', sort: (r) => r.target_route || null },
   { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => formatGilDay(s.target_gil_day), sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },

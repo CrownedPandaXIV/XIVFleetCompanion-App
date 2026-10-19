@@ -4,12 +4,16 @@
 //        2 x 14.9 hours = "≈ in 1d 6h"
 //   Sub2 (rank 83, 2,000 in): measured from its recorded history, rank 82 with 0 five days ago, so 12,000
 //        in 5 days = 2,400 a day, and 8,000 more takes 3.3 days = "in 3d 8h" (no ≈)
+//   Sub4 (rank 85, 4,000 in, back in 5 days): measured, rank 84 with 0 five days ago, so 2,800 a day and
+//        6,000 more takes about 2.1 days, but it can't rank up before it is back, so "in 5d" (or 4d 23h)
+//   Sub3 is set back an hour ago, waiting to be collected, for sorting by Status.
 // A Sub Rules rule for rank 88 (all Syldra) is added, so the next build for these subs is YYYY at 88.
 // Gus Kitteh 6's Sub4 is rank 90, the highest in the test data.
 const BEX = '18014498578000001';
 // Sub1's return time when the test data was made; it is set to an hour from now for the test (the answer
 // depends on it), and put back after.
 let sub1ReturnTime = null;
+let otherReturnTimes = [];
 
 module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, shot } = t;
@@ -43,6 +47,30 @@ module.exports = async (t) => {
   check(sub2 && /^in 3d [78]h$/.test(sub2[iRank].text), 'measured from recorded history, no ≈: ' + (sub2 && sub2[iRank].text));
   check(sub2 && /From its experience over the last week: 2,4\d\d a day\. Assumes it carries on as now/.test(sub2[iRank].title), 'measured rate on hover, with what it assumes: ' + (sub2 && sub2[iRank].title));
 
+  const sub4 = await subRow('Bex Kitteh 1', 'Sub4');
+  check(sub4 && /^in (5d|4d 23h)$/.test(sub4[iRank].text), 'measured, out at sea: not before it is back: ' + (sub4 && sub4[iRank].text));
+  check(sub4 && / Experience comes in when a voyage is collected, so this is when it is back\.$/.test(sub4[iRank].title), 'and says so on hover: ' + (sub4 && sub4[iRank].title));
+
+  // Current Route: the map's number before the letters, its name on hover.
+  const iRoute = heads.indexOf('current route');
+  check(sub1 && sub1[iRoute].text === '1 · O-J' && sub1[iRoute].title === 'Deep-sea Site', 'the route has its map: ' + (sub1 && `${sub1[iRoute].text} (${sub1[iRoute].title})`));
+
+  // Sorting by Status: by when each sub is back, across the fleet. Back and waiting first, then out at
+  // sea soonest first, then in port.
+  await ev(`[...document.querySelector('thead').querySelectorAll('th')].find(th => th.innerText.trim().toLowerCase().startsWith('status')).querySelector('span').click()`);
+  await waitFor(`document.querySelectorAll('.account-group').length === 0`, 'one table for the fleet', 5000);
+  const statuses = await ev(`(() => {
+    const i = [...document.querySelector('thead').querySelectorAll('th')].findIndex(th => th.innerText.trim().toLowerCase().startsWith('status'));
+    return [...document.querySelectorAll('tbody tr')].map(r => r.children[i].innerText.trim());
+  })()`);
+  const kind = (s) => (s.startsWith('Returned') ? 0 : /^\d+:\d\d:\d\d$/.test(s) ? 1 : 2);
+  const secs = (s) => s.split(':').reduce((a, n) => a * 60 + Number(n), 0);
+  const ordered = statuses.every((s, i) => i === 0 || kind(statuses[i - 1]) < kind(s)
+    || (kind(statuses[i - 1]) === kind(s) && (kind(s) !== 1 || secs(statuses[i - 1]) <= secs(s))));
+  check(statuses.length > 0 && kind(statuses[0]) === 0 && kind(statuses[statuses.length - 1]) === 2 && ordered,
+    'Status sorts by return: waiting first, then soonest back, in port last: ' + statuses.slice(0, 4).join(', ') + ' ... ' + statuses.slice(-2).join(', '));
+  await ev(`[...document.querySelectorAll('.controls button')].find(b => b.innerText.trim() === 'Reset Sorting').click()`);
+
   const gus = await subRow('Gus Kitteh 6', 'Sub4');
   check(gus && gus[iRank].text === 'Max rank' && gus[iBuild].text === '—', 'the highest rank: ' + (gus && gus.slice(iRank, iBuild + 1).map((c) => c.text).join(' | ')));
 };
@@ -51,17 +79,25 @@ module.exports.before = async (db) => {
   const sub1 = (await db.query(`SELECT return_time FROM companion_submarine_snapshot WHERE cid = ${BEX} AND sub_name = 'Sub1'`)).rows[0];
   sub1ReturnTime = sub1 ? sub1.return_time : null;
   await db.query(`UPDATE companion_submarine_snapshot SET return_time = floor(extract(epoch FROM now() + interval '1 hour')) WHERE cid = ${BEX} AND sub_name = 'Sub1'`);
+  otherReturnTimes = (await db.query(`SELECT sub_name, return_time FROM companion_submarine_snapshot WHERE cid = ${BEX} AND sub_name IN ('Sub3', 'Sub4')`)).rows;
+  await db.query(`UPDATE companion_submarine_snapshot SET return_time = floor(extract(epoch FROM now() - interval '1 hour')) WHERE cid = ${BEX} AND sub_name = 'Sub3'`);
+  await db.query(`UPDATE companion_submarine_snapshot SET return_time = floor(extract(epoch FROM now() + interval '5 days')) WHERE cid = ${BEX} AND sub_name = 'Sub4'`);
   await db.query(`DELETE FROM companion_metric_history WHERE subject_id = ${BEX} AND metric LIKE 'sub\\_%'`);
   await db.query(`INSERT INTO companion_metric_history (recorded_at, subject_type, subject_id, metric, value) VALUES
     (now() - interval '5 days', 'character', ${BEX}, 'sub_rank:2', 82),
     (now() - interval '5 days', 'character', ${BEX}, 'sub_exp:2', 0),
     (now(), 'character', ${BEX}, 'sub_rank:2', 83),
-    (now(), 'character', ${BEX}, 'sub_exp:2', 2000)`);
+    (now(), 'character', ${BEX}, 'sub_exp:2', 2000),
+    (now() - interval '5 days', 'character', ${BEX}, 'sub_rank:4', 84),
+    (now() - interval '5 days', 'character', ${BEX}, 'sub_exp:4', 0),
+    (now(), 'character', ${BEX}, 'sub_rank:4', 85),
+    (now(), 'character', ${BEX}, 'sub_exp:4', 4000)`);
   await db.query(`INSERT INTO sub_build_rules (rank, sub_filter, hull, stern, bow, bridge) VALUES (88, '', 'Y', 'Y', 'Y', 'Y')`);
 };
 
 module.exports.after = async (db) => {
   if (sub1ReturnTime !== null) await db.query(`UPDATE companion_submarine_snapshot SET return_time = $1 WHERE cid = ${BEX} AND sub_name = 'Sub1'`, [sub1ReturnTime]);
+  for (const r of otherReturnTimes) await db.query(`UPDATE companion_submarine_snapshot SET return_time = $1 WHERE cid = ${BEX} AND sub_name = $2`, [r.return_time, r.sub_name]);
   await db.query(`DELETE FROM companion_metric_history WHERE subject_id = ${BEX} AND metric LIKE 'sub\\_%'`);
   await db.query(`DELETE FROM sub_build_rules WHERE rank = 88`);
 };
