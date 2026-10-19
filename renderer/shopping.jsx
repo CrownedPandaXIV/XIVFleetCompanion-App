@@ -230,19 +230,20 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   const [showHeld, setShowHeld] = useState(false);
   const [copied, setCopied] = useState(false);
   const [progressError, setProgressError] = useState(null);
+  // While a new list is worked out, the last one stays on screen (so the page keeps its scroll position).
+  const [updating, setUpdating] = useState(false);
   const [buyFromVendors, setBuyFromVendors] = useState(() => {
     try { return localStorage.getItem('shoppingBuyFromVendors') === 'true'; } catch { return false; }
   });
 
   useEffect(() => {
     try { localStorage.setItem('shoppingBuyFromVendors', String(buyFromVendors)); } catch { /* only a convenience */ }
-    setList(null);
-    setError(null);
+    setUpdating(true);
     let current = true;
     window.api.getShoppingList({ buyFromVendors, aheadDays, priceScope }).then((result) => {
       if (!current) return;
-      if (result.success) setList(result);
-      else setError(result.error);
+      setUpdating(false);
+      if (result.success) { setList(result); setError(null); } else setError(result.error);
     });
     return () => { current = false; };
   }, [refreshKey, buyFromVendors, aheadDays, priceScope]);
@@ -252,7 +253,7 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
     try { localStorage.setItem('shoppingPriceScope', value); } catch { /* only a convenience */ }
   }
 
-  if (error) return <div className="error">Failed to load the shopping list: {error}</div>;
+  if (error && list === null) return <div className="error">Failed to load the shopping list: {error}</div>;
   if (list === null) return <div className="status">Working out the shopping list...</div>;
   if (list.empty) {
     return <div className="status">Nothing needs crafting - every need is either met, covered by a spare, or covered by a reused old part{aheadDays ? ', with no new build due in that time' : ''}.</div>;
@@ -288,7 +289,9 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
           <ShoppingPriceScope market={list.market} onChange={choosePriceScope} />
         )}
         <button style={{ marginLeft: '16px' }} onClick={copy}>{copied ? 'Copied' : 'Copy as Text'}</button>
+        {updating && <span className="shopping-note shopping-updating" style={{ marginLeft: '16px' }}>Updating...</span>}
       </div>
+      {error && <div className="error">Could not update the shopping list: {error}. Showing the last one.</div>}
       {list.market && list.market.enabled && <ShoppingMarketNote market={list.market} totals={list.marketTotals} />}
       <div className="shopping-note">
         Held counts every character's bags, saddlebags and crystals, their retainers, and the Free Company

@@ -3,6 +3,15 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.2 - 2026-10-19
+
+No database or plugin change.
+
+- **The Shopping List no longer jumps back to the top on every refresh.** It keeps showing the last list while the
+  new one is worked out, with "Updating..." beside Copy as Text, so the page stays where you scrolled to. The same
+  goes for changing Prices from, Look ahead or Buy from vendors. If an update fails, the last list stays up with a
+  note saying so.
+
 ## 1.4.1 - 2026-10-19
 
 No database or plugin change.
