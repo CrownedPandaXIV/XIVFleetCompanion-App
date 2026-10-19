@@ -44,10 +44,13 @@ No administrator rights are needed: it installs just for your Windows account.
 
 ### Updates happen by themselves
 
-The app checks for a new version when it starts and every few hours, and downloads it in the background. When it's
-ready, a bar at the top says so: click **Restart to update**, or just carry on and it updates the next time you close
-the app. After **Restart to update**, the app closes, the installer shows its progress, and the app opens again by
+The app looks for a new version when it starts and every hour, and downloads it in the background. When it's ready,
+a bar at the top says so: click **Restart to update**, or just carry on and it updates the next time you close the
+app. After **Restart to update**, the app closes, the installer shows its progress, and the app opens again by
 itself. This can take a minute or two.
+
+**Settings → General → Updates** shows which version you have and what the update check is doing, and **Check for
+updates** looks straight away.
 
 ## First-time setup
 

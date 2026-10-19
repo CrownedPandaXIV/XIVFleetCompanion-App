@@ -74,6 +74,13 @@ contextBridge.exposeInMainWorld('api', {
   // The installed app's updates (updater.js): { version } once a new version is downloaded.
   getUpdateReady: () => invoke('get-update-ready'),
   installUpdate: () => invoke('install-update'),
+  getUpdateStatus: () => invoke('updates:status'),
+  checkForUpdates: () => invoke('updates:check'),
+  onUpdateStatus: (callback) => {
+    const listener = (event, status) => callback(status);
+    ipcRenderer.on('update-status', listener);
+    return () => ipcRenderer.removeListener('update-status', listener);
+  },
   onUpdateReady: (callback) => {
     const listener = (event, ready) => callback(ready);
     ipcRenderer.on('update-ready', listener);
