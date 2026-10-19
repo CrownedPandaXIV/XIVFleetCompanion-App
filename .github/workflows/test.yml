@@ -154,3 +154,27 @@ jobs:
         ls -l dist
         test -f "dist/XIV-Fleet-Companion-Setup-${version}.exe"
         test -f dist/latest.yml
+    - name: Uninstalling removes the backup and alert tasks, an update keeps them
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $version = node -p "require('./package.json').version"
+        $setup = "dist/XIV-Fleet-Companion-Setup-$version.exe"
+        $tasks = @((node -p "require('./backups/schedule').TASK_NAME"), (node -p "require('./alerts/schedule').TASK_NAME"))
+        function Exists($name) { schtasks.exe /Query /TN $name 2>$null | Out-Null; return $LASTEXITCODE -eq 0 }
+        function Close-App { Get-Process -Name 'XIV Fleet Companion' -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 2 }
+        Start-Process -FilePath $setup -ArgumentList '/S' -Wait; Close-App
+        foreach ($t in $tasks) { schtasks.exe /Create /TN $t /TR 'cmd.exe /c exit' /SC DAILY /ST 03:00 /F | Out-Null }
+        # Installing over it runs the old uninstaller as an update: the tasks stay.
+        Start-Process -FilePath $setup -ArgumentList '/S' -Wait; Close-App
+        foreach ($t in $tasks) { if (-not (Exists $t)) { throw "An update removed the task '$t'" } }
+        $entry = Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Get-ItemProperty | Where-Object { $_.DisplayName -like 'XIV Fleet Companion*' } | Select-Object -First 1
+        if (-not $entry) { throw 'Not in the installed programs list' }
+        if ($entry.QuietUninstallString -notmatch '^\s*"([^"]+)"\s*(.*)$') { throw "Unexpected uninstall command: $($entry.QuietUninstallString)" }
+        $exe = $Matches[1]; $uninstallArgs = @($Matches[2] -split ' ' | Where-Object { $_ })
+        Start-Process -FilePath $exe -ArgumentList $uninstallArgs -Wait
+        Start-Sleep -Seconds 5
+        foreach ($t in $tasks) { if (Exists $t) { throw "Uninstalling left the task '$t'" } }
+        Write-Output 'Tasks kept on update and removed on uninstall.'
+        # The last lookup above found nothing (exit code 1), which is the point; don't let it fail the step.
+        exit 0

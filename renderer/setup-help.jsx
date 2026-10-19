@@ -134,7 +134,7 @@ function RemoveEverything() {
     return (
       <div className="setup-remove">
         <h4>Remove everything from this PC</h4>
-        <div className="alerts-help">For when you're done with the app on this PC. Uninstalling it from Windows only removes the app and keeps your data; this removes the rest too.</div>
+        <div className="alerts-help">For when you're done with the app on this PC. Uninstalling it from Windows removes only the app and its backup and alert tasks, and keeps your database, PostgreSQL and Tailscale; this removes the rest too.</div>
         <button className="remove-open" onClick={() => setOpen(true)}>Remove everything...</button>
       </div>
     );

@@ -3,6 +3,15 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.5 - 2026-10-19
+
+No database or plugin change.
+
+- **Uninstalling the app also removes its daily backup and Discord alert tasks on that PC.** Both start the app, so
+  once it was gone they failed quietly every time. PostgreSQL, the database, Tailscale, the app's settings and your
+  backup files still stay, so you can uninstall the app from the database PC and keep the database running for
+  your other PCs. Updates keep the tasks.
+
 ## 1.4.4 - 2026-10-19
 
 No database or plugin change.
