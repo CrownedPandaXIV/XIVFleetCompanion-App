@@ -3,6 +3,8 @@
 
 // The address players paste into Dalamud to install the plugin.
 const PLUGIN_REPO = 'https://raw.githubusercontent.com/CrownedPandaXIV/XIVFleetCompanion-Releases/main/repo.json';
+// Where problems with the app or the plugin are reported (Setup Help → Found a problem?).
+const REPORT_PROBLEM_URL = 'https://github.com/CrownedPandaXIV/XIVFleetCompanion-App/issues/new/choose';
 
 // The plugins XIV Fleet Companion reads from, made by others. repo: the address to paste into Dalamud's
 // Experimental tab, or null when it's in Dalamud's own plugin list.
@@ -113,4 +115,4 @@ function describeTestError(err, host) {
   return message || String(err);
 }
 
-module.exports = { PLUGIN_REPO, COMPANION_PLUGINS, isTailscaleAddress, pcAddresses, homeNetworkCidrs, isThisPc, connectionDetails, describeTestError };
+module.exports = { PLUGIN_REPO, REPORT_PROBLEM_URL, COMPANION_PLUGINS, isTailscaleAddress, pcAddresses, homeNetworkCidrs, isThisPc, connectionDetails, describeTestError };

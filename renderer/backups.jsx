@@ -48,6 +48,14 @@ function BackupsSection() {
   };
   const save = () => act('Saving...', () => window.api.saveBackupSettings(form),
     (r) => `Saved.${form.enabled ? ` Backs up every day at ${form.time}.` : ''}${r.note ? ` ${r.note}` : ''}`);
+  // "Restore from a file...": checked as a real backup first, then the same question as Restore.
+  const pickFile = async () => {
+    setStatus('');
+    const r = await window.api.chooseBackupFile();
+    if (!r) return;
+    if (!r.success) { setStatus(r.error || 'That file could not be used.'); return; }
+    setConfirmRestore({ ...r, picked: true });
+  };
   const takeOverLegacy = () => setForm((f) => ({ ...f, ...data.schedule.legacy.settings, enabled: true }));
 
   const { tools, schedule, last } = data;
@@ -124,6 +132,12 @@ function BackupsSection() {
       </div>
 
       <h4>Backups in {data.settings.folder || 'the backup folder'}</h4>
+      <div className="settings-row">
+        <button className="backups-pick" onClick={pickFile} disabled={busy || !tools.found || !data.settings.folder}>Restore from a file...</button>
+        <span className="alerts-help">{data.settings.folder
+          ? "A backup from anywhere else, such as a USB drive or another PC's backup folder."
+          : 'Choose and save a backup folder first: the database as it is now is backed up there before restoring.'}</span>
+      </div>
       {data.backups.length === 0
         ? <div className="status">None yet.</div>
         : (
@@ -156,7 +170,7 @@ function BackupsSection() {
       {confirmRestore && ReactDOM.createPortal(
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmRestore(null); }}>
           <div className="modal backups-confirm" role="dialog" aria-label="Restore a backup">
-            <h2>Restore the backup from {backupWhen(confirmRestore.takenAt)}?</h2>
+            <h2>{confirmRestore.picked ? `Restore ${confirmRestore.name} (${backupWhen(confirmRestore.takenAt)})?` : `Restore the backup from ${backupWhen(confirmRestore.takenAt)}?`}</h2>
             <p>The whole database goes back to how it was then: everything recorded since (by every PC) is replaced.</p>
             <p>First, the database as it is now is backed up, so this can be undone by restoring that backup. If anything goes
               wrong while restoring, nothing is changed.</p>
@@ -165,7 +179,7 @@ function BackupsSection() {
               <button className="danger" onClick={() => {
                 const b = confirmRestore;
                 setConfirmRestore(null);
-                act('Restoring (backing up first)...', () => window.api.restoreBackup(b.file), (r) => r.message);
+                act('Restoring (backing up first)...', () => (b.picked ? window.api.restoreBackupFile(b.file) : window.api.restoreBackup(b.file)), (r) => r.message);
               }}>Restore</button>
             </div>
           </div>

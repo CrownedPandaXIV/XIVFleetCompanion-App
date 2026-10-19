@@ -11,6 +11,21 @@ if (app.getPath('userData') === defaultUserData) {
   app.setPath('userData', chooseUserDataFolder(app.getPath('appData'), path.join(app.getPath('appData'), 'XIV Fleet Companion')));
 }
 
+// What the app prints also goes to logs\app.log in that folder (app-log.js). Not for Windows' permission-prompt
+// runs (--fleet-setup), which run as the administrator and report back to the app that started them.
+if (!process.argv.includes('--fleet-setup')) {
+  const { createLog, captureConsole } = require('./app-log');
+  const log = captureConsole(createLog(path.join(app.getPath('userData'), 'logs')));
+  const mode = process.argv.includes('--fleet-backup') ? 'daily backup' : process.argv.includes('--fleet-alerts') ? 'alert check' : 'window';
+  log.write('info', [`XIV Fleet Companion ${app.getVersion()} started (${mode}) on ${process.platform} ${require('os').release()}`]);
+  app.on('render-process-gone', (event, contents, details) => {
+    if (details.reason !== 'clean-exit') console.error('The window stopped:', details.reason, `(exit code ${details.exitCode})`);
+  });
+  app.on('child-process-gone', (event, details) => {
+    if (details.reason !== 'clean-exit') console.error(`A ${details.type} process stopped:`, details.reason, `(exit code ${details.exitCode})`);
+  });
+}
+
 const gameData = require('./db/game-data');
 const { leaveRemovedOutOfTrends } = require('./db/trends-cleanup');
 const { withClient } = require('./db');

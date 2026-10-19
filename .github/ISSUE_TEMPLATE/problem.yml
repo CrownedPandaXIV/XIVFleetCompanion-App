@@ -1,0 +1,51 @@
+name: Report a problem
+description: Something in the app or the plugin isn't working, or looks wrong.
+labels: [problem]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. The more of this you can fill in, the quicker it can be looked into.
+        Never paste a password or your Discord webhook address here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where is the problem?
+      options:
+        - The app
+        - The plugin (in the game)
+        - Setting up, updating or installing
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: In the app, Settings → Setup Help → Found a problem? shows it with a Copy button.
+      placeholder: XIV Fleet Companion 0.36.0 on Windows 10.0.26100
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: In the title of the plugin's window in the game (/xivfleet), or on the app's PCs tab.
+      placeholder: "0.14.1"
+  - type: textarea
+    id: check
+    attributes:
+      label: /xivfleet check results
+      description: For a problem with the plugin or the game, type /xivfleet check in the game, click Copy results and paste them here.
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: The app's log
+      description: Settings → Setup Help → Found a problem? → Open the log folder. Paste the end of app.log here, or drag the file in.
+      render: text

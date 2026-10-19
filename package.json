@@ -1,6 +1,6 @@
 {
   "name": "xiv-fleet-companion",
-  "version": "0.35.5",
+  "version": "0.36.0",
   "description": "XIV Fleet Companion: your FFXIV submarines, retainers and gil across every account",
   "main": "main.js",
   "license": "AGPL-3.0-only",

@@ -58,5 +58,20 @@ module.exports = async (t) => {
   check(bad.startsWith(`Can't find a PC called "no-such-pc.invalid"`), `a made-up address says it can't be found: ${bad}`);
   check(/listen_addresses = '\*'/.test(await text()) && (await text()).includes('100.64.0.0/10'), 'the "can\'t connect" steps give the lines to add');
 
+
+  // Found a problem?: the app's version to copy, what to include, and the log folder, where the app's log is.
+  await page('Found a problem?');
+  await waitFor(`!!${section}.querySelector('.setup-problem')`, 'the Found a problem? page', 5000);
+  const problem = await text();
+  // The version Electron gives the app (its own under the test launcher, the app's when installed).
+  const shown = /XIV Fleet Companion (\S+) on \S+/.exec(problem);
+  check(!!shown, 'it shows the app\'s version, and the system, to copy');
+  const version = shown ? shown[1] : '?';
+  check(problem.includes('/xivfleet check') && problem.includes('Report a problem') && problem.includes('Open the log folder'), 'it says what to include, with the report and log buttons');
+  const logFolder = require('path').join(t.profile, 'logs');
+  check(problem.includes(logFolder), `it names the log folder: ${logFolder}`);
+  const log = require('fs').readFileSync(require('path').join(logFolder, 'app.log'), 'utf8');
+  check(log.includes(`XIV Fleet Companion ${version} started (window)`), 'the app writes its log there, starting with the same version');
+
   await ev(`[...document.querySelectorAll('.modal-actions button')].find((b) => b.innerText === 'Close').click()`);
 };

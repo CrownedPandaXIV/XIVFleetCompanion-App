@@ -14,6 +14,7 @@ const { rangesToAllow } = require('../setup/remote-access');
 const { homeNetworkCidrs } = require('../setup/help');
 const { createDatabase } = require('../setup/create-database');
 const { recordInstalled } = require('../setup/remove-everything');
+const { stepsText } = require('../app-log');
 
 // What this PC already has: { postgres, tailscale }.
 async function detect() {
@@ -56,6 +57,7 @@ ipcMain.handle('setup:run', async (event, input) => {
       wait: (ms) => new Promise((r) => setTimeout(r, ms)),
     };
     const result = await runSetup(input, deps, (steps) => { if (!event.sender.isDestroyed()) event.sender.send('setup:progress', steps); });
+    (result.ok ? console.log : console.error)(stepsText('Set up this PC', result));
     return { ok: result.ok, error: result.error || null, steps: result.steps || [], plan: result.plan || null };
   } catch (err) {
     return { ok: false, error: err.message, steps: [] };
