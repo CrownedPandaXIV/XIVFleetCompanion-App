@@ -155,3 +155,22 @@ test('HQ items are priced at the cheapest HQ listing, else either quality', () =
   const hq = scopePrices(market, 'world', new Map(), undefined, { hq: true });
   assert.deepStrictEqual([nq.get(1), hq.get(1), hq.get(2)], [100, 400, 50]);
 });
+
+test('the Shopping List asks for one world, data center or region at a time, kept for 30 minutes', async () => {
+  const calls = [];
+  let at = 0;
+  const u = createUniversalis({
+    baseUrl: 'http://stub', now: () => at,
+    fetchImpl: fakeFetch([['/data-centers', []], ['/worlds', []], ['/api/v2/', { items: { 22528: { itemID: 22528, listings: [listing(600, { worldName: 'Halicarnassus' })] } } }]], calls),
+  });
+  const first = await u.listingsIn('Dynamis', [22528, 22528, 0]);
+  assert.deepStrictEqual([...first.listings.keys()], [22528]);
+  assert.strictEqual(first.stale, null);
+  assert.ok(calls[0].includes('/api/v2/Dynamis/22528'), calls[0]);
+  at = 29 * 60 * 1000;
+  await u.listingsIn('Dynamis', [22528]);
+  assert.strictEqual(calls.length, 1, 'kept');
+  await u.listingsIn('North-America', [22528]);
+  assert.strictEqual(calls.length, 2, 'another scope is asked for');
+  assert.deepStrictEqual((await u.listingsIn('Dynamis', [])).listings.size, 0);
+});

@@ -384,6 +384,17 @@ async function loadForecastAccuracy(client) {
   return accuracy.summarize(checks);
 }
 
+// Saves this hour's Next Rank dates without a window open: the nightly backup (backups/app.js) calls this,
+// so the forecast line gets at least one set a day. Never throws.
+async function saveForecastsNow() {
+  try {
+    await withClient(async (client) => saveForecasts(client, await loadSubmarinesWithRankUps(client)),
+      (err) => console.warn(`Could not save the Next Rank dates: ${err.message}`));
+  } catch (err) {
+    console.warn(`Could not save the Next Rank dates: ${err.message}`);
+  }
+}
+
 // Every sub with its rank-up dates and next build (the Subs tab's rows; Look ahead on the Parts tab).
 async function loadSubmarinesWithRankUps(client) {
   return addRankUps(client, await loadSubmarines(client));
@@ -472,4 +483,4 @@ ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled }) => 
   });
 });
 
-module.exports = { loadSubmarines, loadSubmarinesWithRankUps };
+module.exports = { loadSubmarines, loadSubmarinesWithRankUps, saveForecastsNow };

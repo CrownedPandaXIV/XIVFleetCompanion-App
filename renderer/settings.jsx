@@ -506,8 +506,9 @@ function LivePricesSection() {
           <div className="alerts-help">
             Universalis (universalis.app) collects market board prices from players. With this on, the app asks it for the cheapest
             listing of each item on the character's home world, data center and region, and shows them next to the vendor prices: the
-            market value of loot and venture rewards on the Income tab, and which of your listings someone sells cheaper on the
-            Gil &amp; Market tab. Only item numbers and world names are sent. Prices are kept for 30 minutes. Items not sold on the market
+            market value of loot and venture rewards on the Income tab, which of your listings someone sells cheaper on the
+            Gil &amp; Market tab, and what the parts and materials on the Parts tab's Shopping List cost to buy (from the world, data
+            center or region you pick there). Only item numbers and world, data center or region names are sent. Prices are kept for 30 minutes. Items not sold on the market
             board (such as salvage) keep their vendor price.
           </div>
         </div>

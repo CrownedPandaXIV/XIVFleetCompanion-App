@@ -3,6 +3,21 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.4.0 - 2026-10-19
+
+No database or plugin change.
+
+- **Market board prices on the Shopping List** (with Live Market Prices on in Settings → General). A **Prices from**
+  choice picks where they come from: one world your characters are on, a data center, or a region (NA, EU, JP,
+  OCE). It starts on the data center with the most of your characters and is remembered on each PC. For a data
+  center or region, each price says which world it is on. Each sub part shows its cheapest listing, what it costs
+  to make (its materials each at their cheapest: a vendor, the market board, or making them) and which is
+  cheaper; materials show their cheapest listing too. Totals say what buying the parts not made yet, and every
+  material still short, would cost. Your own retainers' listings are left out. With Look ahead on, the parts
+  coming up are priced too.
+- **The nightly backup also saves the subs' Next Rank dates,** so the Subs tab's forecast line gets at least one
+  set a day even when no app window is open. It runs after the backup and never changes how the backup went.
+
 ## 1.3.0 - 2026-10-19
 
 Adds one database table, which the app sets up by itself (database update 11). No plugin change.

@@ -49,11 +49,26 @@ function shoppingItemDefs(kind) {
 const SHOPPING_CRAFT_DEFS = shoppingItemDefs('craft');
 const SHOPPING_GATHER_DEFS = shoppingItemDefs('gather');
 
+// Live Market Prices on: the cheapest market board listing, with its world when prices are from a data
+// center or region ("45,000 gil (Halicarnassus)"), or "none listed".
+function ShoppingMarketPrice({ listed, kind }) {
+  if (!listed) return <span className="shopping-note" title="Nobody is selling it there right now.">none listed</span>;
+  return <span>{shoppingGil(listed.price)}{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}</span>;
+}
+const SHOPPING_MARKET_DEF = {
+  key: 'market', label: 'Market board', cell: (r, ctx) => <ShoppingMarketPrice listed={r.market} kind={ctx && ctx.marketKind} />,
+  sort: (r) => (r.market ? r.market.price : Infinity),
+};
+const SHOPPING_CRAFT_MARKET_DEFS = [...SHOPPING_CRAFT_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_CRAFT_DEFS[SHOPPING_CRAFT_DEFS.length - 1]];
+const SHOPPING_GATHER_MARKET_DEFS = [...SHOPPING_GATHER_DEFS.slice(0, -1), SHOPPING_MARKET_DEF, SHOPPING_GATHER_DEFS[SHOPPING_GATHER_DEFS.length - 1]];
+
 // One section (tableKey keeps each section's columns apart).
-function ShoppingTable({ title, note, rows, kind, showHeld, className, tableKey }) {
+function ShoppingTable({ title, note, rows, kind, showHeld, className, tableKey, market }) {
   const missing = (r) => (kind === 'craft' ? r.make : r.short);
   const sort = useColumnSort();
-  const cols = useTableColumns({ tableKey, ownDefs: kind === 'craft' ? SHOPPING_CRAFT_DEFS : SHOPPING_GATHER_DEFS, rows: null, idOf: () => null });
+  const priced = !!(market && market.scope && !market.error);
+  const defs = kind === 'craft' ? (priced ? SHOPPING_CRAFT_MARKET_DEFS : SHOPPING_CRAFT_DEFS) : (priced ? SHOPPING_GATHER_MARKET_DEFS : SHOPPING_GATHER_DEFS);
+  const cols = useTableColumns({ tableKey, ownDefs: defs, rows: null, idOf: () => null });
   const visible = showHeld ? rows : rows.filter((r) => missing(r) > 0);
   const hidden = rows.length - visible.length;
   return (
@@ -63,7 +78,8 @@ function ShoppingTable({ title, note, rows, kind, showHeld, className, tableKey 
       {visible.length === 0 ? (
         <div className="status">{rows.length ? 'Everything here is already held.' : 'Nothing.'}</div>
       ) : (
-        <ColumnTable cols={cols} sort={sort} rows={visible} rowKey={(r) => r.itemId} rowClassName={(r) => (missing(r) > 0 ? '' : 'shopping-done')} />
+        <ColumnTable cols={cols} sort={sort} rows={visible} rowKey={(r) => r.itemId} ctx={{ marketKind: market && market.kind }}
+          rowClassName={(r) => (missing(r) > 0 ? '' : 'shopping-done')} />
       )}
       {hidden > 0 && <div className="shopping-note">{hidden} more already held in full.</div>}
     </div>
@@ -150,11 +166,66 @@ const SHOPPING_PART_DEFS = [
   { key: 'crafter', label: 'Crafter', cell: (p) => p.job || '?', sort: (p) => p.job },
   { key: 'made', label: 'Made', td: (p, ctx) => <ShoppingMadeCell part={p} onSave={ctx.onSave} />, sort: (p) => p.made || 0 },
 ];
+// Live Market Prices on: what one costs on the market board, what it costs to make, and which is cheaper.
+const SHOPPING_MAKE_COST_TITLE = 'One part made from its materials, each at its cheapest: a vendor, the market board, or making it. ' +
+  'What you already hold is not taken off.';
+const SHOPPING_PART_MARKET_DEFS = [
+  ...SHOPPING_PART_DEFS.slice(0, 3),
+  SHOPPING_MARKET_DEF,
+  {
+    key: 'makeCost', label: 'To make',
+    cell: (p) => (p.makeCost !== null && p.makeCost !== undefined
+      ? <span title={SHOPPING_MAKE_COST_TITLE}>{shoppingGil(p.makeCost)}</span>
+      : <span className="shopping-note" title="Some of its materials have no price: not sold by a vendor or listed there.">—</span>),
+    sort: (p) => (p.makeCost === null || p.makeCost === undefined ? Infinity : p.makeCost),
+  },
+  { key: 'cheaper', label: 'Cheaper', cell: (p) => (p.cheaper === 'buy' ? 'Buy' : p.cheaper === 'make' ? 'Make' : ''), sort: (p) => p.cheaper || '' },
+  SHOPPING_PART_DEFS[3],
+];
+
+// "Prices from": each world the characters are on, their data centers and regions.
+function ShoppingPriceScope({ market, onChange }) {
+  const groups = [['world', 'World'], ['dc', 'Data center'], ['region', 'Region']];
+  return (
+    <label style={{ marginLeft: '16px', whiteSpace: 'nowrap' }}
+      title="Where the market board prices come from: one world, a data center, or a whole region. For a data center or region, each price says which world it is on.">
+      Prices from{' '}
+      <select value={market.scope || ''} onChange={(e) => onChange(e.target.value)}>
+        {groups.map(([kind, label]) => {
+          const these = market.choices.filter((c) => c.kind === kind);
+          return these.length ? (
+            <optgroup key={kind} label={label}>
+              {these.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </optgroup>
+          ) : null;
+        })}
+      </select>
+    </label>
+  );
+}
+
+// Where the prices are from, the totals for buying instead, and anything that went wrong.
+function ShoppingMarketNote({ market, totals }) {
+  if (market.error) return <div className="error">Market board prices are not shown: {market.error}</div>;
+  const unlisted = (n) => (n ? ` (${n} not listed)` : '');
+  return (
+    <div className="shopping-note">
+      Market board prices from {market.label}: the cheapest listing of each, leaving out your own retainers'.
+      {totals && <> Buying the parts not made yet: <strong>{shoppingGil(totals.parts)}</strong>{unlisted(totals.partsUnlisted)}.
+        Buying every material still short: <strong>{shoppingGil(totals.materials)}</strong>{unlisted(totals.materialsUnlisted)}.</>}
+      {market.stale && <span> Universalis did not answer ({market.stale.problem}), so some prices are from {new Date(market.stale.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</span>}
+    </div>
+  );
+}
 
 function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   const partSort = useColumnSort();
-  const partCols = useTableColumns({ tableKey: 'shoppingParts', ownDefs: SHOPPING_PART_DEFS, rows: null, idOf: () => null });
+  const [priceScope, setPriceScope] = useState(() => {
+    try { return localStorage.getItem('shoppingPriceScope') || null; } catch { return null; }
+  });
   const [list, setList] = useState(null);
+  const priced = !!(list && list.market && list.market.scope && !list.market.error);
+  const partCols = useTableColumns({ tableKey: 'shoppingParts', ownDefs: priced ? SHOPPING_PART_MARKET_DEFS : SHOPPING_PART_DEFS, rows: null, idOf: () => null });
   const [error, setError] = useState(null);
   const [showHeld, setShowHeld] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -168,13 +239,18 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
     setList(null);
     setError(null);
     let current = true;
-    window.api.getShoppingList({ buyFromVendors, aheadDays }).then((result) => {
+    window.api.getShoppingList({ buyFromVendors, aheadDays, priceScope }).then((result) => {
       if (!current) return;
       if (result.success) setList(result);
       else setError(result.error);
     });
     return () => { current = false; };
-  }, [refreshKey, buyFromVendors, aheadDays]);
+  }, [refreshKey, buyFromVendors, aheadDays, priceScope]);
+
+  function choosePriceScope(value) {
+    setPriceScope(value);
+    try { localStorage.setItem('shoppingPriceScope', value); } catch { /* only a convenience */ }
+  }
 
   if (error) return <div className="error">Failed to load the shopping list: {error}</div>;
   if (list === null) return <div className="status">Working out the shopping list...</div>;
@@ -208,8 +284,12 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
           <input type="checkbox" checked={showHeld} onChange={(e) => setShowHeld(e.target.checked)} />
           {' '}Show items already held in full
         </label>
+        {list.market && list.market.enabled && list.market.choices && list.market.choices.length > 0 && (
+          <ShoppingPriceScope market={list.market} onChange={choosePriceScope} />
+        )}
         <button style={{ marginLeft: '16px' }} onClick={copy}>{copied ? 'Copied' : 'Copy as Text'}</button>
       </div>
+      {list.market && list.market.enabled && <ShoppingMarketNote market={list.market} totals={list.marketTotals} />}
       <div className="shopping-note">
         Held counts every character's bags, saddlebags and crystals, their retainers, and the Free Company
         chests, as of each character's last sync.
@@ -224,16 +304,16 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
           it leaves the list by itself. The materials below are for every part on the list, made or not.
         </div>
         {progressError && <div className="error">Could not save: {progressError}</div>}
-        <ColumnTable cols={partCols} sort={partSort} rows={list.parts} rowKey={(p) => p.itemId} ctx={{ onSave: saveMade }}
+        <ColumnTable cols={partCols} sort={partSort} rows={list.parts} rowKey={(p) => p.itemId} ctx={{ onSave: saveMade, marketKind: list.market && list.market.kind }}
           rowClassName={(p) => ((p.made || 0) >= p.crafts ? 'shopping-done' : '')} />
       </div>
       {!list.vendorsLoaded && (
         <div className="shopping-note">Vendor prices need the vendor list from the game data: check for game data updates in Settings → Data and apply them.</div>
       )}
       {list.buyFromVendors && <ShoppingBuyTable rows={list.buy} total={list.buyCost} showHeld={showHeld} />}
-      <ShoppingTable title="Craft first" note="In-between items, in the order to make them." rows={list.craft} kind="craft" showHeld={showHeld} className="shopping-craft" tableKey="shoppingCraft" />
-      <ShoppingTable title="Gather or buy" rows={list.gather} kind="gather" showHeld={showHeld} className="shopping-gather" tableKey="shoppingGather" />
-      <ShoppingTable title="Crystals" rows={list.crystals} kind="gather" showHeld={showHeld} className="shopping-crystals" tableKey="shoppingCrystals" />
+      <ShoppingTable title="Craft first" note="In-between items, in the order to make them." rows={list.craft} kind="craft" showHeld={showHeld} className="shopping-craft" tableKey="shoppingCraft" market={list.market} />
+      <ShoppingTable title="Gather or buy" rows={list.gather} kind="gather" showHeld={showHeld} className="shopping-gather" tableKey="shoppingGather" market={list.market} />
+      <ShoppingTable title="Crystals" rows={list.crystals} kind="gather" showHeld={showHeld} className="shopping-crystals" tableKey="shoppingCrystals" market={list.market} />
     </div>
   );
 }

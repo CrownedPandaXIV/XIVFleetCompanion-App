@@ -1,5 +1,7 @@
 // The app's side of backups: where its settings are kept on this PC, the saved database connection,
-// and `--fleet-backup` (started by the daily scheduled task: one backup, then quit, with no window).
+// and `--fleet-backup` (started by the daily scheduled task: one backup, then quit, with no window). That run
+// also saves the subs' Next Rank dates for the Subs tab's forecast line, after the backup, so a PC with no
+// window open still adds a set each day; that never changes how the backup went.
 const { app } = require('electron');
 const path = require('path');
 const { loadPostgresConfig, followMoveNow } = require('../db');
@@ -41,6 +43,7 @@ async function runFromCommandLine() {
     console.error(err);
     code = 1;
   }
+  await require('../ipc/subs').saveForecastsNow();
   app.exit(code);
 }
 
