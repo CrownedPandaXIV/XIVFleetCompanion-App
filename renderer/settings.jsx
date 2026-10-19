@@ -373,6 +373,30 @@ function GameDataSection() {
 // its own load/save state independently, so a failure or slow load in
 // one section doesn't block the others from working.
 // The Settings window's tabs, in order. The last one used is remembered (on this PC).
+// Settings → General → Updates (updater.js): this app's version, what the update check is doing, and looking now.
+// The installed app also looks by itself when it starts and every hour.
+function UpdatesSection() {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    window.api.getUpdateStatus().then(setInfo);
+    return window.api.onUpdateStatus((status) => setInfo((i) => ({ ...(i || {}), status })));
+  }, []);
+  if (!info) return <section className="settings-section updates-section"><h3>Updates</h3><div className="status">Loading...</div></section>;
+  const { status } = info;
+  const busy = ['checking', 'downloading', 'ready'].includes(status.state);
+  return (
+    <section className="settings-section updates-section">
+      <h3>Updates</h3>
+      <div className="settings-row">
+        <span>This is version {info.version}.</span>
+        {!status.source && <button className="updates-check" onClick={() => window.api.checkForUpdates().then(setInfo)} disabled={busy}>Check for updates</button>}
+        <span className={`save-status updates-status${status.state === 'error' ? ' supply-warn' : ''}`}>{status.text}</span>
+      </div>
+      {!status.source && <div className="alerts-help">The app also looks by itself when it starts and every hour, and downloads a new version in the background.</div>}
+    </section>
+  );
+}
+
 const SETTINGS_TABS = [
   { key: 'general', label: 'General' },
   { key: 'database', label: 'Database' },
@@ -843,6 +867,7 @@ function SettingsModal({ onClose, initialTab = null }) {
             </div>
           )}
         </section>
+        <UpdatesSection />
         <CreditsSection />
             </>
           )}

@@ -3,6 +3,16 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 0.36.1 - 2026-10-19
+
+No database or plugin change.
+
+- **Settings → General → Updates:** this app's version, what the update check is doing ("Looking for a new version",
+  "Downloading version 0.36.2 (45%)", "Up to date", or why it couldn't look, in plain words), and a **Check for
+  updates** button.
+- The app now looks for a new version every hour instead of every 6 hours, as well as when it starts.
+- The app's log notes what the update check finds: a new version, when it's downloaded, or why it couldn't look.
+
 ## 0.36.0 - 2026-10-19
 
 No database or plugin change.
