@@ -5,10 +5,10 @@ module.exports = async (t) => {
   const { ev, waitFor, check } = t;
   await waitFor(`document.querySelectorAll('.sidebar-button').length>0`, 'the app to load', 60000);
   const rows = await t.query('SELECT version, name FROM companion_schema_version ORDER BY version');
-  check(JSON.stringify(rows) === JSON.stringify([{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }]),
-    `the database is recorded as version 9, then update 10: ${JSON.stringify(rows)}`);
+  check(JSON.stringify(rows) === JSON.stringify([{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }]),
+    `the database is recorded as version 9, then updates 10 and 11: ${JSON.stringify(rows)}`);
   const status = await ev(`window.api.getDatabaseStatus()`);
-  check(status && status.ok === true && status.version === 10 && status.latest === 10 && status.applied.length === 0, `nothing more needed changing: ${JSON.stringify(status)}`);
+  check(status && status.ok === true && status.version === 11 && status.latest === 11 && status.applied.length === 0, `nothing more needed changing: ${JSON.stringify(status)}`);
   check(!(await ev(`[...document.querySelectorAll('[role=status]')].some((e) => /database/i.test(e.innerText))`)), 'no database banner');
   check((await ev('document.title')).startsWith('XIV Fleet Companion'), `the window is named XIV Fleet Companion: ${await ev('document.title')}`);
 };

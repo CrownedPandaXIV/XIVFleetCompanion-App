@@ -19,11 +19,24 @@ function reconcileProgress(stored, parts) {
   return next;
 }
 
-// The stored progress after ticking `made` of `crafts` for one part (0 removes it).
-function setProgress(stored, itemId, made, crafts) {
+// With Look ahead on the Parts tab, the list asks for more or fewer parts depending on how far it looks, which
+// is not parts being crafted. So each tick remembers the look-ahead it was made with (`ahead`, days; missing
+// is 0) and is checked against the list for that look-ahead. listsByAhead: Map days -> parts (as above).
+function reconcileByAhead(stored, listsByAhead) {
+  const next = {};
+  for (const [ahead, parts] of listsByAhead) {
+    const own = Object.fromEntries(Object.entries(stored || {}).filter(([, entry]) => (Number(entry && entry.ahead) || 0) === ahead));
+    for (const [itemId, entry] of Object.entries(reconcileProgress(own, parts))) next[itemId] = ahead ? { ...entry, ahead } : entry;
+  }
+  return next;
+}
+
+// The stored progress after ticking `made` of `crafts` for one part (0 removes it), on the list that looks
+// `ahead` days ahead.
+function setProgress(stored, itemId, made, crafts, ahead = 0) {
   const next = { ...(stored || {}) };
   const n = Math.max(0, Math.min(Number(crafts) || 0, Math.round(Number(made) || 0)));
-  if (n > 0) next[itemId] = { made: n, outOf: Number(crafts) || 0 };
+  if (n > 0) next[itemId] = ahead ? { made: n, outOf: Number(crafts) || 0, ahead } : { made: n, outOf: Number(crafts) || 0 };
   else delete next[itemId];
   return next;
 }
@@ -38,4 +51,4 @@ function parseProgress(text) {
   }
 }
 
-module.exports = { reconcileProgress, setProgress, parseProgress };
+module.exports = { reconcileProgress, reconcileByAhead, setProgress, parseProgress };

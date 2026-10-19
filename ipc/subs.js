@@ -6,6 +6,7 @@ const { metricWindow } = require('../db/metric-window');
 const forecastVoyages = require('../subs/voyage-forecast');
 const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
 const rankUp = require('../subs/rank-up');
+const accuracy = require('../subs/forecast-accuracy');
 const { columnsByKey } = require('./shopping');
 const { targetBuildAt, repairKitCostFrom, FIGHT_CLUB_COLUMNS } = require('./parts');
 
@@ -300,6 +301,7 @@ async function addRankUps(client, subs) {
       nextBuild: switchTo ? {
         rank: switchTo.rank,
         build: switchTo.build.map((letter) => letter || '·').join(''),
+        parts: switchTo.build.map((letter) => letter || ''),
         at: switchAt && switchAt.at ? switchAt.at : null,
         voyages: switchAt && switchAt.voyages ? switchAt.voyages : null,
         fightClub: fightClub ? { route: fightClub.route, net: fightClub.net, gain: fightClub.gain } : null,
@@ -312,9 +314,94 @@ async function addRankUps(client, subs) {
   return subs;
 }
 
+// Saves each sub's Next Rank date, at most once an hour (whichever copy of the app gets there first), so
+// get-forecast-accuracy can later compare it with the real rank-up. Dates older than 30 days are dropped.
+// Never stops the Subs tab: a database without the table (or a login that may not write) is skipped, and
+// said once in the app's log.
+let forecastSaveWarned = false;
+async function saveForecasts(client, subs) {
+  const due = subs.filter((s) => s.slot && s.rank_up && s.rank_up.nextRank && s.rank_up.nextRankAt);
+  if (!due.length) return;
+  try {
+    const { rows: [saved] } = await client.query(
+      `SELECT EXISTS (SELECT 1 FROM companion_rankup_forecast WHERE made_at = date_trunc('hour', now())) AS done`);
+    if (saved.done) return;
+    await client.query(
+      `INSERT INTO companion_rankup_forecast (cid, slot, rank, made_at, predicted_at, sub_name)
+       SELECT cid, slot, rank, date_trunc('hour', now()), predicted_at, sub_name
+       FROM unnest($1::numeric[], $2::int[], $3::int[], $4::timestamptz[], $5::text[]) AS f(cid, slot, rank, predicted_at, sub_name)
+       ON CONFLICT DO NOTHING`,
+      [due.map((s) => String(s.cid)), due.map((s) => s.slot), due.map((s) => s.rank_up.nextRank),
+        due.map((s) => new Date(s.rank_up.nextRankAt).toISOString()), due.map((s) => s.sub_name)]);
+    await client.query(`DELETE FROM companion_rankup_forecast WHERE made_at < now() - make_interval(days => $1)`, [accuracy.KEEP_DAYS]);
+  } catch (err) {
+    if (err.code !== '42P01' && !forecastSaveWarned) {
+      forecastSaveWarned = true;
+      console.warn(`Could not save the Next Rank dates (the Subs tab's forecast line needs them): ${err.message}`);
+    }
+  }
+}
+
+// How close the saved Next Rank dates came to the real rank-ups (forecast-accuracy.js), with each sub's and
+// character's name: { count, averageOff, checks }, or null before the database has the table.
+async function loadForecastAccuracy(client) {
+  let saved;
+  try {
+    ({ rows: saved } = await client.query(
+      `SELECT cid::text AS cid, slot, rank, made_at, predicted_at, sub_name FROM companion_rankup_forecast
+       WHERE made_at >= now() - make_interval(days => $1)`, [accuracy.KEEP_DAYS]));
+  } catch (err) {
+    if (err.code === '42P01') return null;
+    throw err;
+  }
+  const bySub = new Map();
+  for (const r of saved) {
+    const key = `${r.cid}|${r.slot}`;
+    if (!bySub.has(key)) bySub.set(key, { cid: r.cid, slot: r.slot, subName: r.sub_name, latest: 0, predictions: [] });
+    const sub = bySub.get(key);
+    const madeAt = new Date(r.made_at).getTime();
+    sub.predictions.push({ rank: Number(r.rank), madeAt, predictedAt: new Date(r.predicted_at).getTime() });
+    // Its name as last saved (a sub can be renamed).
+    if (madeAt >= sub.latest) { sub.latest = madeAt; sub.subName = r.sub_name; }
+  }
+  if (!bySub.size) return accuracy.summarize([]);
+
+  const since = new Date(Date.now() - (accuracy.KEEP_DAYS + 1) * DAY);
+  const cids = [...new Set([...bySub.values()].map((s) => s.cid))];
+  const { latestCharacter } = await snapshotFragments(client);
+  const characters = new Map((await client.query(`SELECT cid::text AS cid, name, fc_id FROM ${latestCharacter} c WHERE c.cid = ANY($1::numeric[])`, [cids])).rows
+    .map((c) => [c.cid, c]));
+  const points = await metricWindow(client, 'character', [1, 2, 3, 4].map((slot) => `sub_rank:${slot}`), since, cids);
+  const voyages = await loadVoyageRoutes(client, since);
+
+  const checks = [];
+  for (const sub of bySub.values()) {
+    const character = characters.get(sub.cid) || {};
+    const returns = (voyages.get(`${character.fc_id}|${sub.subName}`) || []).map((v) => v.returnedAt);
+    const ups = accuracy.rankUps(points.get(`${sub.cid}|sub_rank:${sub.slot}`) || [], returns);
+    for (const c of accuracy.checkSub(sub.predictions, ups)) checks.push({ ...c, subName: sub.subName, characterName: character.name || '' });
+  }
+  return accuracy.summarize(checks);
+}
+
+// Every sub with its rank-up dates and next build (the Subs tab's rows; Look ahead on the Parts tab).
+async function loadSubmarinesWithRankUps(client) {
+  return addRankUps(client, await loadSubmarines(client));
+}
+
 ipcMain.handle('get-submarines', async () => {
   return withClient(async (client) => {
-    return { success: true, rows: await addRankUps(client, await loadSubmarines(client)) };
+    const rows = await loadSubmarinesWithRankUps(client);
+    await saveForecasts(client, rows);
+    return { success: true, rows };
+  }, (err) => {
+    return { success: false, error: err.message };
+  });
+});
+
+ipcMain.handle('get-forecast-accuracy', async () => {
+  return withClient(async (client) => {
+    return { success: true, accuracy: await loadForecastAccuracy(client) };
   }, (err) => {
     return { success: false, error: err.message };
   });
@@ -385,4 +472,4 @@ ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled }) => 
   });
 });
 
-module.exports = { loadSubmarines };
+module.exports = { loadSubmarines, loadSubmarinesWithRankUps };

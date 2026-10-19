@@ -21,6 +21,7 @@ const COUNTS = `
          (SELECT count(*) FROM companion_inventory_snapshot WHERE owner_cid = ${CID}) AS inventory,
          (SELECT count(*) FROM companion_character_housing WHERE cid = ${CID}) AS housing,
          (SELECT count(*) FROM character_sort_order WHERE cid = ${CID}) AS sort_order,
+         (SELECT count(*) FROM companion_rankup_forecast WHERE cid = ${CID}) AS forecasts,
          (SELECT count(*) FROM companion_fc_inventory_snapshot WHERE fc_id = ${FC}) AS own_chest,
          (SELECT count(*) FROM companion_fc_inventory_snapshot WHERE fc_id <> ${FC}) AS other_chests,
          (SELECT count(*) FROM companion_character_current WHERE cid <> ${CID}) AS other_characters,
@@ -43,6 +44,7 @@ async function clear(db) {
     ['companion_character_current', 'cid'], ['companion_character_snapshot', 'cid'], ['companion_submarine_snapshot', 'cid'],
     ['sub_craft_toggle', 'cid'], ['sub_build_rules', 'cid_override'], ['companion_retainer_lookup', 'owner_cid'],
     ['companion_inventory_snapshot', 'owner_cid'], ['companion_character_housing', 'cid'], ['character_sort_order', 'cid'],
+    ['companion_rankup_forecast', 'cid'],
   ]) {
     await db.query(`DELETE FROM ${table} WHERE ${column} = ${CID}`);
   }
@@ -99,7 +101,7 @@ module.exports = async (t) => {
   check(await ev(`document.body.innerText.includes('Removed Remy Removeme.') && !${dialog}`), 'the Roster says the character was removed');
 
   const after = (await query(COUNTS))[0];
-  const gone = ['character_rows', 'subs', 'craft', 'rules', 'retainers', 'gear_targets', 'inventory', 'housing', 'sort_order', 'own_chest'];
+  const gone = ['character_rows', 'subs', 'craft', 'rules', 'retainers', 'gear_targets', 'inventory', 'housing', 'sort_order', 'forecasts', 'own_chest'];
   check(gone.every((k) => Number(after[k]) === 0), 'its rows are removed everywhere, its Free Company chest too: ' + JSON.stringify(after));
   check(after.other_chests === before.other_chests && after.other_characters === before.other_characters,
     'other characters and other Free Company chests are untouched');
@@ -125,6 +127,7 @@ module.exports.before = async (db) => {
   await db.query(`INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES (${CID}, ${CID}, 0, 0, 22500, 3), (${CID}, ${RETAINER}, 10000, 0, 22501, 2)`);
   await db.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, fc_points, fc_rank, total_members, has_house) VALUES (${CID}, ${FC}, 'Remy FC', 'Remy Removeme', 10, '1', 1, false)`);
   await db.query(`INSERT INTO character_sort_order (cid, sort_index) VALUES (${CID}, 999)`);
+  await db.query(`INSERT INTO companion_rankup_forecast (cid, slot, rank, made_at, predicted_at, sub_name) VALUES (${CID}, 1, 11, now() - interval '1 day', now(), 'Remy Sub')`);
   await db.query(`INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES (${FC}, 20000, 0, 22502, 4)`);
   await db.query(`INSERT INTO companion_metric_history (recorded_at, subject_type, subject_id, metric, value) VALUES
                   (now() - interval '1 day', 'character', ${CID}, 'gil', 5), (now() - interval '1 day', 'fc', ${FC}, 'fc_points', 10)`);

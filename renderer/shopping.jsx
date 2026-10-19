@@ -151,7 +151,7 @@ const SHOPPING_PART_DEFS = [
   { key: 'made', label: 'Made', td: (p, ctx) => <ShoppingMadeCell part={p} onSave={ctx.onSave} />, sort: (p) => p.made || 0 },
 ];
 
-function ShoppingListView({ refreshKey }) {
+function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   const partSort = useColumnSort();
   const partCols = useTableColumns({ tableKey: 'shoppingParts', ownDefs: SHOPPING_PART_DEFS, rows: null, idOf: () => null });
   const [list, setList] = useState(null);
@@ -167,15 +167,20 @@ function ShoppingListView({ refreshKey }) {
     try { localStorage.setItem('shoppingBuyFromVendors', String(buyFromVendors)); } catch { /* only a convenience */ }
     setList(null);
     setError(null);
-    window.api.getShoppingList({ buyFromVendors }).then((result) => {
+    let current = true;
+    window.api.getShoppingList({ buyFromVendors, aheadDays }).then((result) => {
+      if (!current) return;
       if (result.success) setList(result);
       else setError(result.error);
     });
-  }, [refreshKey, buyFromVendors]);
+    return () => { current = false; };
+  }, [refreshKey, buyFromVendors, aheadDays]);
 
   if (error) return <div className="error">Failed to load the shopping list: {error}</div>;
   if (list === null) return <div className="status">Working out the shopping list...</div>;
-  if (list.empty) return <div className="status">Nothing needs crafting - every need is either met, covered by a spare, or covered by a reused old part.</div>;
+  if (list.empty) {
+    return <div className="status">Nothing needs crafting - every need is either met, covered by a spare, or covered by a reused old part{aheadDays ? ', with no new build due in that time' : ''}.</div>;
+  }
 
   function copy() {
     navigator.clipboard.writeText(shoppingListText(list)).then(() => {
@@ -186,7 +191,7 @@ function ShoppingListView({ refreshKey }) {
 
   async function saveMade(part, made) {
     setList((l) => ({ ...l, parts: l.parts.map((p) => (p.itemId === part.itemId ? { ...p, made } : p)) }));
-    const result = await window.api.saveShoppingProgress({ itemId: part.itemId, made, crafts: part.crafts });
+    const result = await window.api.saveShoppingProgress({ itemId: part.itemId, made, crafts: part.crafts, aheadDays });
     setProgressError(result.success ? null : result.error);
   }
 
