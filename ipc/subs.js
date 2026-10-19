@@ -45,6 +45,7 @@ async function loadSubmarines(client) {
     if (id && row.location) pointLetterById.set(id, row.location);
   }
   const validRouteLetters = new Set(pointLetterById.values());
+  const mapOfPoint = await loadSectorMaps(client);
 
   const rankStatsResult = await client.query(`SELECT id, speed_bonus, range_bonus FROM ffxiv_submarinerank`);
   const rankStatsById = new Map();
@@ -99,6 +100,7 @@ async function loadSubmarines(client) {
       rank_progress_pct: rankProgressPct,
       current_setup: partLetters.join('-'),
       current_route: currentRoute,
+      current_map: routeMap(row.points, mapOfPoint),
       target_route: target.route,
       target_gil_day: target.gilPerDay,
       current_gil_day: currentGilDay,
@@ -115,6 +117,32 @@ async function loadSubmarines(client) {
   });
 
   return rows;
+}
+
+// Which map (sea) each sector is on, from game data: sector id -> { id, name } (the game's own map
+// number: 1 Deep-sea Site, 2 Sea of Ash, ...). Empty when the game data has no Map column.
+async function loadSectorMaps(client) {
+  const mapOfPoint = new Map();
+  const cols = await columnsByKey(client, 'ffxiv_submarineexploration');
+  if (!cols.has('map')) return mapOfPoint;
+  const names = new Map();
+  const mapCols = await columnsByKey(client, 'ffxiv_submarinemap');
+  if (mapCols.has('name')) {
+    const { rows } = await client.query(`SELECT id, ${quote(mapCols.get('name'))} AS name FROM ffxiv_submarinemap`);
+    for (const r of rows) names.set(Number(r.id), r.name || '');
+  }
+  const { rows } = await client.query(`SELECT id, ${quote(cols.get('map'))} AS map FROM ffxiv_submarineexploration`);
+  for (const r of rows) {
+    const id = Number(r.map);
+    if (Number(r.id) > 0 && id > 0) mapOfPoint.set(Number(r.id), { id, name: names.get(id) || '' });
+  }
+  return mapOfPoint;
+}
+
+// The map a route is on (its first sector's), or null.
+function routeMap(pointsBuffer, mapOfPoint) {
+  const first = Array.from(pointsBuffer || []).find((b) => b > 0);
+  return (first && mapOfPoint.get(first)) || null;
 }
 
 // Game data the rank-up dates need: experience per rank, and each route sector's position, experience
@@ -170,11 +198,13 @@ async function addRankUps(client, subs) {
     const sectors = sectorIds.map((id) => game.sectors.get(id));
     const start = sectorIds.length ? rankUp.startFor(sectorIds[0], game.startingPoints) : null;
     const trip = typeof sub.speed === 'number' ? rankUp.voyage(sectors, start, sub.speed) : null;
-    const calculated = trip ? { ...trip, returnAt: Number(sub.return_time) > 0 ? Number(sub.return_time) * 1000 : null } : null;
+    const returnAt = Number(sub.return_time) > 0 ? Number(sub.return_time) * 1000 : null;
+    const calculated = trip ? { ...trip, returnAt } : null;
+    const out = { returnAt, hours: trip ? trip.hours : null };
 
     const method = measured ? 'measured' : calculated ? 'calculated' : null;
     const rate = { measured: method === 'measured' ? measured : null, calculated: method === 'calculated' ? calculated : null };
-    const dateFor = (targetRank) => rankUp.rankDate({ rank: sub.rank, exp: sub.current_exp, targetRank, expToNext: game.expToNext, ...rate, now });
+    const dateFor = (targetRank) => rankUp.rankDate({ rank: sub.rank, exp: sub.current_exp, targetRank, expToNext: game.expToNext, ...rate, out, now });
 
     const next = sub.rank < top ? dateFor(sub.rank + 1) : null;
     const buildAt = (rank) => targetBuildAt({ rank, slot: sub.slot, cid, craftEnabled: sub.craft_enabled, rules, fightClubRows });
@@ -183,6 +213,7 @@ async function addRankUps(client, subs) {
 
     sub.rank_up = {
       method,
+      outAtSea: method === 'measured' && returnAt > now,
       perDay: measured ? measured.perDay : null,
       voyage: calculated ? { exp: calculated.exp, hours: calculated.hours } : null,
       maxRank: top,

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { DAY } = require('../subs/supply-runway');
 const {
-  totalExp, totalExpSeries, measuredRate, voyage, startFor, rankDate, maxRank, nextBuildRank,
+  totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, nextBuildRank,
 } = require('../subs/rank-up');
 
 const now = Date.UTC(2026, 9, 20);
@@ -60,6 +60,21 @@ test('measured date: the experience still needed at the rate per day', () => {
   assert.deepStrictEqual(rankDate({ ...base, targetRank: 2 }), { reached: true });
   assert.strictEqual(rankDate({ ...base, targetRank: 3, measured: { perDay: 0 } }), null, 'no progress');
   assert.strictEqual(rankDate({ ...base, targetRank: 6 }), null, 'past the highest rank');
+});
+
+test('measured date for a sub out at sea: never before it is back, then on a return', () => {
+  // 100 a day, 150 needed: 1.5 days at the steady rate.
+  const base = { rank: 2, exp: 50, targetRank: 3, expToNext, measured: { perDay: 100 }, now };
+  // Back in 2 days: it can't rank up before then, so the date is its return.
+  assert.strictEqual(rankDate({ ...base, out: { returnAt: now + 2 * DAY, hours: 24 } }).at, now + 2 * DAY);
+  // Back in 5 hours, 24h voyages: 1.5 days falls during the second voyage after, so it's the return after that.
+  assert.strictEqual(rankDate({ ...base, out: { returnAt: now + 5 * HOUR, hours: 24 } }).at, now + 53 * HOUR);
+  // Voyage length unknown: the return, or the steady date when that is later.
+  assert.strictEqual(rankDate({ ...base, out: { returnAt: now + 5 * HOUR, hours: null } }).at, now + 1.5 * DAY);
+  // In port, or back and waiting to be collected: the steady date.
+  assert.strictEqual(rankDate({ ...base, out: { returnAt: null, hours: 24 } }).at, now + 1.5 * DAY);
+  assert.strictEqual(rankDate({ ...base, out: { returnAt: now - HOUR, hours: 24 } }).at, now + 1.5 * DAY);
+  assert.strictEqual(atCollection(now + DAY, undefined, now), now + DAY);
 });
 
 test('calculated date: experience arrives when each voyage comes back', () => {

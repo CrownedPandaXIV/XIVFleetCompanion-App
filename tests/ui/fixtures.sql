@@ -75,10 +75,13 @@ insert into fight_club_routes(route, hours, repair_times, gil_sub_day, gil_hr, r
 values ('OJZ', 24, '10', 300000, 12500, '85: WWWW', '85: WWWW', '85: WWWW'), ('OJ', 12, '10', 250000, 10400, '85: SSSS', '85: SSSS', '85: SSSS');
 -- Sectors for the rank-up dates: point 0 is the map's starting point; O and J are 500 and 120 apart and
 -- give 1,000 and 2,000 experience, with 100- and 50-minute surveys (Z has no position, so is left out).
+-- All on map 1, Deep-sea Site.
 alter table ffxiv_submarineexploration add column location text, add column exp_reward text, add column survey_durationmin text,
-  add column x text, add column y text, add column z text, add column starting_point text;
-insert into ffxiv_submarineexploration values ('0', '', '0', '0', '0', '0', '0', 'True'),
-  ('1','O', '1000', '100', '300', '400', '0', 'False'), ('2','J', '2000', '50', '300', '400', '120', 'False'), ('3','Z', null, null, null, null, null, 'False');
+  add column x text, add column y text, add column z text, add column starting_point text, add column map text;
+insert into ffxiv_submarineexploration values ('0', '', '0', '0', '0', '0', '0', 'True', '1'),
+  ('1','O', '1000', '100', '300', '400', '0', 'False', '1'), ('2','J', '2000', '50', '300', '400', '120', 'False', '1'), ('3','Z', null, null, null, null, null, 'False', '1');
+alter table ffxiv_submarinemap add column name text;
+insert into ffxiv_submarinemap values ('1', 'Deep-sea Site'), ('2', 'Sea of Ash');
 -- Ranks 1-89 need 10,000 experience each to the next; 90 is the highest.
 alter table ffxiv_submarinerank add column speed_bonus text, add column range_bonus text, add column exp_to_next text;
 insert into ffxiv_submarinerank (id, speed_bonus, range_bonus, exp_to_next)
