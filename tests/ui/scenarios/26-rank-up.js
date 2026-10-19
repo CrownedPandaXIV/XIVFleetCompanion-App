@@ -8,7 +8,8 @@
 //        3,000 a voyage after, so 2 voyages: "≈ in 5d 14h", never before it is back
 //   Sub3 is set back an hour ago, waiting to be collected, for sorting by Status.
 // A Sub Rules rule for rank 88 (all Syldra) is added, so the next build for these subs is YYYY at 88.
-// Gus Kitteh 6's Sub4 is rank 90, the highest in the test data.
+// Gus Kitteh 6's Sub4 is rank 90, the highest in the test data; Fight Club's all-Whale O-J-Z build pays more
+// than its own, so Next Build still says so (see 45-fight-club-next-build.js).
 const BEX = '18014498578000001';
 // Sub1's return time when the test data was made; it is set to an hour from now for the test (the answer
 // depends on it), and put back after.
@@ -73,7 +74,7 @@ module.exports = async (t) => {
   await ev(`[...document.querySelectorAll('.controls button')].find(b => b.innerText.trim() === 'Reset Sorting').click()`);
 
   const gus = await subRow('Gus Kitteh 6', 'Sub4');
-  check(gus && gus[iRank].text === 'Max rank' && gus[iBuild].text === '—', 'the highest rank: ' + (gus && gus.slice(iRank, iBuild + 1).map((c) => c.text).join(' | ')));
+  check(gus && gus[iRank].text === 'Max rank' && gus[iBuild].text === 'WWWW at 90 · now', 'the highest rank, still told of a better-paying build from Fight Club: ' + (gus && gus.slice(iRank, iBuild + 1).map((c) => c.text).join(' | ')));
 };
 
 module.exports.before = async (db) => {

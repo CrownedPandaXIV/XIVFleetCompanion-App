@@ -86,24 +86,61 @@ function formatRouteWithDashes(routeStr, validRouteLetters) {
   return tokens.join('-');
 }
 
-// Target Route + Target Gil/Day: among every Fight Club row whose Rec
-// Build threshold this rank clears, picks whichever has the highest
-// Gil/Hr, matching the sheet's own recommendation logic. Only
-// activates at rank 85+.
-function computeTargetRoute(rank, fightClubRows, repairKitCost, validRouteLetters) {
-  if (rank < 85) return { route: '', gilPerDay: '' };
-  let best = null;
+// Every Fight Club row with a Rec Build, as { row, rank, parts, net }: the rank its Rec Build needs and the
+// gil it makes a day after the repair kits that build breaks (at repairKitCost each).
+function fightClubOptions(fightClubRows, repairKitCost) {
+  const out = [];
   for (const row of fightClubRows) {
     const recBuild = parseRankBuild(row.rec_build_notes);
     if (!recBuild) continue;
-    if (rank < recBuild.rank) continue;
-    const gilHr = Number(row.gil_hr) || 0;
-    if (!best || gilHr > best.gilHr) best = { row, recBuild, gilHr };
+    const parts = recBuild.parts.map((p) => (p.modified ? `${p.letter}+` : p.letter));
+    out.push({ row, rank: recBuild.rank, parts, net: netGilPerDay(row, parts, repairKitCost) });
   }
+  return out;
+}
+
+// The best of `options` a sub at `rank` can run (its Rec Build rank cleared, most gil a day after repair
+// kits), or null. Only from rank 85, like Fight Club itself.
+function bestOf(options, rank) {
+  if (rank < 85) return null;
+  let best = null;
+  for (const o of options) if (rank >= o.rank && (!best || o.net > best.net)) best = o;
+  return best;
+}
+
+// The best Fight Club option a sub at `rank` can run: { row, parts, net } or null.
+function bestFightClubOption(rank, fightClubRows, repairKitCost) {
+  return bestOf(fightClubOptions(fightClubRows, repairKitCost), rank);
+}
+
+// Target Route + Target Gil/Day: Fight Club's best option at this rank, after repair kits.
+function computeTargetRoute(rank, fightClubRows, repairKitCost, validRouteLetters) {
+  const best = bestFightClubOption(rank, fightClubRows, repairKitCost);
   if (!best) return { route: '', gilPerDay: '' };
-  const partLetters = best.recBuild.parts.map((p) => (p.modified ? `${p.letter}+` : p.letter));
-  const net = netGilPerDay(best.row, partLetters, repairKitCost);
-  return { route: formatRouteWithDashes(best.row.route, validRouteLetters), gilPerDay: Math.round(net) };
+  return { route: formatRouteWithDashes(best.row.route, validRouteLetters), gilPerDay: Math.round(best.net) };
+}
+
+// The first rank from `rank` (now) up to `top` at which Fight Club's best option needs a different build from
+// `currentParts` and makes more gil a day after repair kits than `currentNet` (the sub's Current Gil/Day; its
+// best option now when that isn't known). { rank, build, route, net, gain } or null.
+function nextFightClubBuild({ rank, top, currentParts, currentNet, fightClubRows, repairKitCost, validRouteLetters }) {
+  const options = fightClubOptions(fightClubRows, repairKitCost);
+  const now = bestOf(options, rank);
+  const baseline = typeof currentNet === 'number' ? currentNet : now ? now.net : null;
+  const current = (currentParts || []).join('-');
+  for (let r = rank; r <= top; r++) {
+    const option = bestOf(options, r);
+    if (!option || option.parts.join('-') === current) continue;
+    if (baseline !== null && option.net <= baseline) continue;
+    return {
+      rank: r,
+      build: option.parts,
+      route: formatRouteWithDashes(option.row.route, validRouteLetters),
+      net: Math.round(option.net),
+      gain: baseline === null ? null : Math.round(option.net - baseline),
+    };
+  }
+  return null;
 }
 
 // Current Gil/Day: matches the sub's ACTUAL current route + installed
@@ -194,6 +231,8 @@ module.exports = {
   partLetter,
   parseRankBuild,
   computeTargetRoute,
+  bestFightClubOption,
+  nextFightClubBuild,
   computeCurrentGilPerDay,
   decodeRoute,
   computeStat,

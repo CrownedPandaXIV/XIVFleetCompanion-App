@@ -126,11 +126,18 @@ function NextRankCell({ sub }) {
 function NextBuildCell({ sub }) {
   const r = sub.rank_up;
   const b = r && r.nextBuild;
-  if (!b) return <span title="No build change ahead in Sub Rules (or Fight Club for a Craft? sub).">—</span>;
+  if (!b) return <span title="No build change ahead in Sub Rules, and nothing in Fight Club makes more after repair kits.">—</span>;
+  const fc = b.fightClub;
+  const why = fc
+    ? `From Fight Club (your Sub Rules have no change ahead): on ${fc.route}, ${fc.net.toLocaleString()} gil a day after repair kits` +
+      (fc.gain !== null ? `, ${fc.gain.toLocaleString()} more than now.` : '.')
+    : undefined;
   return (
     <span>
-      {b.build} at {b.rank}
-      {b.at ? <span className="subs-dim"> · <RankUpWhen rankUp={r} at={b.at} voyages={b.voyages} label={`Rank ${b.rank}`} /></span> : null}
+      <span className="next-build" title={why}>{b.build} at {b.rank}</span>
+      {b.rank <= sub.rank
+        ? <span className="subs-dim"> · now</span>
+        : b.at ? <span className="subs-dim"> · <RankUpWhen rankUp={r} at={b.at} voyages={b.voyages} label={`Rank ${b.rank}`} /></span> : null}
     </span>
   );
 }
