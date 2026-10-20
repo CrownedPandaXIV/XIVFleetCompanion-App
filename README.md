@@ -75,7 +75,8 @@ At the end it shows what to type on your other PCs, and how to install the plugi
 You can run it again any time from **Settings → Setup Help → Set up this PC**, for example to add Tailscale later.
 Uninstalling the app never removes PostgreSQL, your database or Tailscale, so you can take the app off the database
 PC and leave the database running for your other PCs. Uninstalling does remove the daily backup and Discord alert
-tasks on that PC, since they need the app; turn them on from another PC if you still want them.
+tasks on that PC, since they need the app. To keep daily backups, turn them on from another PC (see
+[Backups from a PC without the database](#backups-from-a-pc-without-the-database)).
 
 **Done with the app on a PC?** **Settings → Setup Help → Remove everything** takes it all off: the app, its settings,
 its scheduled tasks, and the database. It makes a final backup first if you want one, and asks you to type DELETE.
@@ -181,6 +182,19 @@ PC is back on.
   folder.
 
 If a backup fails, the Discord alerts tell you.
+
+### Backups from a PC without the database
+
+Backups are made with PostgreSQL's own tools, which come with PostgreSQL, so normally only the database PC has them.
+Any other PC with the app can get them: **Settings → Backups → Get the backup tools**. It asks the database which
+PostgreSQL version it runs (14 to 18), downloads that version from PostgreSQL's maker (about 350 to 370 MB, once,
+checked against its known checksum), keeps only the 11 MB needed for backups and restores in the app's settings folder,
+and deletes the rest. Nothing is installed and Windows doesn't ask for permission. Then set up backups there as above.
+The tools have to match the database's version, so if the database later moves to a newer PostgreSQL, click **Get
+the backup tools again**.
+
+The tools need Microsoft's Visual C++ runtime, which most PCs with games already have. If it's missing, the app says
+so: install "Microsoft Visual C++ Redistributable" (x64) from Microsoft's website and try again.
 
 ### If the database PC dies
 

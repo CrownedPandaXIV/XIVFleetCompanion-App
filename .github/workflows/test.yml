@@ -178,3 +178,15 @@ jobs:
         Write-Output 'Tasks kept on update and removed on uninstall.'
         # The last lookup above found nothing (exit code 1), which is the point; don't let it fail the step.
         exit 0
+    - name: Get the backup tools, then back up, test and restore with only them
+      shell: pwsh
+      env:
+        PGUSER: postgres
+        PGPASSWORD: root
+        PGPORT: 5432
+      run: |
+        # The test machine's own PostgreSQL (older than the tools), off until started.
+        $service = Get-Service -Name 'postgresql*' | Select-Object -First 1
+        Set-Service -Name $service.Name -StartupType Manual
+        Start-Service -Name $service.Name
+        node tests/windows/backup-tools.js

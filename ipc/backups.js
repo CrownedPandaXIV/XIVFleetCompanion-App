@@ -6,7 +6,11 @@ const path = require('path');
 const { loadPostgresConfig, recheckDatabase } = require('../db');
 const { loadBackupSettings, validateBackupSettings, saveBackupSettings } = require('../backups/settings');
 const { listBackups, backupTime } = require('../backups/files');
-const { findTools } = require('../backups/tools');
+const os = require('os');
+const { findTools, run } = require('../backups/tools');
+const { Client } = require('pg');
+const { chooseDownload, getTools } = require('../backups/get-tools');
+const installers = require('../setup/installers');
 const { testBackup, checkBackupFile, restoreBackup } = require('../backups/run');
 const { settingsFile, backupWithSettings } = require('../backups/app');
 const schedule = require('../backups/schedule');
@@ -54,6 +58,9 @@ ipcMain.handle('backups:get', async () => {
     backups: settings.folder ? listBackups(settings.folder) : [],
     copies: settings.copyFolder ? listBackups(settings.copyFolder) : [],
     log: settings.folder ? logTail(settings.folder) : [],
+    // Get the backup tools is Windows only; the UI tests (on Linux) show its button to check it answers.
+    windows: process.platform === 'win32' || !!process.env.XIV_FLEET_TEST_GET_TOOLS,
+    toolsDownloadMb: installers.toolsMajors().map((m) => installers.toolsDownloadFor(m).sizeMb),
   };
 });
 
@@ -82,6 +89,42 @@ ipcMain.handle('backups:save', async (event, input) => {
   }
   return { success: true, note: notes.join(' ') };
 });
+
+// Get the backup tools: PostgreSQL's pg_dump and pg_restore for a PC without PostgreSQL, in the app's own folder.
+ipcMain.handle('backups:get-tools', (event) => exclusive('getting the backup tools', async () => {
+  if (process.platform !== 'win32') return { success: false, error: 'Only on Windows.' };
+  const send = (text) => { if (!event.sender.isDestroyed()) event.sender.send('backups:tools-progress', text); };
+  // The tools that match the database's PostgreSQL version.
+  send('Asking the database its version...');
+  let versionNum;
+  try {
+    const config = loadPostgresConfig();
+    const client = new Client({ ...config, port: Number(config.port || 5432), connectionTimeoutMillis: 10000 });
+    await client.connect();
+    try {
+      versionNum = (await client.query('SHOW server_version_num')).rows[0].server_version_num;
+    } finally {
+      await client.end().catch(() => {});
+    }
+  } catch (err) {
+    return { success: false, error: `Couldn't ask the database which PostgreSQL version it runs, so the right tools can't be chosen: ${err.message}` };
+  }
+  const chosen = chooseDownload(versionNum, installers);
+  if (!chosen.file) return { success: false, error: chosen.message };
+  const result = await getTools({
+    file: chosen.file,
+    dir: path.join(app.getPath('userData'), 'postgres-tools'),
+    tempDir: path.join(os.tmpdir(), 'xiv-fleet-downloads'),
+    deps: {
+      download: installers.downloadOnce,
+      powershell: (script) => run('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]),
+      version: (dump) => run(dump, ['--version']),
+    },
+    onProgress: send,
+  });
+  (result.ok ? console.log : console.error)(`Get the backup tools: ${result.ok ? `${result.version} in ${result.bin}` : result.message}`);
+  return result.ok ? { success: true, version: result.version } : { success: false, error: result.message };
+}));
 
 ipcMain.handle('backups:choose-folder', async (event, { title, current } = {}) => {
   const win = BrowserWindow.fromWebContents(event.sender);

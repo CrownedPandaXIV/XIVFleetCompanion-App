@@ -22,6 +22,18 @@ const DOWNLOADS = {
     x64: { url: 'https://pkgs.tailscale.com/stable/tailscale-setup-1.104.1-amd64.msi', sha256: '6DA8BCDB0D45A214CAE0E8A88C2987AD48DEC134BF04DFFB9C05F1354C02B0B4' },
     arm64: { url: 'https://pkgs.tailscale.com/stable/tailscale-setup-1.104.1-arm64.msi', sha256: 'CB9688912EB48FAF2F752B084EE638D80545832634DA5F1885514041071C95D0' },
   },
+  // Settings → Backups → Get the backup tools (backups/get-tools.js): PostgreSQL as a zip instead of an installer,
+  // in the version the database runs (a newer pg_restore sends settings an older server doesn't know). Only
+  // pg_dump, pg_restore and what they need are kept from it. These checksums aren't in winget's list: they were
+  // measured on GitHub's Windows test machine, which downloads and checks one of them on every pull request.
+  pgtools: {
+    name: "PostgreSQL's backup tools",
+    14: { version: '14.24', sizeMb: 351, x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-14.24-4-windows-x64-binaries.zip', sha256: '8D5B5AEF56848DBD0562E5E02D613EB5CBC7D97CAE10B290CBFDABF1B4969088' } },
+    15: { version: '15.19', sizeMb: 354, x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-15.19-5-windows-x64-binaries.zip', sha256: '49E0690194D9FE2BB4D7D6587FDDDAA85A3EAAAFE2FD5480E0916FCB25D0143E' } },
+    16: { version: '16.15', sizeMb: 356, x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-16.15-5-windows-x64-binaries.zip', sha256: '43BB45F173A6F08CF1D29A97A6D8DEB119E8E8093A24C00D2D1001A0CCAA8281' } },
+    17: { version: '17.11', sizeMb: 364, x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-17.11-5-windows-x64-binaries.zip', sha256: '80379B2C04D51C30225532E0AE04509899141E9957ED096FE749D7FD9DF8F82F' } },
+    18: { version: '18.6', sizeMb: 367, x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip', sha256: 'E2246BA91D22345BC3D017586C09EDE52D9DF180B1EEB480F050445F1CAD84E2' } },
+  },
 };
 
 // The kinds of PC, as the setup screen offers them.
@@ -50,6 +62,14 @@ function setupPlan(role, { sameNetwork = false, installed = {} } = {}) {
     askConnection: role === 'connect' || role === 'plugin',
   };
 }
+
+// Get the backup tools' download for a database on PostgreSQL `major` (x64: Windows on ARM runs it too), or null
+// for a version there is none for.
+function toolsDownloadFor(major) {
+  const d = DOWNLOADS.pgtools[major];
+  return d && typeof d === 'object' && d.x64 ? { ...d.x64, name: `${DOWNLOADS.pgtools.name} ${d.version}`, version: d.version, sizeMb: d.sizeMb } : null;
+}
+const toolsMajors = () => Object.keys(DOWNLOADS.pgtools).filter((k) => /^\d+$/.test(k)).map(Number);
 
 // The download for this PC's processor; PostgreSQL has no ARM build for Windows.
 function downloadFor(what, arch) {
@@ -158,7 +178,7 @@ function tailscaleStatus(json) {
 }
 
 module.exports = {
-  DOWNLOADS, ROLES, setupPlan, downloadFor, postgresOptions, postgresCommand, tailscaleCommand, installSucceeded,
+  DOWNLOADS, ROLES, setupPlan, downloadFor, toolsDownloadFor, toolsMajors, postgresOptions, postgresCommand, tailscaleCommand, installSucceeded,
   TAILSCALE_PRODUCT, productCodeFrom, tailscaleUninstallCommand, postgresUninstallCommand,
   sha256Of, download, downloadOnce, suggestPassword, tailscaleExe, loginUrl, tailscaleStatus,
 };
