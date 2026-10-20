@@ -10,6 +10,8 @@ const defaultUserData = path.join(app.getPath('appData'), app.getName());
 if (app.getPath('userData') === defaultUserData) {
   app.setPath('userData', chooseUserDataFolder(app.getPath('appData'), path.join(app.getPath('appData'), 'XIV Fleet Companion')));
 }
+// PostgreSQL's backup tools, when Settings → Backups → Get the backup tools downloaded them (backups/get-tools.js).
+require('./backups/tools').useAppTools(path.join(app.getPath('userData'), 'postgres-tools'));
 
 // What the app prints also goes to logs\app.log in that folder (app-log.js). Not for Windows' permission-prompt
 // runs (--fleet-setup), which run as the administrator and report back to the app that started them. The alert

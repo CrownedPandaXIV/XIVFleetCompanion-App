@@ -61,6 +61,12 @@ contextBridge.exposeInMainWorld('api', {
   restoreBackup: (file) => invoke('backups:restore', file),
   chooseBackupFile: () => invoke('backups:choose-file'),
   restoreBackupFile: (file) => invoke('backups:restore-file', file),
+  getBackupTools: () => invoke('backups:get-tools'),
+  onBackupToolsProgress: (callback) => {
+    const listener = (event, text) => callback(text);
+    ipcRenderer.on('backups:tools-progress', listener);
+    return () => ipcRenderer.removeListener('backups:tools-progress', listener);
+  },
   // Database updates (db/apply-updates.js): { ok, version, created, applied, newer } or { ok: false, message }.
   getDatabaseStatus: () => invoke('get-database-status'),
   checkDatabaseSpeed: () => invoke('database:speed-check'),

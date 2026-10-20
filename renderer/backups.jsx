@@ -56,6 +56,11 @@ function BackupsSection() {
     if (!r.success) { setStatus(r.error || 'That file could not be used.'); return; }
     setConfirmRestore({ ...r, picked: true });
   };
+  // Get the backup tools: progress ("Downloading... 40%") shows where the status goes.
+  const getBackupTools = () => {
+    const stop = window.api.onBackupToolsProgress((text) => setWorking(text));
+    return act('Starting...', () => window.api.getBackupTools(), (r) => `Got the backup tools: ${r.version}.`).finally(stop);
+  };
   const takeOverLegacy = () => setForm((f) => ({ ...f, ...data.schedule.legacy.settings, enabled: true }));
 
   const { tools, schedule, last } = data;
@@ -66,7 +71,8 @@ function BackupsSection() {
       <h3>Backups</h3>
       <div className="alerts-help">
         A copy of the whole database, made every day on this PC with PostgreSQL's own tools. Turn this on in the
-        app on the PC that has the database. Everything here is for this PC only.
+        app on the PC that has the database, or on any PC once it has the backup tools. Everything here is for this
+        PC only.
       </div>
 
       <div className="backups-last">
@@ -78,6 +84,15 @@ function BackupsSection() {
       </div>
 
       {!tools.found && <div className="warning backups-no-tools">{tools.error}</div>}
+      {!tools.found && data.windows && (
+        <div className="settings-row backups-get-tools">
+          <button className="backups-get-tools-button" onClick={getBackupTools} disabled={busy}>Get the backup tools</button>
+          <span className="alerts-help">
+            For a PC without PostgreSQL. Downloads PostgreSQL from its maker (about {data.toolsDownloadMb} MB, once), keeps
+            the 11 MB backups and restores need, and deletes the rest. Nothing is installed.
+          </span>
+        </div>
+      )}
 
       {schedule.legacy && (
         <div className="settings-row backups-legacy">
@@ -120,7 +135,7 @@ function BackupsSection() {
         <button onClick={() => choose('pgBin', 'Choose PostgreSQL\'s "bin" folder')} disabled={busy}>Browse...</button>
       </div>
       <div className="alerts-help">
-        {tools.found ? `Found: ${tools.version}${tools.bin ? ` in ${tools.bin}` : ''}. ` : ''}Leave it blank unless they are not found: it is the
+        {tools.found ? `Found: ${tools.version}${tools.bin ? ` in ${tools.bin}` : ''}${tools.fromApp ? ' (from Get the backup tools)' : ''}. ` : ''}Leave it blank unless they are not found: it is the
         "bin" folder of PostgreSQL's install, with pg_dump.exe in it.
       </div>
 

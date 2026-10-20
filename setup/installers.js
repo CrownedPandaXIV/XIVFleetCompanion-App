@@ -22,6 +22,15 @@ const DOWNLOADS = {
     x64: { url: 'https://pkgs.tailscale.com/stable/tailscale-setup-1.104.1-amd64.msi', sha256: '6DA8BCDB0D45A214CAE0E8A88C2987AD48DEC134BF04DFFB9C05F1354C02B0B4' },
     arm64: { url: 'https://pkgs.tailscale.com/stable/tailscale-setup-1.104.1-arm64.msi', sha256: 'CB9688912EB48FAF2F752B084EE638D80545832634DA5F1885514041071C95D0' },
   },
+  // Settings → Backups → Get the backup tools (backups/get-tools.js): the same PostgreSQL as a zip instead of an
+  // installer. Only pg_dump, pg_restore and what they need are kept from it. Its checksum isn't in winget's
+  // list: it was measured on GitHub's Windows test machine, which downloads and checks it on every pull request.
+  pgtools: {
+    name: "PostgreSQL 18's backup tools",
+    version: '18.6',
+    sizeMb: 367,
+    x64: { url: 'https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip', sha256: 'E2246BA91D22345BC3D017586C09EDE52D9DF180B1EEB480F050445F1CAD84E2' },
+  },
 };
 
 // The kinds of PC, as the setup screen offers them.
