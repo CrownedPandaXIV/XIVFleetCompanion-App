@@ -9,9 +9,10 @@ No database or plugin change.
 
 - **Any PC can make the backups.** Backups need PostgreSQL's own tools, which only the database PC had, so with the
   app uninstalled there nothing was backed up. **Settings → Backups → Get the backup tools** now gets them on any PC:
-  it downloads PostgreSQL from its maker (about 367 MB, once, checksum checked), keeps only the 11 MB needed for
-  backups and restores, and deletes the rest. Nothing is installed. Daily backups, Test, Restore and Restore from a
-  file then work on that PC. If Microsoft's Visual C++ runtime is missing, it says so.
+  it downloads PostgreSQL from its maker in the version the database runs (14 to 18; about 350 to 370 MB, once,
+  checksum checked), keeps only the 11 MB needed for backups and restores, and deletes the rest. Nothing is
+  installed. Daily backups, Test, Restore and Restore from a file then work on that PC. If Microsoft's Visual C++
+  runtime is missing, it says so.
 
 ## 1.4.5 - 2026-10-19
 

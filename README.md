@@ -186,10 +186,12 @@ If a backup fails, the Discord alerts tell you.
 ### Backups from a PC without the database
 
 Backups are made with PostgreSQL's own tools, which come with PostgreSQL, so normally only the database PC has them.
-Any other PC with the app can get them: **Settings → Backups → Get the backup tools**. It downloads PostgreSQL from its
-maker (about 367 MB, once, checked against its known checksum), keeps only the 11 MB needed for backups and restores
-in the app's settings folder, and deletes the rest. Nothing is installed and Windows doesn't ask for permission. Then
-set up backups there as above.
+Any other PC with the app can get them: **Settings → Backups → Get the backup tools**. It asks the database which
+PostgreSQL version it runs (14 to 18), downloads that version from PostgreSQL's maker (about 350 to 370 MB, once,
+checked against its known checksum), keeps only the 11 MB needed for backups and restores in the app's settings folder,
+and deletes the rest. Nothing is installed and Windows doesn't ask for permission. Then set up backups there as above.
+The tools have to match the database's version, so if the database later moves to a newer PostgreSQL, click **Get
+the backup tools again**.
 
 The tools need Microsoft's Visual C++ runtime, which most PCs with games already have. If it's missing, the app says
 so: install "Microsoft Visual C++ Redistributable" (x64) from Microsoft's website and try again.

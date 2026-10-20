@@ -15,7 +15,7 @@ module.exports = async (t) => {
   await ev(`[...document.querySelectorAll('.settings-tab')].find((b) => b.innerText === 'Backups').click()`);
   await waitFor(`!!${section} && !!${section}.querySelector('.backups-get-tools-button')`, 'the Get the backup tools button', 20000);
   const help = await ev(`${section}.querySelector('.backups-get-tools').innerText`);
-  check(/about 367 MB, once/.test(help) && /Nothing is installed/.test(help), 'says how big the download is and that nothing is installed: ' + help);
+  check(/in the version the database runs \(about 351 to 367 MB, once\)/.test(help) && /Nothing is installed/.test(help), 'says how big the download is and that nothing is installed: ' + help);
   await shot('backup-tools');
   await ev(`${section}.querySelector('.backups-get-tools-button').click()`);
   await waitFor(`/Only on Windows/.test((${section}.querySelector('.backups-status') || {}).innerText || '')`, 'the answer', 20000);

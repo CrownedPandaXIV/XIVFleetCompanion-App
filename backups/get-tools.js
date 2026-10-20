@@ -7,11 +7,10 @@ const fs = require('fs');
 const path = require('path');
 
 // What pg_dump and pg_restore load from the zip's bin folder (measured with dumpbin on GitHub's Windows test
-// machine), and the licences of the libraries among them.
-const KEEP = [
-  'pg_dump.exe', 'pg_restore.exe', 'libpq.dll', 'libintl-9.dll', 'libiconv-2.dll', 'libwinpthread-1.dll',
-  'liblz4.dll', 'libzstd.dll', 'zlib1.dll', 'libcrypto-3-x64.dll', 'libssl-3-x64.dll',
-].map((name) => `pgsql/bin/${name}`).concat('pgsql/commandlinetools_3rd_party_licenses.txt');
+// machine for each version; the numbers in some names change between versions), and the licences of those
+// libraries when the zip has them. REQUIRED must all be there.
+const KEEP = /^pgsql\/(bin\/(pg_dump\.exe|pg_restore\.exe|libpq\.dll|libintl-\d+\.dll|libiconv-\d+\.dll|libwinpthread-\d+\.dll|liblz4\.dll|libzstd\.dll|zlib1\.dll|libcrypto-[\w-]+\.dll|libssl-[\w-]+\.dll)|commandlinetools_3rd_party_licenses\.txt)$/;
+const REQUIRED = ['pg_dump.exe', 'pg_restore.exe', 'libpq.dll'];
 
 // Windows' "a DLL it needs is missing" (0xC0000135): here, Microsoft's Visual C++ runtime, which comes with
 // most games and with PostgreSQL's own installer but isn't in the zip.
@@ -19,20 +18,31 @@ const DLL_NOT_FOUND = 0xC0000135;
 
 const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
-// The PowerShell that copies the files in KEEP out of the zip into `dest` (Windows' own zip reader, so nothing
+// The PowerShell that copies the files KEEP matches out of the zip into `dest` (Windows' own zip reader, so nothing
 // else is unpacked).
 function extractScript(zip, dest) {
   return [
     "$ErrorActionPreference = 'Stop'",
     'Add-Type -AssemblyName System.IO.Compression.FileSystem',
-    `$want = @(${KEEP.map(psQuote).join(', ')})`,
+    `$keep = ${psQuote(KEEP.source)}`,
     `$zip = [IO.Compression.ZipFile]::OpenRead(${psQuote(zip)})`,
     'try {',
     '  foreach ($e in $zip.Entries) {',
-    `    if ($want -contains $e.FullName) { [IO.Compression.ZipFileExtensions]::ExtractToFile($e, (Join-Path ${psQuote(dest)} $e.Name), $true) }`,
+    `    if ($e.FullName -cmatch $keep) { [IO.Compression.ZipFileExtensions]::ExtractToFile($e, (Join-Path ${psQuote(dest)} $e.Name), $true) }`,
     '  }',
     '} finally { $zip.Dispose() }',
   ].join('\n');
+}
+
+// Which download to get for a database whose `SHOW server_version_num` is versionNum: { file } (from
+// toolsDownloadFor, setup/installers.js) or { message } when there is none for its version. The tools match the
+// database's version, as on the PC that has it: a newer pg_restore sends settings an older server doesn't know.
+function chooseDownload(versionNum, { toolsDownloadFor, toolsMajors }) {
+  const major = Math.floor(Number(versionNum) / 10000);
+  const file = toolsDownloadFor(major);
+  if (file) return { file };
+  const majors = toolsMajors();
+  return { message: `The database runs PostgreSQL ${major || 'of an unknown version'}. The app can get the backup tools for PostgreSQL ${Math.min(...majors)} to ${Math.max(...majors)} only.` };
 }
 
 // deps: { download(file, dest, onProgress), powershell(script) -> { ok, stderr }, version(dumpExe) -> { ok, code,
@@ -49,7 +59,7 @@ async function getTools({ file, dir, tempDir, deps, onProgress = () => {} }) {
     fs.rmSync(fresh, { recursive: true, force: true });
     fs.mkdirSync(fresh, { recursive: true });
     const unpacked = await deps.powershell(extractScript(zip, fresh));
-    const missing = KEEP.map((k) => path.basename(k)).filter((name) => !fs.existsSync(path.join(fresh, name)));
+    const missing = REQUIRED.filter((name) => !fs.existsSync(path.join(fresh, name)));
     if (!unpacked.ok || missing.length) {
       return { ok: false, message: `The download couldn't be unpacked${missing.length ? ` (${missing.join(', ')} not in it)` : ''}: ${(unpacked.stderr || '').trim() || 'no reason given'}` };
     }
@@ -75,4 +85,4 @@ async function getTools({ file, dir, tempDir, deps, onProgress = () => {} }) {
   }
 }
 
-module.exports = { KEEP, DLL_NOT_FOUND, extractScript, getTools };
+module.exports = { KEEP, REQUIRED, DLL_NOT_FOUND, extractScript, chooseDownload, getTools };

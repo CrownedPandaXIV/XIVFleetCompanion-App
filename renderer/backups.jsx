@@ -84,12 +84,13 @@ function BackupsSection() {
       </div>
 
       {!tools.found && <div className="warning backups-no-tools">{tools.error}</div>}
-      {!tools.found && data.windows && (
+      {(!tools.found || tools.fromApp) && data.windows && (
         <div className="settings-row backups-get-tools">
-          <button className="backups-get-tools-button" onClick={getBackupTools} disabled={busy}>Get the backup tools</button>
+          <button className="backups-get-tools-button" onClick={getBackupTools} disabled={busy}>{tools.found ? 'Get the backup tools again' : 'Get the backup tools'}</button>
           <span className="alerts-help">
-            For a PC without PostgreSQL. Downloads PostgreSQL from its maker (about {data.toolsDownloadMb} MB, once), keeps
-            the 11 MB backups and restores need, and deletes the rest. Nothing is installed.
+            {tools.found
+              ? 'For when the database moves to a newer PostgreSQL: gets the tools for the version it runs now.'
+              : `For a PC without PostgreSQL. Downloads PostgreSQL from its maker in the version the database runs (about ${Math.min(...data.toolsDownloadMb)} to ${Math.max(...data.toolsDownloadMb)} MB, once), keeps the 11 MB backups and restores need, and deletes the rest. Nothing is installed.`}
           </span>
         </div>
       )}
