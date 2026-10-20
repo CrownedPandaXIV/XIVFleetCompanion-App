@@ -1,0 +1,45 @@
+name: Measure
+on: pull_request
+jobs:
+  zip:
+    runs-on: windows-2022
+    steps:
+    - shell: pwsh
+      run: |
+        $ProgressPreference = 'SilentlyContinue'
+        foreach ($b in 1,2,3,4,5) {
+          $u = "https://get.enterprisedb.com/postgresql/postgresql-18.6-$b-windows-x64-binaries.zip"
+          try { $r = Invoke-WebRequest -Uri $u -Method Head -MaximumRedirection 5; Write-Output "OK $u $($r.Headers['Content-Length'])" } catch { Write-Output "NO $u $($_.Exception.Response.StatusCode)" }
+        }
+        $u = (Get-Content -Raw -Path $null -ErrorAction SilentlyContinue)
+        foreach ($b in 1,2,3,4,5) {
+          $u = "https://get.enterprisedb.com/postgresql/postgresql-18.6-$b-windows-x64-binaries.zip"
+          try { Invoke-WebRequest -Uri $u -OutFile z.zip; break } catch { Remove-Item z.zip -ErrorAction SilentlyContinue }
+        }
+        Write-Output "GOT $u"
+        Write-Output ("SIZE " + (Get-Item z.zip).Length)
+        Write-Output ("SHA " + (Get-FileHash z.zip -Algorithm SHA256).Hash)
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead("$PWD\z.zip")
+        $zip.Entries | Where-Object { $_.FullName -match '^pgsql/bin/[^/]+$' } | ForEach-Object { "BIN $($_.FullName) $($_.Length)" }
+        $zip.Entries | Select-Object -First 5 | ForEach-Object { "TOP $($_.FullName)" }
+        $zip.Dispose()
+        Expand-Archive z.zip -DestinationPath x
+        # Which DLLs pg_dump and pg_restore load: try with only the exe, then add DLLs one by one until it runs.
+        New-Item -ItemType Directory t | Out-Null
+        Copy-Item x/pgsql/bin/pg_dump.exe, x/pgsql/bin/pg_restore.exe t/
+        $dlls = Get-ChildItem x/pgsql/bin/*.dll | ForEach-Object Name
+        $need = @()
+        for ($i = 0; $i -lt 40; $i++) {
+          $p = Start-Process -FilePath t/pg_dump.exe -ArgumentList '--version' -Wait -PassThru -NoNewWindow -RedirectStandardOutput o.txt -RedirectStandardError e.txt
+          if ($p.ExitCode -eq 0) { break }
+          $code = '{0:X8}' -f $p.ExitCode; Write-Output "exit $code"; break
+        }
+        Write-Output ("DUMP " + (Get-Content o.txt))
+        Get-ChildItem x/pgsql/bin/*.dll | ForEach-Object { "DLL $($_.Name) $($_.Length)" }
+        # dumpbin from VS lists direct imports
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $db = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+        foreach ($f in 'pg_dump.exe','pg_restore.exe','libpq.dll','libssl-3-x64.dll','libcrypto-3-x64.dll','libintl-9.dll','libiconv-2.dll','zlib1.dll','liblz4.dll','libzstd.dll','libwinpthread-1.dll') {
+          if (Test-Path "x/pgsql/bin/$f") { Write-Output "IMPORTS $f"; & $db.FullName /dependents "x/pgsql/bin/$f" | Select-String '\.dll' | ForEach-Object { "   " + $_.Line.Trim() } }
+        }
