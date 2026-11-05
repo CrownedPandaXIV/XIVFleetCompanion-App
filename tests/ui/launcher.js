@@ -16,6 +16,9 @@ fs.writeFileSync(path.join(process.env.UI_TEST_PROFILE, 'whats-new.json'),
 // No internet for the game data download: a new database stays without it (filling it is tested in
 // tests/db/verify-game-data.js).
 if (process.env.XIV_FLEET_SKIP_GAME_DATA_FILL === undefined) process.env.XIV_FLEET_SKIP_GAME_DATA_FILL = '1';
+// No internet either for the daily look for new game data: GitHub's answer is stood in for (nothing new, unless a
+// scenario says otherwise).
+if (process.env.XIV_FLEET_TEST_GAME_DATA_CHANGES === undefined) process.env.XIV_FLEET_TEST_GAME_DATA_CHANGES = '{}';
 // Linux CI machines have no system keyring; use plain-text storage there (tests only).
 if (process.platform === 'linux') safeStorage.setUsePlainTextEncryption(true);
 

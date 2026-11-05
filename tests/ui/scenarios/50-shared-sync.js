@@ -15,6 +15,7 @@ module.exports = async (t) => {
   check(/Advanced → Character Synchronization/.test(summary) && /Prune deleted characters/.test(summary) && /JustBackup/.test(summary),
     "points to AutoRetainer's Character Synchronization first");
   check(/Only sync the characters I tick/.test(summary), 'and the plugin setting as the other way');
+  check(/plugin 1\.0\.2 or newer on every setup, this stops by itself once the character logs in on its setup/.test(summary.replace(/\s+/g, ' ')), 'says newer plugins stop it by themselves');
   check(!/Cal Kitteh 2/.test(summary), 'a label changed once is not counted');
   await shot('shared-sync-summary');
 

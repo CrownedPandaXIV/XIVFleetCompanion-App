@@ -66,6 +66,8 @@ jobs:
       run: node tests/db/verify-metric-series.js
     - name: Verify the game data update
       run: node tests/db/verify-game-data.js
+    - name: Verify the daily look for new game data
+      run: node tests/db/verify-game-data-notice.js
     - name: Verify the extra table columns
       run: node tests/db/verify-column-catalog.js
     - name: Verify the database updates

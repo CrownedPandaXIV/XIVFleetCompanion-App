@@ -1,7 +1,10 @@
 // Game data update and backups of the game (ffxiv_*) tables.
-const { ipcMain } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const { app, ipcMain } = require('electron');
 const { withClient } = require('../db');
 const gameData = require('../db/game-data');
+const gameDataNotice = require('../db/game-data-notice');
 
 // ---- Game data update (ffxiv_* reference tables from the ffxiv-datamining repository) ----
 // "Check" downloads and compares without changing anything and keeps the result for a while;
@@ -35,8 +38,13 @@ ipcMain.handle('game-data-check', async () => {
   gameDataBusy = true;
   try {
     return await withClient(async (client) => {
-      const checked = await gameData.checkAll(client);
+      const checked = await gameData.checkAll(client, testCheckOptions());
       gameDataChecked = { at: Date.now(), ...checked };
+      // Every table already matches the files: the game data is up to date as of the files' version, so the
+      // window's "New game data is available" goes away.
+      if (checked.version && checked.tables.every((t) => t.status === 'unchanged')) {
+        await gameDataNotice.markUpToDate(client, checked.version.date).catch(() => {});
+      }
       return { success: true, version: checked.version, tables: checked.tables.map(summarizeGameDataTable) };
     }, (err) => ({ success: false, error: err.message }));
   } finally {
@@ -72,6 +80,49 @@ ipcMain.handle('game-data-apply', async (event, options) => {
   } finally {
     gameDataBusy = false;
   }
+});
+
+// The UI tests have no internet: XIV_FLEET_TEST_GAME_DATA_BASE_URL points the game data downloads elsewhere.
+function testCheckOptions() {
+  const baseUrl = process.env.XIV_FLEET_TEST_GAME_DATA_BASE_URL;
+  return baseUrl ? { baseUrl, fetchSourceVersion: false } : {};
+}
+
+// ---- "New game data is available" (db/game-data-notice.js) ----
+// Asked by the window when it opens and every hour; GitHub itself is asked at most once a day across all PCs.
+// "Later" is remembered on this PC until something newer changes.
+const noticeFile = () => path.join(app.getPath('userData'), 'game-data-notice.json');
+
+function readDismissed() {
+  try {
+    return JSON.parse(fs.readFileSync(noticeFile(), 'utf8')).dismissed || null;
+  } catch {
+    return null;
+  }
+}
+
+// The UI tests have no internet: XIV_FLEET_TEST_GAME_DATA_CHANGES ({ File: date }) stands in for GitHub's answers.
+function testFetch() {
+  const fake = process.env.XIV_FLEET_TEST_GAME_DATA_CHANGES;
+  if (fake === undefined) return undefined;
+  const changes = JSON.parse(fake || '{}');
+  return async (url) => {
+    const file = /path=csv\/en\/([^.&]+)\.csv/.exec(url);
+    const dates = file ? (changes[decodeURIComponent(file[1])] ? [changes[decodeURIComponent(file[1])]] : []) : Object.values(changes);
+    return dates.map((date) => ({ commit: { committer: { date } } }));
+  };
+}
+
+ipcMain.handle('game-data-notice:get', () => withClient(async (client) => {
+  const found = await gameDataNotice.refresh(client, { fetch: testFetch() });
+  if (found.error) console.log(`Game data: couldn't look for new game data (${found.error}); trying again in an hour.`);
+  return { success: true, ...gameDataNotice.noticeFrom({ changes: found.changes, dismissed: readDismissed() }) };
+}, (err) => ({ success: false, error: err.message })));
+
+ipcMain.handle('game-data-notice:later', (event, newest) => {
+  if (typeof newest !== 'string' || Number.isNaN(Date.parse(newest))) return { success: false, error: 'Not a date.' };
+  fs.writeFileSync(noticeFile(), JSON.stringify({ dismissed: new Date(newest).toISOString() }));
+  return { success: true };
 });
 
 // Backups of the game tables: list, make one now, restore, delete.

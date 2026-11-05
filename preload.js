@@ -136,6 +136,8 @@ contextBridge.exposeInMainWorld('api', {
   getGameDataStatus: () => invoke('game-data-status'),
   checkGameData: () => invoke('game-data-check'),
   applyGameData: (options) => invoke('game-data-apply', options),
+  getGameDataNotice: () => invoke('game-data-notice:get'),
+  gameDataNoticeLater: (newest) => invoke('game-data-notice:later', newest),
   listGameDataBackups: () => invoke('game-data-backups'),
   createGameDataBackup: () => invoke('game-data-backup-create'),
   restoreGameDataBackup: (name) => invoke('game-data-backup-restore', name),

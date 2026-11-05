@@ -90,7 +90,8 @@ app's own database and login are removed. On a PC the database was moved away fr
 password in **Settings → Database**, click **Test Connection**, then **Save**.
 
 On a brand-new database, the app fills in the game data (item names, recipes, worlds and so on) by itself the first
-time it connects. That takes a minute or two, and a note at the top of the window says when it's done.
+time it connects. That takes a minute or two, and a note at the top of the window says when it's done. After that, a bar
+at the top says when new game data is available (usually after a game patch), with an **Update now** button.
 
 Your password is encrypted with Windows' own protection and never leaves this PC.
 
@@ -111,10 +112,15 @@ You never need to run anything on the database by hand.
 ### More than one account
 
 Give each game account its own setup of AutoRetainer and Fleet Companion (for example, separate XIVLauncher setups),
-with its own account label in the plugin's settings (the Roster and the PCs tab point out any without one). Each setup syncs every character its AutoRetainer knows, so if one
-setup's AutoRetainer still has an old copy of another account's character, the two setups keep overwriting that
-character's subs and label. The Summary and the PCs tab warn when that happens. To fix it, on the setup that doesn't
-play the character, either open AutoRetainer's settings → **Advanced → Character Synchronization** and click **Prune
+with its own account label in the plugin's settings (the Roster and the PCs tab point out any without one). Each setup
+notes when a character logs in on it, and only the setup a character last logged in on syncs it (plugin 1.0.2 or
+newer), so an old copy of a character left in another setup's AutoRetainer can't overwrite it. There's no time limit:
+after a long break, each character still belongs to the setup it last logged in on.
+
+With an older plugin, or before a character has logged in since the update, each setup syncs every character its
+AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
+keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it, on the
+setup that doesn't play the character, either open AutoRetainer's settings → **Advanced → Character Synchronization** and click **Prune
 deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup), or in Fleet
 Companion's plugin settings choose **Only sync the characters I tick** and tick only that account's characters.
 
@@ -348,3 +354,8 @@ Version numbers follow [Semantic Versioning](https://semver.org):
 **Settings → Data → Game Data** refreshes the `ffxiv_` tables (items, recipes, worlds and so on) from
 [xivapi/ffxiv-datamining](https://github.com/xivapi/ffxiv-datamining). Before applying an update it can save a copy of
 those tables inside the database, and those copies can be restored from the same screen.
+
+You don't have to remember to look: once a day the app asks GitHub whether any of those files have changed since the
+last update (only their dates, a few kilobytes), and says so in a bar under the header. **Update now** there does the
+same check and update, backing up the old tables first; **Later** hides it on that PC until something newer changes.
+With the app open on several PCs, only one of them asks each day.

@@ -194,6 +194,69 @@ function WhatsNewBox() {
   );
 }
 
+// "New game data is available" (db/game-data-notice.js): asked when the window opens and every hour (GitHub itself
+// at most once a day). Update now runs the same check and update as Settings > Data > Game Data, backing up the old
+// game data first; Later hides it on this PC until something newer changes.
+const GAME_DATA_NOTICE_EVERY_MS = 60 * 60 * 1000;
+
+function GameDataBanner() {
+  const [notice, setNotice] = useState(null);
+  const [phase, setPhase] = useState('idle'); // idle | checking | updating | done
+  const [message, setMessage] = useState('');
+  const load = () => window.api.getGameDataNotice().then((r) => setNotice(r && r.success && r.available ? r : null));
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, GAME_DATA_NOTICE_EVERY_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const finish = (text) => { setMessage(text); setPhase('done'); load(); };
+  const plain = (tables) => tables.map((t) => t.table.replace(/^ffxiv_/, '')).join(', ');
+  async function update() {
+    setPhase('checking');
+    const checked = await window.api.checkGameData();
+    if (!checked.success) return finish(`The game data couldn't be checked: ${checked.error}`);
+    const changed = checked.tables.filter((t) => t.status === 'ok');
+    const blocked = checked.tables.filter((t) => t.status === 'blocked');
+    if (!changed.length) {
+      return finish(blocked.length
+        ? `The game data couldn't be downloaded (${blocked[0].reason}). Try again later, or from Settings > Data > Game Data.`
+        : 'The game data is already up to date.');
+    }
+    setPhase('updating');
+    const applied = await window.api.applyGameData({ backupFirst: true });
+    if (!applied.success) return finish(`The game data couldn't be updated: ${applied.error}`);
+    const updated = applied.results.filter((r) => r.status === 'updated');
+    const failed = applied.results.filter((r) => r.status === 'failed').concat(blocked);
+    finish(`Game data updated (${updated.length} table${updated.length === 1 ? '' : 's'})${failed.length ? `, except ${plain(failed)}` : ''}.`
+      + ' The old game data was backed up first; Settings > Data > Game Data can put it back.');
+  }
+  const later = () => { window.api.gameDataNoticeLater(notice.newest); setNotice(null); };
+
+  if (phase === 'done') {
+    return (
+      <div className="update-banner game-data-banner" role="status">
+        {message} <button onClick={() => { setPhase('idle'); setMessage(''); }}>Close</button>
+      </div>
+    );
+  }
+  if (phase === 'checking' || phase === 'updating') {
+    return (
+      <div className="update-banner game-data-banner" role="status">
+        {phase === 'checking' ? 'Downloading the new game data to see what changed...' : 'Updating the game data...'} This takes a minute or two.
+      </div>
+    );
+  }
+  if (!notice) return null;
+  return (
+    <div className="update-banner game-data-banner" role="status">
+      New game data is available (it changed on {new Date(notice.newest).toLocaleDateString()}, usually after a game patch).{' '}
+      <button onClick={update}>Update now</button>
+      <button onClick={later}>Later</button>
+    </div>
+  );
+}
+
 // Shown under the header when the app could not update the database (db/apply-updates.js), when it has just
 // set up a new one, or when a newer copy of the app has already updated it further.
 function DatabaseBanner() {
@@ -484,6 +547,7 @@ function App() {
         <ConnectionBanner status={connection} />
         <UpdateBanner />
         <WhatsNewBox />
+        <GameDataBanner />
         <DatabaseBanner />
 
         {showSettings && (

@@ -5,7 +5,19 @@ All notable changes to the app are recorded here. Versions follow
 
 ## 1.6.0 - unreleased
 
-No database or plugin change.
+Goes with plugin 1.0.2. The app adds two tables to the database by itself (update 12); nothing to do by hand.
+
+- **The app says when new game data is available.** Once a day, the app asks GitHub whether any of the game data
+  files it uses (items, recipes, submarine parts and sectors, and so on) have changed since the game data was last
+  updated, usually after a game patch. Only the dates the files changed are asked for, not the files, and with the app
+  open on several PCs only one of them asks each day. When something is new, a bar under the header says so: **Update
+  now** runs the same check and update as **Settings → Data → Game Data** (backing up the old game data first), and
+  **Later** hides it on that PC until something newer changes. Nothing is changed until you click.
+- **Only the setup a character last logged in on syncs it** (with plugin 1.0.2). Each setup of the plugin now notes
+  in the database when a character logs in on it. A setup leaves alone a character that last logged in on another
+  setup, so an old copy of it in that setup's AutoRetainer can't overwrite it any more. Characters that haven't logged
+  in anywhere since the update keep syncing as before, and there's no time limit: a long break, or the plugins being
+  down for a while after a game patch, changes nothing. Removing a character from the Roster removes its login too.
 
 - **What's new after an update.** The first time the app opens after updating, it shows what changed in each version
   since you last opened it, until you click **Got it**. The **Restart to update** bar has a **What's new** button too,
@@ -15,7 +27,8 @@ No database or plugin change.
   Parts tab asks for starter parts, and its account label switches back and forth. The Summary and the PCs tab now
   name the character and both labels, and say how to fix it on the setup that doesn't play it: AutoRetainer's
   **Advanced → Character Synchronization → Prune deleted characters**, or the plugin's **Only sync the characters I
-  tick**. The warning goes away once the label has stopped switching for 3 days.
+  tick**. With plugin 1.0.2 on every setup, it stops by itself once the character logs in on its own setup. The
+  warning goes away once the label has stopped switching for 3 days.
 - **A note when a character or a setup of the plugin has no account label.** Without one, the app can't tell which
   account a character is on, setups on one PC share a row on the PCs tab, and the warning above can't work. The
   Roster and the PCs tab say how many have none and where to fill it in (each setup's plugin settings, Account

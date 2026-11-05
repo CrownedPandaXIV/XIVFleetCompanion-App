@@ -512,7 +512,11 @@ function SharedSyncWarning({ characters }) {
           <ul className="shared-sync-list">{characters.map((c) => <li key={c.cid}>{line(c)}</li>)}</ul>
         </details>
       )}
-      <span className="alerts-help">This goes away once {one ? 'its label has' : 'their labels have'} stopped switching for 3 days.</span>
+      <span className="alerts-help">
+        With plugin 1.0.2 or newer on every setup, this stops by itself once {one ? 'the character logs' : 'each character logs'} in
+        on {one ? 'its' : 'its own'} setup: only the setup a character last logged in on syncs it. This goes away once {one ? 'its label has' : 'their labels have'} stopped
+        switching for 3 days.
+      </span>
     </div>
   );
 }

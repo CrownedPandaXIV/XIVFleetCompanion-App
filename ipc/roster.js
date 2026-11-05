@@ -129,7 +129,8 @@ ipcMain.handle('remove-character', async (event, cid) => {
       SELECT to_regclass('companion_character_current') IS NOT NULL AS has_current,
              to_regclass('companion_character_snapshot') IS NOT NULL AS has_history,
              to_regclass('companion_metric_latest') IS NOT NULL AS has_latest,
-             to_regclass('companion_rankup_forecast') IS NOT NULL AS has_forecasts`);
+             to_regclass('companion_rankup_forecast') IS NOT NULL AS has_forecasts,
+             to_regclass('companion_character_login') IS NOT NULL AS has_logins`);
     const fcResult = await client.query(`
       SELECT fc_id FROM ${latestCharacter} c WHERE c.cid = $1 AND c.fc_id IS NOT NULL
       UNION
@@ -158,6 +159,7 @@ ipcMain.handle('remove-character', async (event, cid) => {
         await client.query(`DELETE FROM companion_metric_latest WHERE subject_type = 'character' AND subject_id = $1`, [cid]);
       }
       if (tables.has_forecasts) await client.query('DELETE FROM companion_rankup_forecast WHERE cid = $1', [cid]);
+      if (tables.has_logins) await client.query('DELETE FROM companion_character_login WHERE cid = $1', [cid]);
       if (fcIds.length) {
         // Free Companies no other character is in (the character's own rows are already gone).
         const { rows: orphans } = await client.query(`
