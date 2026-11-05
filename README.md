@@ -117,6 +117,10 @@ notes when a character logs in on it, and only the setup a character last logged
 newer), so an old copy of a character left in another setup's AutoRetainer can't overwrite it. There's no time limit:
 after a long break, each character still belongs to the setup it last logged in on.
 
+One setup used for several accounts (the same AutoRetainer and plugin, logging into each account in turn) still syncs
+every character correctly. But the account label belongs to the setup, so all of its characters share one label, and
+the app can't tell those accounts apart in the Account column, the Roster or Trends.
+
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
 keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
