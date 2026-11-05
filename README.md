@@ -55,6 +55,12 @@ updates** looks straight away.
 After an update, the app shows what changed in each version since you last opened it, until you click **Got it**.
 **What's new** on the update bar, and in **Settings → General → Updates**, shows the same any time.
 
+**Trying new versions first:** tick **Get test versions** in **Settings → General → Updates**, and that PC gets new
+versions to try before everyone else (they're numbered like `1.6.0-test.12`). It still gets every normal update too.
+Turning it off keeps the version you have until a normal version is newer. A test version can still have problems, so
+this is for whoever wants to try things first. The plugin has its own test builds: see
+[the download page](https://github.com/CrownedPandaXIV/XIVFleetCompanion-Releases) for how to get them in Dalamud.
+
 ## First-time setup
 
 The first time the app starts, it asks what this PC is for:
@@ -125,6 +131,11 @@ The same goes for Allagan Tools, FC Tracker and Submarine Tracker: they keep the
 so a shared setup syncs all of it, under its one label. And a setup leaves alone their data too (bags, retainers' items,
 FC chests, house details, voyage loot) for any character that last logged in on another setup.
 
+The Roster's **Synced By** column names the setup each character last logged in on, and the PCs tab says how many
+characters each setup left to another one. If a character's setup keeps syncing but leaves it out (it's unticked in
+that setup's plugin settings), no setup sends it any more: the Roster and the PCs tab say which character and where to
+tick it.
+
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
 keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
@@ -138,7 +149,7 @@ keep a backup).
 | Tab | What it shows |
 | --- | --- |
 | **Summary** | Everything that needs you, at a glance: idle subs, low supplies, FC houses at risk, retainers without a venture. |
-| **Character Roster** | Every character with gil, ceruleum and repair kits. Drag to reorder; group by account. |
+| **Character Roster** | Every character with gil, ceruleum and repair kits, and which setup of the plugin syncs it. Drag to reorder; group by account. |
 | **Free Companies** | Each FC with its house and when it was last entered. |
 | **Salvage** | The salvage you're holding and what it's worth. |
 | **Subs** | Every sub, when it's back, and its next rank-up and build change, with how close the rank-up dates have come. |
@@ -351,6 +362,11 @@ GitHub then tags the release, builds the installer and publishes it to
 [XIVFleetCompanion-Releases](https://github.com/CrownedPandaXIV/XIVFleetCompanion-Releases), where installed copies
 pick it up. That needs the `RELEASES_TOKEN` secret: a token that can write to that repository.
 `npm run dist` builds the installer locally into `dist/`.
+
+**A test version first:** push the branch to `testing` (`git push origin dev:testing --force`). GitHub builds it as
+`<version>-test.<run>` and puts it on the `testing` pre-release of XIVFleetCompanion-Releases, where only copies with
+**Get test versions** on look (`update-feed.js`, `.github/workflows/test-release.yml`). Every normal release also goes
+there when it's newer, so testers never miss one.
 
 Version numbers follow [Semantic Versioning](https://semver.org):
 

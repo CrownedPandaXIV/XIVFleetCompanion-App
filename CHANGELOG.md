@@ -5,7 +5,8 @@ All notable changes to the app are recorded here. Versions follow
 
 ## 1.6.0 - unreleased
 
-Goes with plugin 1.0.2. The app adds two tables to the database by itself (update 12); nothing to do by hand.
+Goes with plugin 1.0.2. The app adds two tables and a column to the database by itself (update 12); nothing to do by
+hand.
 
 - **The app says when new game data is available.** Once a day, the app asks GitHub whether any of the game data
   files it uses (items, recipes, submarine parts and sectors, and so on) have changed since the game data was last
@@ -18,7 +19,15 @@ Goes with plugin 1.0.2. The app adds two tables to the database by itself (updat
   setup, so an old copy of it in that setup's AutoRetainer can't overwrite it any more. Characters that haven't logged
   in anywhere since the update keep syncing as before, and there's no time limit: a long break, or the plugins being
   down for a while after a game patch, changes nothing. Removing a character from the Roster removes its login too.
-
+- **Test versions.** Tick **Get test versions** in **Settings → General → Updates** and that PC gets new versions to
+  try before everyone else, numbered like `1.6.0-test.12`. It still gets every normal update too, and turning it off
+  keeps the version you have until a normal version is newer. From plugin 1.0.2 on, new plugin versions can be tried
+  first too, with Dalamud's testing builds.
+- **Who syncs each character.** The Roster's new **Synced By** column names the setup (account label and PC) each
+  character last logged in on, which with plugin 1.0.2 is the only one that syncs it. The PCs tab says how many
+  characters each setup left to another one.
+- **A note when no setup syncs a character.** If a character's setup keeps syncing but leaves it out (it's unticked in
+  that setup's plugin settings, or its AutoRetainer lost it), the Roster and the PCs tab name it and say where to tick it.
 - **What's new after an update.** The first time the app opens after updating, it shows what changed in each version
   since you last opened it, until you click **Got it**. The **Restart to update** bar has a **What's new** button too,
   and **Settings → General → Updates → What's new** shows the recent versions any time.

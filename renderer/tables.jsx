@@ -531,9 +531,26 @@ function NoLabelNote({ characters = 0, setups = 0 }) {
     : `${characters} character${characters === 1 ? ' has' : 's have'} no account label`;
   return (
     <div className="supplies-note no-label-note">
-      <span className="warning">{what},</span> so the app can't tell which account {setups ? (setups === 1 ? 'it syncs' : 'they sync') : (characters === 1 ? 'it is on' : 'they are on')} or
+      <span className="note-warn">{what},</span> so the app can't tell which account {setups ? (setups === 1 ? 'it syncs' : 'they sync') : (characters === 1 ? 'it is on' : 'they are on')} or
       spot two setups syncing the same character. In each setup's Fleet Companion plugin settings, fill in Account Label,
       for example with the account's name.
+    </div>
+  );
+}
+
+// Characters no setup syncs (characters/owner-skips.js): the setup a character last logged in on is the only one that
+// syncs it, and that setup is syncing without it, so it's unticked there or that setup's AutoRetainer lost it.
+function NotSyncedAnywhereNote({ characters }) {
+  if (!characters || characters.length === 0) return null;
+  const setup = (c) => `${c.label || '(no label)'} on ${c.pc}`;
+  const one = characters.length === 1;
+  return (
+    <div className="supplies-note not-synced-anywhere">
+      <span className="note-warn">{one ? '1 character isn\'t' : `${characters.length} characters aren't`} synced by any setup of the plugin:</span>{' '}
+      {characters.map((c) => `${c.name} (${c.world}, last logged in on ${setup(c)})`).join('; ')}. Only the setup a character last
+      logged in on syncs it, and {one ? 'that setup is' : 'those setups are'} syncing without {one ? 'it' : 'them'}. In that setup's
+      Fleet Companion plugin settings, under Characters, tick {one ? 'it' : 'them'}; or log in as {one ? 'it' : 'each'} on the setup
+      that should sync {one ? 'it' : 'them'}.
     </div>
   );
 }

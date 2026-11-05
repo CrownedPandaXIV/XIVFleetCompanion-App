@@ -1,6 +1,7 @@
 // Roster: the character list, when the plugin last wrote data, and drag-to-reorder.
 const { ipcMain } = require('electron');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { loadOwnerSkips } = require('../characters/owner-skips');
 const { withClient, snapshotFragments } = require('../db');
 
 // Handles a single request from the renderer to fetch the character roster.
@@ -23,8 +24,11 @@ ipcMain.handle('get-roster', async () => {
 
     // One row per character (latestCharacter, see db/index.js), joined to its Free Company and house, the
     // city names, its place in the roster order and how many of its subs are built.
+    // Where each character last logged in (plugin 1.0.2, database update 12): only that setup syncs it.
+    const { rows: [loginTable] } = await client.query(`SELECT to_regclass('companion_character_login') IS NOT NULL AS ok`);
     const result = await client.query(`
       SELECT
+        ${loginTable.ok ? 'l.pc_name AS login_pc, l.account_label AS login_label, l.logged_in_at,' : ''}
         s.cid, s.name, s.world, s.gil, s.retainer_count, s.submarine_count,
         s.account_label, s.snapshot_at, s.repair_kits, s.ceruleum,
         h.fc_name, h.fc_points, h.has_house, h.house_ward, h.house_plot,
@@ -35,6 +39,7 @@ ipcMain.handle('get-roster', async () => {
       LEFT JOIN companion_character_housing h ON s.cid = h.cid
       LEFT JOIN housing_key_city_lookup k ON h.house_city = k.city_id
       LEFT JOIN character_sort_order so ON s.cid = so.cid
+      ${loginTable.ok ? 'LEFT JOIN companion_character_login l ON l.cid = s.cid' : ''}
       ORDER BY s.cid
     `);
 
@@ -53,7 +58,7 @@ ipcMain.handle('get-roster', async () => {
       };
     });
 
-    return { success: true, rows };
+    return { success: true, rows, ownerSkips: await loadOwnerSkips(client, latestCharacter) };
   }, (err) => {
     return { success: false, error: err.message };
   });

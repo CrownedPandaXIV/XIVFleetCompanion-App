@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => invoke('install-update'),
   getUpdateStatus: () => invoke('updates:status'),
   checkForUpdates: () => invoke('updates:check'),
+  setTestVersions: (on) => invoke('updates:set-testing', on),
   // What's new (ipc/updates.js): { current, versions } not yet shown on this PC; marking them seen; the recent ones.
   getWhatsNew: () => invoke('whats-new:get'),
   markWhatsNewSeen: () => invoke('whats-new:seen'),

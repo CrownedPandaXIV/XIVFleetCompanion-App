@@ -395,6 +395,20 @@ function UpdatesSection() {
         <span className={`save-status updates-status${status.state === 'error' ? ' supply-warn' : ''}`}>{status.text}</span>
       </div>
       {!status.source && <div className="alerts-help">The app also looks by itself when it starts and every hour, and downloads a new version in the background.</div>}
+      {!status.source && (
+        <div className="settings-row test-versions">
+          <label>
+            <input type="checkbox" className="test-versions-toggle" checked={!!status.testing}
+              onChange={(e) => window.api.setTestVersions(e.target.checked).then(setInfo)} />
+            {' '}Get test versions
+          </label>
+          <span className="alerts-help">
+            {status.testing
+              ? 'On: this PC gets new versions to try before everyone else, and every normal update too. Turning it off keeps the version you have until a normal version is newer.'
+              : 'Try new versions on this PC before everyone else gets them. Test versions may still have problems.'}
+          </span>
+        </div>
+      )}
       <div className="settings-row">
         <button className="whats-new-open" onClick={showRecent}>{recent ? "Hide what's new" : "What's new"}</button>
         <span className="alerts-help">What changed in this version and the few before it.</span>

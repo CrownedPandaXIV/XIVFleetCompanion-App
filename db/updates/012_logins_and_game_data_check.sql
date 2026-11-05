@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS companion_character_login (
     logged_in_at  timestamptz NOT NULL
 );
 
+-- How many characters each setup left to another setup at its last sync, because they last logged in there (the PCs
+-- tab shows it).
+ALTER TABLE companion_pc_status ADD COLUMN IF NOT EXISTS characters_elsewhere int;
+
 -- The app's daily look for new game data (db/game-data-notice.js), shared by every PC the app runs on so only one
 -- asks GitHub each day. One row. changes: { file: when it last changed } for the files changed since checked_since;
 -- confirmed_at: a check in Settings found nothing to update as of then.

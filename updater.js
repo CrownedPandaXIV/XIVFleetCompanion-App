@@ -8,6 +8,20 @@ const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow } = require('electron');
 const { nextStatus, statusText, logLine } = require('./update-status');
+const { testingWanted, feedFor } = require('./update-feed');
+
+// This copy's version (package.json, which is also what the installed app reports) and whether it gets test
+// versions (Settings → General → Updates; kept in test-versions.json in the app's settings folder).
+const VERSION = require('./package.json').version;
+const testingFile = () => path.join(app.getPath('userData'), 'test-versions.json');
+function readTesting() {
+  try {
+    return JSON.parse(fs.readFileSync(testingFile(), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+const testingOn = () => testingWanted(readTesting(), VERSION);
 
 // Where new versions are downloaded to (%LOCALAPPDATA%\<package name>-updater), as electron-updater names it.
 // Versions before 0.33.8 were called fleet-tier3, so their folder is deleted once a newer version runs.
@@ -49,6 +63,24 @@ function onEvent(event, data) {
 // The status with its line for the window.
 const shown = () => ({ ...status, text: statusText(status) });
 
+// Points the updater at the normal releases or the test versions. A test version is never swapped for an older
+// normal one: turning test versions off keeps it until a normal version is newer.
+function applyFeed() {
+  if (!updater) return;
+  const testing = testingOn();
+  updater.allowDowngrade = false;
+  updater.allowPrerelease = testing;
+  if (typeof updater.setFeedURL === 'function') updater.setFeedURL(feedFor(testing));
+}
+
+// Settings → General → Updates → Get test versions: saved on this PC, then looked for straight away.
+function setTesting(on) {
+  fs.writeFileSync(testingFile(), JSON.stringify({ testing: !!on }));
+  console.log(on ? 'Update: test versions turned on.' : 'Update: test versions turned off.');
+  applyFeed();
+  return checkNow();
+}
+
 // Looks for a new version now, unless it already is (or one is downloading or downloaded).
 function checkNow() {
   if (!updater || status.state === 'ready') return shown();
@@ -70,6 +102,7 @@ function startUpdates() {
   updater = autoUpdater;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  applyFeed();
   for (const event of ['checking-for-update', 'update-available', 'update-not-available', 'download-progress', 'update-downloaded', 'error']) {
     autoUpdater.on(event, (data) => onEvent(event, data));
   }
@@ -79,7 +112,7 @@ function startUpdates() {
 
 // The downloaded version waiting to be installed ({ version }), or null; and what the update check is doing.
 const updateReady = () => ready;
-const updateStatus = () => shown();
+const updateStatus = () => ({ ...shown(), testing: testingOn() });
 
 // Closes the app and installs the downloaded version (the window's "Restart to update"), with the installer's
 // progress window showing (not silent), and opens the app again once it's done.
@@ -87,4 +120,4 @@ function installUpdate() {
   if (ready && updater) updater.quitAndInstall(false, true);
 }
 
-module.exports = { startUpdates, updateReady, updateStatus, checkNow, installUpdate, downloadFolders };
+module.exports = { startUpdates, updateReady, updateStatus, checkNow, installUpdate, downloadFolders, setTesting, testingOn };

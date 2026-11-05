@@ -6,6 +6,7 @@ const { MIN_PLUGIN_VERSION } = require('../shared/plugin-version');
 const { withClient, snapshotFragments } = require('../db');
 const { readMoveNote } = require('../db/database-move');
 const { loadSharedCharacters } = require('../characters/shared-sync');
+const { loadOwnerSkips } = require('../characters/owner-skips');
 const { WINDOW_CHOICES } = require('../subs/supply-runway');
 const { DEFAULT_WINDOW_DAYS } = require('../subs/income');
 const { voyagesFrom, lootSummary, ventureSummary, ventureMarketGil, marketLoot } = require('../subs/loot');
@@ -84,7 +85,8 @@ ipcMain.handle('get-pcs', () => withDetails(async (client) => {
   const pcs = (await client.query(`
     SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready,
            fctracker_found, submarinetracker_found, venture_stats_found, characters_synced, characters_left_out,
-           problems, check_text, check_to_fix, check_at
+           problems, check_text, check_to_fix, check_at,
+           (to_jsonb(companion_pc_status) ->> 'characters_elsewhere')::int AS characters_elsewhere -- update 12
     FROM companion_pc_status
     ORDER BY account_label, pc_name`)).rows;
   // Accounts whose characters sync but no PC has reported for (a plugin older than 0.10.0).
@@ -107,6 +109,7 @@ ipcMain.handle('get-pcs', () => withDetails(async (client) => {
     unreported: accounts.filter((a) => !reported.has(a.account_label)),
     moved,
     sharedSync: await loadSharedCharacters(client, latestCharacter),
+    ownerSkips: await loadOwnerSkips(client, latestCharacter),
   };
 }));
 

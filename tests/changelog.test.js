@@ -48,6 +48,8 @@ test('what to show: every version since the one last seen, or only this one when
   assert.deepStrictEqual(versionsSince(versions, '1.4.9', '1.4.10').map((v) => v.version), ['1.4.10'], 'nothing newer than the running version');
   assert.strictEqual(compareVersions('1.4.10', '1.5.0'), -1);
   assert.strictEqual(compareVersions('2.0.0', '1.99.99'), 1);
+  assert.strictEqual(compareVersions('1.6.0-test.3', '1.6.0'), 0, 'a test version counts as its version');
+  assert.deepStrictEqual(versionsSince(versions, '1.4.9', '1.5.0-test.7').map((v) => v.version), ['1.5.0', '1.4.10'], "a test version shows its version's changes");
 });
 
 test("the app's own changelog reads, with this version in it", () => {

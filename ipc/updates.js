@@ -4,15 +4,17 @@
 const fs = require('fs');
 const path = require('path');
 const { app, ipcMain, shell } = require('electron');
-const { updateReady, updateStatus, checkNow, installUpdate } = require('../updater');
+const { updateReady, updateStatus, checkNow, installUpdate, setTesting, testingOn } = require('../updater');
 const { parseChangelog, versionsSince } = require('../shared/changelog');
+const { isTestVersion } = require('../update-feed');
 // This copy's version and changelog, from its own files (the same as app.getVersion() once installed).
 const VERSION = require('../package.json').version;
 
 ipcMain.handle('get-update-ready', () => updateReady());
 ipcMain.handle('install-update', () => installUpdate());
 ipcMain.handle('updates:status', () => ({ version: app.getVersion(), status: updateStatus() }));
-ipcMain.handle('updates:check', () => ({ version: app.getVersion(), status: checkNow() }));
+ipcMain.handle('updates:check', () => ({ version: app.getVersion(), status: { ...checkNow(), testing: testingOn() } }));
+ipcMain.handle('updates:set-testing', (event, on) => ({ version: app.getVersion(), status: { ...setTesting(on === true), testing: testingOn() } }));
 
 // The newest version this PC has been shown, kept in the app's settings folder.
 const seenFile = () => path.join(app.getPath('userData'), 'whats-new.json');
@@ -50,6 +52,10 @@ ipcMain.handle('whats-new:seen', () => { writeSeen(VERSION); return true; });
 ipcMain.handle('whats-new:recent', () => ({ current: VERSION, versions: versionsSince(changelog(), '0.0.0', VERSION).slice(0, 8) }));
 // "What's new" on the Restart to update bar: the new version's notes on its release page.
 ipcMain.handle('whats-new:open-release', (event, version) => {
+  if (isTestVersion(version)) {
+    shell.openExternal('https://github.com/CrownedPandaXIV/XIVFleetCompanion-Releases/releases/tag/testing');
+    return true;
+  }
   if (!/^\d+\.\d+\.\d+$/.test(String(version))) return false;
   shell.openExternal(`https://github.com/CrownedPandaXIV/XIVFleetCompanion-Releases/releases/tag/v${version}`);
   return true;

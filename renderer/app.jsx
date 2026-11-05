@@ -384,6 +384,7 @@ function PluginDataStatus({ refreshKey }) {
 
 function App() {
   const [rows, setRows] = useState(null);
+  const [ownerSkips, setOwnerSkips] = useState([]);
   const [error, setError] = useState(null);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
@@ -444,6 +445,7 @@ function App() {
     const result = await window.api.getRoster();
     if (result.success) {
       setRows(sortRows(result.rows));
+      setOwnerSkips(result.ownerSkips || []);
       setError(null);
     } else {
       setError(result.error);
@@ -614,6 +616,7 @@ function App() {
             )}
 
             {!error && rows !== null && <NoLabelNote characters={rows.filter((r) => !r.account_label).length} />}
+            {!error && rows !== null && <NotSyncedAnywhereNote characters={ownerSkips} />}
 
             {!error && rows !== null && rows.length > 0 && groupByAccountEnabled &&
               groupByAccount(rosterRows).map((group) => (
