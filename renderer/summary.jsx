@@ -6,8 +6,7 @@
 // "needs attention" categories already built elsewhere in the app.
 // No LLM involved - everything here is real Postgres data, same as
 // every other view.
-// The Parts tab's rows grouped per built sub: subs whose rank now calls for different parts (the same
-// as the Discord "Ready for new parts" alert, alerts/checks.js).
+// The Parts tab's rows grouped per built sub: subs whose rank now calls for different parts.
 function subsReadyForParts(partRows) {
   const subs = new Map();
   for (const r of partRows) {

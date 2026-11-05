@@ -5,7 +5,7 @@ const HOUR = 60 * 60 * 1000;
 
 // rows: [{ owner_cid, owner_name, world, account_label, sort_index, retainer_name, job, job_abbreviation,
 // has_venture, venture_ends_at (Unix seconds) }] for retainers with a class. A finished venture waiting
-// to be collected still counts as on a venture (as in the Discord alert).
+// to be collected still counts as on a venture.
 function retainerSummary(rows, now = Date.now()) {
   const idle = [];
   let away = 0;

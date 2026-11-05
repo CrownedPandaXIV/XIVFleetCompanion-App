@@ -95,7 +95,7 @@ function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, re
 // Needed / Parse Spare Parts nodes, now reading real Postgres tables
 // instead of Sheets tabs and n8n cross-references.
 // aheadDays (Look ahead): also the parts of each sub's next build due within that many days, marked with
-// due_at; 0 for only what is needed now (the Summary, alerts and Discord always use 0).
+// due_at; 0 for only what is needed now (the Summary always uses 0).
 async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
   const { latestCharacter } = await snapshotFragments(client);
 

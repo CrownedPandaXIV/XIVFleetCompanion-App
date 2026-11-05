@@ -14,14 +14,13 @@ if (app.getPath('userData') === defaultUserData) {
 require('./backups/tools').useAppTools(path.join(app.getPath('userData'), 'postgres-tools'));
 
 // What the app prints also goes to logs\app.log in that folder (app-log.js). Not for Windows' permission-prompt
-// runs (--fleet-setup), which run as the administrator and report back to the app that started them. The alert
-// check runs every 5 minutes and keeps its own alerts.log, so only its warnings and errors go here.
+// runs (--fleet-setup), which run as the administrator and report back to the app that started them.
 if (!process.argv.includes('--fleet-setup')) {
   const { createLog, captureConsole } = require('./app-log');
-  const alertCheck = process.argv.includes('--fleet-alerts');
-  const log = captureConsole(createLog(path.join(app.getPath('userData'), 'logs')), console, { onlyProblems: alertCheck });
-  const mode = process.argv.includes('--fleet-backup') ? 'daily backup' : 'window';
-  if (!alertCheck) log.write('info', [`XIV Fleet Companion ${app.getVersion()} started (${mode}) on ${process.platform} ${require('os').release()}`]);
+  const log = captureConsole(createLog(path.join(app.getPath('userData'), 'logs')), console);
+  const mode = process.argv.includes('--fleet-backup') ? 'daily backup'
+    : process.argv.includes('--fleet-alerts') ? 'old Discord alerts task, to remove it' : 'window';
+  log.write('info', [`XIV Fleet Companion ${app.getVersion()} started (${mode}) on ${process.platform} ${require('os').release()}`]);
   app.on('render-process-gone', (event, contents, details) => {
     if (details.reason !== 'clean-exit') console.error('The window stopped:', details.reason, `(exit code ${details.exitCode})`);
   });
@@ -52,7 +51,6 @@ require('./ipc/universalis');
 require('./ipc/csv');
 require('./ipc/retainers');
 require('./ipc/inventory');
-require('./ipc/alerts');
 require('./ipc/updates');
 require('./ipc/database');
 require('./ipc/backups');
@@ -64,8 +62,8 @@ require('./ipc/leftovers');
 
 let mainWindow;
 
-// Started with --fleet-alerts (by the Windows scheduled task, see alerts/schedule.js): run one Discord
-// alert check and quit, with no window.
+// Started with --fleet-alerts by the scheduled task of the Discord alerts (removed in 1.7.0) on a PC that
+// had them set up: remove that task and the alerts' files (setup/old-discord-alerts.js), then quit.
 const ALERTS_ONLY = process.argv.includes('--fleet-alerts');
 // Started with --fleet-backup (by the daily backup task, see backups/schedule.js): make one backup and
 // quit, with no window.
@@ -122,8 +120,14 @@ function createWindow() {
 
 
 app.whenReady().then(() => {
+  const removeOldAlerts = () => require('./setup/old-discord-alerts').removeOldDiscordAlerts(app.getPath('userData'))
+    .then((r) => {
+      if (r && (r.task || r.files.length)) console.log(`Discord alerts (removed in 1.7.0) cleaned up: ${r.task ? 'scheduled task removed; ' : ''}files removed: ${r.files.join(', ') || 'none'}.`);
+      if (r && r.error) console.error(r.error);
+    })
+    .catch((err) => console.error('Could not clean up the old Discord alerts:', err.message));
   if (ALERTS_ONLY) {
-    require('./alerts/run').runFromCommandLine();
+    removeOldAlerts().finally(() => app.quit());
     return;
   }
   if (BACKUP_ONLY) {
@@ -136,6 +140,7 @@ app.whenReady().then(() => {
   }
   createWindow();
   startUpdates();
+  removeOldAlerts();
   // Indexes and planner statistics for the game tables (see game-data.js). Quick when they are
   // already in place; skipped quietly when no connection is set up yet.
   withClient(

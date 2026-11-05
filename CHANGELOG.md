@@ -3,6 +3,21 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.7.0 - 2026-11-05
+
+Goes with plugin 1.0.3. The app updates the database by itself (update 13); nothing to do by hand.
+
+- **The Discord alerts are gone.** Settings no longer has a Discord Alerts tab. Alerts are planned inside the game
+  instead, on the plugin's Summary, in a later version.
+  - On a PC that had them set up, the app removes what they left behind the first time it starts: the scheduled task
+    that checked every 5 minutes, the saved webhook address and the alerts' own files. Uninstalling also removes that
+    task, in case the app never started again.
+  - Their settings are removed from the database, except one the app still uses.
+- **Settings → General → Warnings** now has that setting: how many minutes a character can fall behind the rest of
+  its account before the Roster, Subs and Retainers tabs mark it as not synced (10 to 1440, 30 by default). It was
+  "Plugin has sent nothing new for N minutes" under the Discord alerts, and keeps the value you had there.
+- A failed nightly backup is shown in Settings → Backups, as before.
+
 ## 1.6.0 - 2026-11-05
 
 Goes with plugin 1.0.2. The app adds two tables and a column to the database by itself (update 12); nothing to do by

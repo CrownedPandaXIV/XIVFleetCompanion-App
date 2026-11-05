@@ -1,6 +1,6 @@
 // What the player runs: subs, retainers, or both. Chosen in Settings → General → "What do you run?"
 // (tier3_settings 'play_style'); "Work it out" (auto, the default) decides from the data: built subs and
-// retainers with a class among the tracked characters. Tabs, Summary sections and alerts for what is not
+// retainers with a class among the tracked characters. Tabs and Summary sections for what is not
 // run are left out. No Electron or pg here, so it can be tested on its own (tests/play-style.test.js).
 
 const PLAY_STYLE_KEY = 'play_style';
@@ -34,17 +34,4 @@ function hiddenViews(style) {
   return [...(uses.subs ? [] : SUB_VIEWS), ...(uses.retainers ? [] : RETAINER_VIEWS)];
 }
 
-// Alert settings with the alerts for what is not run turned off.
-function alertSettingsFor(settings, style) {
-  const uses = playStyleUses(style);
-  return {
-    ...settings,
-    subsOn: settings.subsOn && uses.subs,
-    suppliesOn: settings.suppliesOn && uses.subs,
-    buildOn: settings.buildOn && uses.subs,
-    retainersOn: settings.retainersOn && uses.retainers,
-    undercutOn: settings.undercutOn && uses.retainers,
-  };
-}
-
-module.exports = { PLAY_STYLE_KEY, PLAY_STYLES, SUB_VIEWS, RETAINER_VIEWS, detectPlayStyle, resolvePlayStyle, playStyleUses, hiddenViews, alertSettingsFor };
+module.exports = { PLAY_STYLE_KEY, PLAY_STYLES, SUB_VIEWS, RETAINER_VIEWS, detectPlayStyle, resolvePlayStyle, playStyleUses, hiddenViews };

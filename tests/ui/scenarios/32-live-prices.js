@@ -8,7 +8,6 @@ const PORT = 9411;
 let server = null;
 let pick = null;
 const asked = [];
-const posts = []; // messages posted to the stand-in Discord webhook
 
 module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, shot } = t;
@@ -64,34 +63,6 @@ module.exports = async (t) => {
   check(await ev(`document.querySelectorAll('.market-undercut tbody tr').length`) === 1, 'only the undercut listing (own retainers do not count, the cheaper one is not undercut)');
   await shot('market-live');
 
-  // Discord: the undercut alert from a check, and the summary with market values.
-  const section = `document.querySelector('.alerts-section')`;
-  const alertStatus = () => ev(`(${section}.querySelector('.alerts-status') || {}).innerText || ''`);
-  const click = (text) => ev(`[...${section}.querySelectorAll('button')].find((x) => x.innerText.trim() === ${JSON.stringify(text)}).click()`);
-  await ev(`localStorage.setItem('settingsTab', 'alerts')`);
-  await ev(`document.querySelector('.gear-button').click()`);
-  await waitFor(`!!${section} && !!${section}.querySelector('input.alerts-webhook')`, 'the Discord Alerts tab', 20000);
-  await ev(`(() => { const el = ${section}.querySelector('input.alerts-webhook');
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, 'http://127.0.0.1:${PORT}/api/webhooks/1/test');
-    el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  await click('Save');
-  await waitFor(`${section}.innerText.includes('Discord webhook saved on this PC.')`, 'the saved webhook');
-  await click('Check Now');
-  await waitFor(`/Check: done|Check failed/.test((${section}.querySelector('.alerts-status') || {}).innerText || '')`, 'the alert check', 60000);
-  const undercutPost = posts.map((p) => p.content).find((c) => /listing undercut/.test(c)) || '';
-  check(/Maduin: 1 listing undercut\. Test Item 5111 on .+ \(.+\): yours 9,000, cheapest 8,500\./.test(undercutPost),
-    'Discord: the undercut listing, with yours and the cheapest price: ' + JSON.stringify(undercutPost || posts.map((p) => p.content)) + ' ' + await alertStatus());
-  const before = posts.length;
-  await click('Send Summary Now');
-  await waitFor(`${posts.length} < 0 || /Summary: (done|failed)|posted|failed/i.test((${section}.querySelector('.alerts-status') || {}).innerText || '')`, 'the summary', 60000);
-  await sleep(500);
-  const summary = (posts.slice(before).find((p) => /Fleet summary/.test(p.content)) || {}).content || '';
-  check(/Ventures: 1 reward collected, worth 0 gil at vendor prices\. At market prices: 34,000 gil \(world\), 32,000 gil \(data center\), 28,000 gil \(region\)\./.test(summary),
-    'the Discord summary gives venture rewards at vendor and market prices: ' + JSON.stringify(summary) + ' ' + await alertStatus());
-  check(/all loot worth .+ gil at vendor prices\. At market prices: 85,000 gil \(world\)/.test(summary), 'and the loot: ' + JSON.stringify(summary));
-  await ev(`document.querySelector('.settings-modal .modal-actions button').click()`);
-  await sleep(300);
-
   // Turned off again: nothing more is asked.
   await ev(`localStorage.setItem('settingsTab', 'general')`);
   await ev(`document.querySelector('.gear-button').click()`);
@@ -108,12 +79,6 @@ module.exports.setup = () => new Promise((resolve) => {
   const price = { world: 8500, dc: 8000, region: 7000 };
   const where = { world: 'Maduin', dc: 'Golem', region: 'Siren' };
   server = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url.startsWith('/api/webhooks/')) {
-      let body = '';
-      req.on('data', (c) => { body += c; });
-      req.on('end', () => { try { posts.push(JSON.parse(body)); } catch { posts.push({ content: body }); } res.writeHead(204); res.end(); });
-      return undefined;
-    }
     asked.push(req.url);
     const send = (body) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
     if (req.url.startsWith('/api/v2/data-centers')) return send([{ name: 'Dynamis', region: 'North-America', worlds: [1] }]);
@@ -133,7 +98,7 @@ module.exports.setup = () => new Promise((resolve) => {
   server.listen(PORT, '127.0.0.1', resolve);
 });
 module.exports.teardown = () => new Promise((resolve) => (server ? server.close(() => resolve()) : resolve()));
-module.exports.env = () => ({ FLEET_UNIVERSALIS_URL: `http://127.0.0.1:${PORT}`, FLEET_ALERTS_ALLOW_LOCAL_WEBHOOK: '1' });
+module.exports.env = () => ({ FLEET_UNIVERSALIS_URL: `http://127.0.0.1:${PORT}` });
 
 module.exports.before = async (db) => {
   pick = (await db.query(`
@@ -142,8 +107,6 @@ module.exports.before = async (db) => {
     JOIN companion_submarine_snapshot s ON s.cid = c.cid AND s.level > 0
     JOIN companion_retainer_lookup r ON r.owner_cid = c.cid
     WHERE c.fc_id IS NOT NULL AND c.world = 'Maduin' ORDER BY c.name LIMIT 1`)).rows[0];
-  await db.query(`INSERT INTO fleet_economics_settings (setting_key, setting_value) VALUES ('alert_enabled', 1)
-                  ON CONFLICT (setting_key) DO UPDATE SET setting_value = 1`);
   await db.query(`INSERT INTO ffxiv_item (id, name) VALUES ('5111', 'Test Item 5111') ON CONFLICT (id) DO NOTHING`);
   await db.query(`INSERT INTO companion_voyage_loot (fc_id, sub_register, returned_at, sector, sub_name, primary_item, primary_count, primary_hq,
       additional_item, additional_count, additional_hq, valid) VALUES ($1, 1700000000, now() - interval '12 hours', 15, $2, 5111, 10, false, 0, 0, false, true)`, [pick.fc_id, pick.sub_name]);
@@ -157,6 +120,5 @@ module.exports.after = async (db) => {
   await db.query('DELETE FROM companion_venture_result');
   await db.query('DELETE FROM companion_market_listing');
   await db.query(`DELETE FROM tier3_settings WHERE setting_key = 'universalis_enabled'`);
-  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key LIKE 'alert\\_%'`);
   await db.query(`DELETE FROM ffxiv_item WHERE id = '5111' AND name = 'Test Item 5111'`);
 };

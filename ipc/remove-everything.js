@@ -19,7 +19,7 @@ const { settingsFile } = require('../backups/app');
 const { findTools } = require('../backups/tools');
 const { backupNow } = require('../backups/run');
 const backupSchedule = require('../backups/schedule');
-const alertSchedule = require('../alerts/schedule');
+const { OLD_TASK_NAME } = require('../setup/old-discord-alerts');
 const { stepsText } = require('../app-log');
 
 const userData = () => app.getPath('userData');
@@ -110,7 +110,7 @@ ipcMain.handle('setup:remove-everything', async (event, input) => {
         }
       },
       removeTasks: async () => {
-        for (const name of [backupSchedule.TASK_NAME, alertSchedule.TASK_NAME]) {
+        for (const name of [backupSchedule.TASK_NAME, OLD_TASK_NAME]) {
           const r = await backupSchedule.removeTask(name);
           if (!r.ok) return r;
         }

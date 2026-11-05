@@ -74,6 +74,9 @@ const indexes = async (c) => (await c.query(
     const c = await freshDatabase('dbupd_older');
     await c.query(SCHEMA);
     await c.query(`INSERT INTO companion_submarine_snapshot (cid, sub_name) VALUES (1, 'Submersible-2'), (1, 'Renamed')`);
+    // Settings of the Discord alerts (removed in 1.7.0): update 13 keeps "not syncing after" under its new name.
+    await c.query(`INSERT INTO fleet_economics_settings (setting_key, setting_value) VALUES
+      ('alert_sync_stale_minutes', 45), ('alert_enabled', 1), ('alert_mention_user_id', 123456789012345678), ('house_warn_days', 30)`);
     await c.query(`DROP TABLE companion_schema_version, companion_pc_status, companion_venture_result, companion_market_listing;
                    DROP INDEX companion_metric_history_metric_idx;
                    ALTER TABLE companion_voyage_loot DROP COLUMN leg;
@@ -86,12 +89,15 @@ const indexes = async (c) => (await c.query(
       'added companion_market_listing', 'added companion_metric_history_metric_idx', 'added companion_metric_latest.label',
       'added companion_pc_status', 'added companion_retainer_lookup.items_seen_at', 'added companion_submarine_snapshot.slot',
       'added companion_venture_result', 'added companion_venture_result_received_idx', 'added companion_voyage_loot.leg',
-      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check']);
+      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check', 'update 13: remove_discord_alerts']);
     assert.deepStrictEqual((await columns(c)).slice().sort(), refColumns.slice().sort());
+    const settings = (await c.query('SELECT setting_key, setting_value::int AS v FROM fleet_economics_settings ORDER BY 1')).rows;
+    assert.deepStrictEqual(settings, [{ setting_key: 'house_warn_days', v: 30 }, { setting_key: 'not_synced_after_minutes', v: 45 }],
+      'the alert settings are gone; "not syncing after" kept its value under its new name; other settings untouched');
     assert.deepStrictEqual(await indexes(c), refIndexes);
     const slots = (await c.query('SELECT sub_name, slot FROM companion_submarine_snapshot ORDER BY sub_name')).rows;
     assert.deepStrictEqual(slots, [{ sub_name: 'Renamed', slot: null }, { sub_name: 'Submersible-2', slot: 2 }]);
-    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }]);
+    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }, { version: 13, name: 'remove_discord_alerts' }]);
     await c.end();
   });
 

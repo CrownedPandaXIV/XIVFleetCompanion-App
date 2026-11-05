@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting it. The more of this you can fill in, the quicker it can be looked into.
-        Never paste a password or your Discord webhook address here.
+        Never paste a password here.
   - type: textarea
     id: what
     attributes:
