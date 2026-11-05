@@ -67,8 +67,10 @@ module.exports = async (t) => {
   })()`);
   const kind = (s) => (s.startsWith('Returned') ? 0 : /^\d+:\d\d:\d\d$/.test(s) ? 1 : 2);
   const secs = (s) => s.split(':').reduce((a, n) => a * 60 + Number(n), 0);
+  // Each countdown ticks on its own timer, so subs back at the same moment can be read a second apart when a tick
+  // lands while the rows are read (the test data has 80 characters' subs back at exactly the same times).
   const ordered = statuses.every((s, i) => i === 0 || kind(statuses[i - 1]) < kind(s)
-    || (kind(statuses[i - 1]) === kind(s) && (kind(s) !== 1 || secs(statuses[i - 1]) <= secs(s))));
+    || (kind(statuses[i - 1]) === kind(s) && (kind(s) !== 1 || secs(statuses[i - 1]) <= secs(s) + 1)));
   check(statuses.length > 0 && kind(statuses[0]) === 0 && kind(statuses[statuses.length - 1]) === 2 && ordered,
     'Status sorts by return: waiting first, then soonest back, in port last: ' + statuses.slice(0, 4).join(', ') + ' ... ' + statuses.slice(-2).join(', '));
   await ev(`[...document.querySelectorAll('.controls button')].find(b => b.innerText.trim() === 'Reset Sorting').click()`);
