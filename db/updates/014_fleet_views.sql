@@ -1,0 +1,161 @@
+-- App 1.8.0, for plugin 2.0: ready-made views of the fleet, so the plugin can show the Summary, Subs and Supplies in
+-- the game without the app running. Each view does its working out inside the database and returns only the rows a
+-- window shows. They give the same numbers as the app's Subs and Supplies tabs (tests/db/verify-fleet-views.js
+-- checks them against the app's own code). Views and functions only: nothing is stored, and replacing them is safe.
+
+-- A sub part's class letter, from its item number (as subs/submarine-builds.js SUB_PART_CLASS; the test checks
+-- they match). Anything else shows as its number.
+CREATE OR REPLACE FUNCTION fleet_part_letter(item int) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE
+    WHEN item BETWEEN 21792 AND 21795 THEN 'S'
+    WHEN item BETWEEN 21796 AND 21799 THEN 'U'
+    WHEN item BETWEEN 22526 AND 22529 THEN 'W'
+    WHEN item BETWEEN 23903 AND 23906 THEN 'C'
+    WHEN item BETWEEN 24344 AND 24347 THEN 'Y'
+    WHEN item BETWEEN 24348 AND 24351 THEN 'S+'
+    WHEN item BETWEEN 24352 AND 24355 THEN 'U+'
+    WHEN item BETWEEN 24356 AND 24359 THEN 'W+'
+    WHEN item BETWEEN 24360 AND 24363 THEN 'C+'
+    WHEN item BETWEEN 24364 AND 24367 THEN 'Y+'
+    ELSE coalesce(item::text, 'null')
+  END
+$$;
+
+-- Every character with subs: ceruleum and repair kits held, used per day, days left and how many to buy (as the
+-- Supplies tab, with its window and restock days from Settings).
+--
+-- Use per day is worked out as subs/supply-runway.js usageRate does: every drop in the recorded values
+-- (companion_metric_history) from the window start to the character's last sync counts as use, a rise is a restock
+-- and is ignored, divided by the days from the window start (or its first value, when later) to that sync. The last
+-- value recorded at or before the window start is the starting point; for what's in the bags, the value at the last
+-- sync counts too. It comes from what's held in bags and retainers together (item_qty:...) when that covers a day,
+-- otherwise from the bags. The history is read in one pass, not character by character.
+--
+-- per_day NULL: not enough history yet; per_day 0: none used, so days_left is NULL (they never run out).
+CREATE OR REPLACE VIEW fleet_supplies_view AS
+WITH settings AS (
+  SELECT window_days, target_days, now() - make_interval(days => window_days) AS window_start
+  FROM (SELECT
+    coalesce((SELECT setting_value::int FROM fleet_economics_settings
+              WHERE setting_key = 'supply_window_days' AND setting_value IN (3, 7, 14, 30)), 14) AS window_days,
+    coalesce((SELECT round(setting_value)::int FROM fleet_economics_settings
+              WHERE setting_key = 'restock_target_days' AND setting_value BETWEEN 1 AND 90), 14) AS target_days) chosen
+),
+characters AS (
+  SELECT c.cid, c.name, c.world, c.account_label, c.fc_id, so.sort_index, c.last_synced_at AS as_of,
+         coalesce(c.ceruleum, 0) AS ceruleum, coalesce(c.repair_kits, 0) AS repair_kits
+  FROM companion_character_current c
+  LEFT JOIN character_sort_order so ON so.cid = c.cid
+  WHERE EXISTS (SELECT 1 FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0)
+),
+series AS (
+  SELECT row_number() OVER ()::int AS id, ch.cid, ch.as_of, m.supply, m.metric, m.held,
+         CASE WHEN NOT m.held THEN CASE m.supply WHEN 'ceruleum' THEN ch.ceruleum ELSE ch.repair_kits END END AS now_value
+  FROM characters ch
+  CROSS JOIN (VALUES ('ceruleum', 'item_qty:10155', true), ('ceruleum', 'ceruleum', false),
+                     ('repair_kits', 'item_qty:10373', true), ('repair_kits', 'repair_kits', false)) m(supply, metric, held)
+),
+points AS (
+  -- the starting point: the last value at or before the window start
+  SELECT se.id, b.recorded_at AS at, b.value, 0 AS ord
+  FROM series se CROSS JOIN settings st
+  CROSS JOIN LATERAL (
+    SELECT h.recorded_at, h.value FROM companion_metric_history h
+    WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric AND h.recorded_at <= st.window_start
+    ORDER BY h.recorded_at DESC LIMIT 1) b
+  UNION ALL
+  -- everything recorded in the window, up to the last sync
+  SELECT se.id, h.recorded_at, h.value, 0
+  FROM companion_metric_history h CROSS JOIN settings st
+  JOIN series se ON se.cid = h.subject_id AND se.metric = h.metric
+  WHERE h.subject_type = 'character' AND h.metric IN ('item_qty:10155', 'ceruleum', 'item_qty:10373', 'repair_kits')
+    AND h.recorded_at > st.window_start AND h.recorded_at <= se.as_of
+  UNION ALL
+  -- what's in the bags at the last sync
+  SELECT id, as_of, now_value, 1 FROM series WHERE now_value IS NOT NULL
+),
+ordered AS (
+  SELECT p.id, p.at, p.value,
+         lag(p.value) OVER (PARTITION BY p.id ORDER BY p.at, p.ord) AS earlier
+  FROM points p JOIN series se ON se.id = p.id
+  WHERE p.at <= se.as_of
+),
+used AS (
+  SELECT o.id, min(o.at) AS first_at,
+         coalesce(sum(greatest(o.earlier - o.value, 0)) FILTER (WHERE o.at > st.window_start), 0) AS used
+  FROM ordered o CROSS JOIN settings st
+  GROUP BY o.id
+),
+rates AS (
+  SELECT se.cid, se.supply, se.held,
+         CASE WHEN extract(epoch FROM (se.as_of - greatest(st.window_start, u.first_at))) / 86400 >= 1
+              THEN u.used::double precision / (extract(epoch FROM (se.as_of - greatest(st.window_start, u.first_at))) / 86400) END AS per_day
+  FROM series se CROSS JOIN settings st
+  JOIN used u ON u.id = se.id
+),
+per_day AS (
+  SELECT ch.*,
+         coalesce((SELECT per_day FROM rates r WHERE r.cid = ch.cid AND r.supply = 'ceruleum' AND r.held),
+                  (SELECT per_day FROM rates r WHERE r.cid = ch.cid AND r.supply = 'ceruleum' AND NOT r.held)) AS ceruleum_per_day,
+         coalesce((SELECT per_day FROM rates r WHERE r.cid = ch.cid AND r.supply = 'repair_kits' AND r.held),
+                  (SELECT per_day FROM rates r WHERE r.cid = ch.cid AND r.supply = 'repair_kits' AND NOT r.held)) AS repair_kits_per_day
+  FROM characters ch
+)
+SELECT p.cid, p.name, p.world, p.account_label, p.fc_id, p.sort_index, p.as_of AS last_synced_at,
+       p.ceruleum, p.ceruleum_per_day,
+       CASE WHEN p.ceruleum_per_day > 0 THEN greatest(p.ceruleum, 0) / p.ceruleum_per_day END AS ceruleum_days_left,
+       CASE WHEN p.ceruleum_per_day > 0 THEN greatest(0, ceil(p.ceruleum_per_day * st.target_days - p.ceruleum))::int ELSE 0 END AS ceruleum_restock,
+       p.repair_kits, p.repair_kits_per_day,
+       CASE WHEN p.repair_kits_per_day > 0 THEN greatest(p.repair_kits, 0) / p.repair_kits_per_day END AS repair_kits_days_left,
+       CASE WHEN p.repair_kits_per_day > 0 THEN greatest(0, ceil(p.repair_kits_per_day * st.target_days - p.repair_kits))::int ELSE 0 END AS repair_kits_restock,
+       st.window_days, st.target_days
+FROM per_day p CROSS JOIN settings st;
+
+-- Every built sub, with its character, rank, parts (as the Subs tab's Current Setup, for example "S-S-U-C") and
+-- where it is: 'in_port' (no voyage), 'returned' (back, waiting to be collected) or 'out' (back at return_time,
+-- Unix seconds).
+CREATE OR REPLACE VIEW fleet_subs_view AS
+SELECT s.cid, c.name AS character_name, c.world, c.account_label, c.fc_id, so.sort_index,
+       s.sub_name, coalesce(s.slot, substring(s.sub_name FROM '^Submersible-([1-4])$')::int) AS slot,
+       s.level AS rank,
+       fleet_part_letter(s.part1) || '-' || fleet_part_letter(s.part2) || '-' || fleet_part_letter(s.part3) || '-' || fleet_part_letter(s.part4) AS build,
+       s.return_time,
+       CASE WHEN coalesce(s.return_time, 0) <= 0 THEN 'in_port'
+            WHEN s.return_time <= extract(epoch FROM now()) THEN 'returned'
+            ELSE 'out' END AS status,
+       s.current_exp, s.next_level_exp, s.updated_at
+FROM companion_submarine_snapshot s
+LEFT JOIN companion_character_current c ON c.cid = s.cid
+LEFT JOIN character_sort_order so ON so.cid = s.cid
+WHERE s.level > 0;
+
+-- The fleet at a glance, one row: subs back and out and when the next one is back, retainers on and off ventures,
+-- characters below the low-supply warnings (Settings → General → Warnings; 0 turns one off) and the soonest a
+-- character runs out of either.
+CREATE OR REPLACE VIEW fleet_summary_view AS
+WITH thresholds AS (
+  SELECT
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_ceruleum_threshold'), 0) AS ceruleum,
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_repair_kit_threshold'), 0) AS repair_kits
+),
+subs AS (
+  SELECT count(*)::int AS subs,
+         (count(*) FILTER (WHERE status = 'returned'))::int AS subs_returned,
+         (count(*) FILTER (WHERE status = 'in_port'))::int AS subs_in_port,
+         (count(*) FILTER (WHERE status = 'out'))::int AS subs_out,
+         min(return_time) FILTER (WHERE status = 'out') AS next_return_time
+  FROM fleet_subs_view
+),
+retainers AS (
+  SELECT count(*)::int AS retainers,
+         (count(*) FILTER (WHERE has_venture AND venture_ends_at <= extract(epoch FROM now())))::int AS ventures_done,
+         (count(*) FILTER (WHERE NOT coalesce(has_venture, false)))::int AS retainers_idle
+  FROM companion_retainer_lookup WHERE coalesce(job, 0) > 0
+),
+supplies AS (
+  SELECT (count(*) FILTER (WHERE t.ceruleum > 0 AND f.ceruleum < t.ceruleum))::int AS low_ceruleum,
+         (count(*) FILTER (WHERE t.repair_kits > 0 AND f.repair_kits < t.repair_kits))::int AS low_repair_kits,
+         min(least(f.ceruleum_days_left, f.repair_kits_days_left)) AS soonest_runs_out_days
+  FROM fleet_supplies_view f CROSS JOIN thresholds t
+)
+SELECT subs.*, retainers.*, supplies.* FROM subs, retainers, supplies;

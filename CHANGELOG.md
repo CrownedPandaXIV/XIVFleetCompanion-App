@@ -3,6 +3,17 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.8.0 - unreleased
+
+For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (update 14); nothing to
+do by hand.
+
+- **Ready-made views of the fleet in the database**, so the plugin can show the Summary, Subs and Supplies in the game
+  without the app running: every built sub with its build and whether it's out, back or in port; each character's
+  ceruleum and repair kits, how many it uses a day, days left and how many to buy; and the fleet at a glance. The
+  database works out the use per day itself (the same way as the Supplies tab), so the plugin reads a few dozen rows
+  instead of weeks of history. Nothing in the app changes.
+
 ## 1.7.0 - 2026-11-05
 
 Goes with plugin 1.0.3. The app updates the database by itself (update 13); nothing to do by hand.

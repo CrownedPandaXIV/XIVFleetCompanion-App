@@ -228,6 +228,7 @@ function parseRankBuild(str) {
 }
 
 module.exports = {
+  SUB_PART_CLASS,
   partLetter,
   parseRankBuild,
   computeTargetRoute,
