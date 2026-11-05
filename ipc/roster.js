@@ -2,6 +2,7 @@
 const { ipcMain } = require('electron');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
 const { loadOwnerSkips } = require('../characters/owner-skips');
+const { rosterWarnings } = require('../characters/roster-warnings');
 const { withClient, snapshotFragments } = require('../db');
 
 // Handles a single request from the renderer to fetch the character roster.
@@ -43,20 +44,10 @@ ipcMain.handle('get-roster', async () => {
       ORDER BY s.cid
     `);
 
-    // Fully-unbuilt characters never get flagged low on fuel/repair kits -
-    // a fresh account's default-zero values aren't a real problem, matching
-    // the exact same suppression get-fleet-warnings already applies.
-    // Characters the plugin no longer syncs (behind the rest of their account), marked on the Roster.
+    // Characters the plugin no longer syncs (behind the rest of their account), marked on the Roster, and the
+    // supply warnings (characters/roster-warnings.js, which the in-game Roster is checked against).
     const behind = notSyncedCharacters(result.rows.map((r) => ({ ...r, last_synced_at: r.snapshot_at })), await readBehindMinutes(client));
-    const rows = result.rows.map((r) => {
-      const subsBuilt = Number(r.subs_built) > 0;
-      return {
-        ...r,
-        not_synced_ms: behind.get(String(r.cid)) ?? null,
-        low_repair: subsBuilt && !behind.has(String(r.cid)) && r.repair_kits < repairKitThreshold,
-        low_ceruleum: subsBuilt && !behind.has(String(r.cid)) && r.ceruleum < ceruleumThreshold
-      };
-    });
+    const rows = rosterWarnings(result.rows, behind, { ceruleum: ceruleumThreshold, repairKits: repairKitThreshold });
 
     return { success: true, rows, ownerSkips: await loadOwnerSkips(client, latestCharacter) };
   }, (err) => {

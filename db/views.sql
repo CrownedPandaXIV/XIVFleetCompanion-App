@@ -2,13 +2,19 @@
 -- the Summary, Subs and Supplies in the game without the app running. Each does its working out inside the database
 -- and returns only the rows a window shows, with the same numbers as the app's tabs (tests/db/verify-fleet-views.js).
 --
+-- Written with plugin-only use in mind (a one-file SQLite version later in 2.x): views added from 2.x's "rest of the
+-- tabs" stage keep to plain SQL where it gives the same answer, so they translate easily. And no view here reads the
+-- game data tables (ffxiv_*): a new database has none until the app fills them, and a view that needed them couldn't
+-- be made. Names of jobs, ventures and items come from the game's own files in the plugin instead.
+--
 -- Unlike db/updates/, this file is applied again whenever it changes: after the numbered updates, the app compares
 -- its checksum with the one recorded in companion_views and, when they differ, replaces every view here in one
 -- transaction (db/apply-updates.js ensureViews). So edit this file freely; a newer app's views are never replaced by
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_alerts_view, fleet_summary_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
+DROP VIEW IF EXISTS fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
+  fleet_alerts_view, fleet_summary_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
 
 -- A sub part's class letter, from its item number (as subs/submarine-builds.js SUB_PART_CLASS; the test checks
 -- they match). Anything else shows as its number.
@@ -254,3 +260,65 @@ SELECT 'warn', 'autoretainer', pc_name || CASE WHEN account_label <> '' THEN ' (
        'AutoRetainer was not running at its last sync, so nothing syncs from there', 0
 FROM companion_pc_status WHERE autoretainer_ready = false AND last_sync_at > now() - interval '1 day'
 ORDER BY 1, 2, 5 DESC, 3;
+
+
+-- 2.x, the rest of the tabs.
+
+-- Every character, as the Roster tab: its Free Company and house, gil, supplies, retainers and subs, when it last
+-- synced and on which setup it last logged in (only that one syncs it). behind_minutes: how far it is behind its
+-- account when the plugin no longer syncs it (fleet_not_synced_view), else NULL. low_ceruleum / low_repair_kits:
+-- below the low-supply warnings, for characters with a built sub that are still synced (as ipc/roster.js, through
+-- characters/roster-warnings.js).
+CREATE OR REPLACE VIEW fleet_roster_view AS
+WITH thresholds AS (
+  SELECT
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_ceruleum_threshold'), 0) AS ceruleum,
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_repair_kit_threshold'), 0) AS repair_kits
+),
+built AS (
+  SELECT cid, count(*) AS subs_built FROM companion_submarine_snapshot WHERE level > 0 GROUP BY cid
+)
+SELECT c.cid, c.name, c.world, c.account_label, so.sort_index,
+       c.gil, c.ceruleum, c.repair_kits, c.retainer_count, c.submarine_count, c.last_synced_at,
+       h.fc_name, h.fc_points,
+       CASE WHEN h.has_house THEN coalesce(k.city_name, 'City ' || h.house_city) || ' W' || h.house_ward || ' P' || h.house_plot END AS house,
+       l.pc_name AS login_pc, l.account_label AS login_label, l.logged_in_at,
+       CAST(coalesce(b.subs_built, 0) AS int) AS subs_built,
+       CAST(floor(extract(epoch FROM ns.behind) / 60) AS int) AS behind_minutes,
+       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.ceruleum, 0) < t.ceruleum) AS low_ceruleum,
+       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.repair_kits, 0) < t.repair_kits) AS low_repair_kits
+FROM companion_character_current c
+CROSS JOIN thresholds t
+LEFT JOIN character_sort_order so ON so.cid = c.cid
+LEFT JOIN companion_character_housing h ON h.cid = c.cid
+LEFT JOIN housing_key_city_lookup k ON k.city_id = h.house_city
+LEFT JOIN companion_character_login l ON l.cid = c.cid
+LEFT JOIN built b ON b.cid = c.cid
+LEFT JOIN fleet_not_synced_view ns ON ns.cid = c.cid;
+
+-- Every retainer, as the Retainers tab: its owner, class (job, a ClassJob number) and level, gil, venture (venture_id,
+-- a RetainerTask number; venture_ends_at in Unix seconds), gear target, and whether Allagan Tools has seen its items
+-- (they're stored, or it was seen holding nothing). The plugin names the class and venture from the game's files.
+CREATE OR REPLACE VIEW fleet_retainers_view AS
+SELECT rl.retainer_id, rl.owner_cid, c.name AS owner_name, c.world, c.account_label, so.sort_index,
+       rl.name AS retainer_name, rl.job, rl.level, rl.gil, rl.has_venture, rl.venture_id, rl.venture_ends_at, rl.hire_order_index,
+       t.target_mode, t.target_value, coalesce(t.only_crafted, false) AS only_crafted,
+       (rl.items_seen_at IS NOT NULL OR EXISTS (SELECT 1 FROM companion_inventory_snapshot inv
+                                                WHERE inv.owner_cid = rl.owner_cid AND inv.retainer_id = rl.retainer_id)) AS items_seen
+FROM companion_retainer_lookup rl
+LEFT JOIN companion_character_current c ON c.cid = rl.owner_cid
+LEFT JOIN retainer_gear_targets t ON t.retainer_id = rl.retainer_id
+LEFT JOIN character_sort_order so ON so.cid = rl.owner_cid;
+
+-- What each retainer wears (its equipped items, container 11000), one row per item, for its average item level. The
+-- plugin looks up each item's level in the game's files, leaving out any it doesn't know, as the app does.
+CREATE OR REPLACE VIEW fleet_retainer_gear_view AS
+SELECT retainer_id, item_id FROM companion_inventory_snapshot WHERE sorted_container = 11000 AND item_id IS NOT NULL;
+
+-- Every setup of the plugin (PC and account label), as the PCs tab: its version, when it last synced, which plugins it
+-- found, its characters, what it couldn't see (problems, one per line) and its last "Check what I can see".
+CREATE OR REPLACE VIEW fleet_pcs_view AS
+SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready, fctracker_found,
+       submarinetracker_found, venture_stats_found, characters_synced, characters_left_out, characters_elsewhere,
+       array_to_string(problems, E'\n') AS problems, check_text, check_to_fix, check_at
+FROM companion_pc_status;

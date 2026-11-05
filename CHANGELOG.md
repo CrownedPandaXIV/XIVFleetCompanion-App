@@ -19,6 +19,11 @@ do by hand.
   characters no longer synced are left out of the low-supply counts there too.
 - **A new submarine icon** for the app's window, taskbar and installer: steel blue with amber portholes, drawn clear at
   every size from 16 to 256 pixels. It matches the plugin's new picture.
+- **The Roster, Retainers and PCs for the game** (plugin 2.0's next pages): every character with its Free Company,
+  house, supplies (and whether they're below the warnings, by the Roster's own rules), retainers, subs and the setup
+  that syncs it; every retainer with its class, venture, gear target and what it wears; and every setup of the
+  plugin. The views give the game's numbers for classes, ventures and items, never names, so they work on a database
+  that has no game data yet; the plugin names them from the game's own files.
 - The views live in one file the app applies again whenever it changes, so later versions can improve them without a
   database update each time (update 15 records which version a database has). An older copy of the app never
   replaces a newer one's views.

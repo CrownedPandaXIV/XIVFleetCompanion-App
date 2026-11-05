@@ -31,3 +31,11 @@ checksum with the one recorded in `companion_views` and, when they differ, repla
 edit `db/views.sql` freely, and don't add a numbered update for a view. An older app never replaces a newer app's views,
 and a login that may only read keeps the views it has. Tables and data still change only through numbered updates.
 
+
+Two rules for the views:
+
+- **No game data tables (`ffxiv_*`).** A new database gets its game data only after the views are made, and a view
+  that reads a game data column couldn't be made there, which would stop the app's database check. Give the game's
+  numbers (a class, a venture, an item) and let the plugin name them from the game's own files.
+- **Plain SQL where it gives the same answer**, so each view translates easily to the plugin-only one-file (SQLite)
+  version planned for later in 2.x.
