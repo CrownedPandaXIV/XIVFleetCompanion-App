@@ -98,3 +98,12 @@ test('the old PowerShell task: its folders, count and time are read', () => {
   assert.strictEqual(listValue(list, 'Start Time'), '3:30:00 AM');
   assert.strictEqual(listValue(list, 'Missing'), null);
 });
+
+test('a scheduled task\'s command is read back, to spot one that runs another copy of the app', () => {
+  const { taskToRun, taskCommand } = require('../backups/schedule');
+  const fromSource = taskCommand('E:\\tier3-app-final\\node_modules\\electron\\dist\\electron.exe', 'E:\\tier3-app-final');
+  const output = `Folder: \\\r\nHostName:      DESKTOP-2\r\nTaskName:      \\XIV Fleet Companion backup\r\nStatus:        Ready\r\nTask To Run:   ${fromSource}\r\nStart In:      N/A\r\n`;
+  assert.strictEqual(taskToRun(output), fromSource);
+  assert.notStrictEqual(taskToRun(output), taskCommand('C:\\Programs\\XIV Fleet Companion\\XIV Fleet Companion.exe', null), 'the installed app is a different copy');
+  assert.strictEqual(taskToRun('Ordnerpfad: \\\r\nAuszuführende Aufgabe: x'), null, 'another language: unknown');
+});

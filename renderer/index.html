@@ -217,15 +217,6 @@
       color: #e6e6e6;
       border-bottom-color: #5b8def;
     }
-    .settings-tab-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      margin-left: 6px;
-      border-radius: 50%;
-      background: #e0b96a;
-      vertical-align: middle;
-    }
     .settings-body {
       flex: 1;
       overflow-y: auto;
@@ -280,70 +271,17 @@
       color: #8a8f9a;
       font-size: 13px;
     }
-    /* Settings: Discord alerts */
-    .alerts-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    /* Help text under settings, and an amber attention line */
     .alerts-attention {
       margin: 6px 0 10px;
       color: #e0b96a;
       font-size: 13px;
-    }
-    .alerts-help-button {
-      font-size: 12px;
-      padding: 3px 10px;
-      font-weight: 400;
-    }
-    .modal.alerts-setup-help {
-      max-width: 640px;
-      font-size: 13px;
-      line-height: 1.55;
-      color: #c4c8d0;
-    }
-    .alerts-setup-help h3 {
-      margin: 18px 0 6px;
-      font-size: 14px;
-      color: #e6e6e6;
-    }
-    .alerts-setup-help ol,
-    .alerts-setup-help ul {
-      padding-left: 22px;
-      margin: 8px 0;
-    }
-    .alerts-setup-help li {
-      margin-bottom: 8px;
-    }
-    .alerts-setup-help strong {
-      color: #e6e6e6;
-    }
-    .alerts-section h4 {
-      margin: 14px 0 8px;
-      font-size: 13px;
-      color: #a8adb7;
-    }
-    .alerts-section .settings-row {
-      flex-wrap: wrap;
-      gap: 10px 16px;
     }
     .alerts-help {
       margin: -4px 0 10px;
       color: #8a8f9a;
       font-size: 12px;
       line-height: 1.5;
-    }
-    .alerts-section input[type="time"] {
-      background: #12141a;
-      color: #e6e6e6;
-      border: 1px solid #2a2e38;
-      border-radius: 4px;
-      padding: 4px 6px;
-      font-size: 13px;
-      color-scheme: dark;
-    }
-    .alerts-actions {
-      margin-top: 14px;
     }
     .plugin-data, .forecast-accuracy {
       cursor: help;
@@ -680,7 +618,6 @@
        tables.js goes first and app.js (which starts the app) goes last. -->
   <script src="tables.js"></script>
   <script src="roster.js"></script>
-  <script src="alerts.js"></script>
   <script src="backups.js"></script>
   <script src="setup-help.js"></script>
   <script src="setup-wizard.js"></script>

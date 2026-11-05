@@ -65,7 +65,7 @@ function removalPlan(facts) {
     removes.push(movedAway ? `The copy of the "${c.database}" database left here when it moved to ${movedAway.movedTo}${login}` : `The "${c.database}" database${login}`);
   }
   if (undoConnections) removes.push('Other PCs\' access to this PC\'s PostgreSQL (the firewall rule and the lines the app added)');
-  removes.push('The daily backup and Discord alert tasks');
+  removes.push('The daily backup task');
   removes.push('The app\'s settings, including the saved connection');
   if (facts.packaged) removes.push('The app itself');
   if (facts.postgresHere && !removePostgres) {
@@ -94,7 +94,7 @@ function removalSteps(plan, choices = {}) {
   const steps = [];
   if (plan.offerBackup && choices.backup) steps.push({ id: 'backup', label: 'Make a final backup' });
   if (plan.dropDatabase) steps.push({ id: 'database', label: `Remove ${plan.movedAway ? 'the copy of ' : ''}the "${plan.database}" database and its login` });
-  steps.push({ id: 'tasks', label: 'Remove the backup and alert tasks' });
+  steps.push({ id: 'tasks', label: 'Remove the backup task' });
   const admin = [
     plan.removePostgres && 'remove PostgreSQL',
     plan.canRemoveTailscale && choices.removeTailscale && 'remove Tailscale',

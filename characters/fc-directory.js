@@ -1,5 +1,5 @@
 // Every Free Company with its house, bid eligibility and how long since the house was last entered.
-// Used by the Free Companies tab, the Summary's house warning (ipc/inventory.js) and the Discord alerts.
+// Used by the Free Companies tab and the Summary's house warning (ipc/inventory.js).
 const { snapshotFragments } = require('../db');
 const { withHouseAge, warnDaysSetting } = require('./house-warning');
 

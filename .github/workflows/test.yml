@@ -27,7 +27,7 @@ jobs:
     - run: npm run build
     - name: Syntax check
       run: |
-        for f in *.js ipc/*.js alerts/*.js backups/*.js db/*.js subs/*.js characters/*.js shared/*.js setup/*.js; do node --check "$f"; done
+        for f in *.js ipc/*.js backups/*.js db/*.js subs/*.js characters/*.js shared/*.js setup/*.js; do node --check "$f"; done
 
   database:
     runs-on: ubuntu-24.04
@@ -156,20 +156,24 @@ jobs:
         ls -l dist
         test -f "dist/XIV-Fleet-Companion-Setup-${version}.exe"
         test -f dist/latest.yml
-    - name: Uninstalling removes the backup and alert tasks, an update keeps them
+    - name: Uninstalling removes the backup task and the old alerts task, an update keeps the backup task
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
         $version = node -p "require('./package.json').version"
         $setup = "dist/XIV-Fleet-Companion-Setup-$version.exe"
-        $tasks = @((node -p "require('./backups/schedule').TASK_NAME"), (node -p "require('./alerts/schedule').TASK_NAME"))
+        $backupTask = node -p "require('./backups/schedule').TASK_NAME"
+        # The Discord alerts' task (removed in 1.7.0): the app removes it when it starts, and uninstalling does in case it never did.
+        $oldAlertsTask = node -p "require('./setup/old-discord-alerts').OLD_TASK_NAME"
         function Exists($name) { schtasks.exe /Query /TN $name 2>$null | Out-Null; return $LASTEXITCODE -eq 0 }
         function Close-App { Get-Process -Name 'XIV Fleet Companion' -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 2 }
         Start-Process -FilePath $setup -ArgumentList '/S' -Wait; Close-App
-        foreach ($t in $tasks) { schtasks.exe /Create /TN $t /TR 'cmd.exe /c exit' /SC DAILY /ST 03:00 /F | Out-Null }
-        # Installing over it runs the old uninstaller as an update: the tasks stay.
+        schtasks.exe /Create /TN $backupTask /TR 'cmd.exe /c exit' /SC DAILY /ST 03:00 /F | Out-Null
+        # Installing over it runs the old uninstaller as an update: the backup task stays.
         Start-Process -FilePath $setup -ArgumentList '/S' -Wait; Close-App
-        foreach ($t in $tasks) { if (-not (Exists $t)) { throw "An update removed the task '$t'" } }
+        if (-not (Exists $backupTask)) { throw "An update removed the task '$backupTask'" }
+        schtasks.exe /Create /TN $oldAlertsTask /TR 'cmd.exe /c exit' /SC DAILY /ST 03:00 /F | Out-Null
+        $tasks = @($backupTask, $oldAlertsTask)
         $entry = Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Get-ItemProperty | Where-Object { $_.DisplayName -like 'XIV Fleet Companion*' } | Select-Object -First 1
         if (-not $entry) { throw 'Not in the installed programs list' }
         if ($entry.QuietUninstallString -notmatch '^\s*"([^"]+)"\s*(.*)$') { throw "Unexpected uninstall command: $($entry.QuietUninstallString)" }
@@ -177,7 +181,7 @@ jobs:
         Start-Process -FilePath $exe -ArgumentList $uninstallArgs -Wait
         Start-Sleep -Seconds 5
         foreach ($t in $tasks) { if (Exists $t) { throw "Uninstalling left the task '$t'" } }
-        Write-Output 'Tasks kept on update and removed on uninstall.'
+        Write-Output 'The backup task kept on update; both tasks removed on uninstall.'
         # The last lookup above found nothing (exit code 1), which is the point; don't let it fail the step.
         exit 0
     - name: Get the backup tools, then back up, test and restore with only them

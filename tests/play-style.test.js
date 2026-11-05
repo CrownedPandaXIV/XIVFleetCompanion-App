@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { detectPlayStyle, resolvePlayStyle, playStyleUses, hiddenViews, alertSettingsFor } = require('../shared/play-style');
+const { detectPlayStyle, resolvePlayStyle, playStyleUses, hiddenViews } = require('../shared/play-style');
 
 test('worked out from the characters: built subs and retainers with a class', () => {
   assert.strictEqual(detectPlayStyle({ subs: 12, retainers: 30 }), 'both');
@@ -24,9 +24,3 @@ test('tabs left out for what is not run', () => {
   assert.deepStrictEqual(playStyleUses('retainers'), { subs: false, retainers: true });
 });
 
-test('alerts for what is not run are turned off, the rest as set', () => {
-  const settings = { enabled: true, subsOn: true, suppliesOn: true, buildOn: false, retainersOn: true, undercutOn: true, houseOn: true };
-  assert.deepStrictEqual(alertSettingsFor(settings, 'both'), settings);
-  assert.deepStrictEqual(alertSettingsFor(settings, 'retainers'), { ...settings, subsOn: false, suppliesOn: false, buildOn: false });
-  assert.deepStrictEqual(alertSettingsFor(settings, 'subs'), { ...settings, retainersOn: false, undercutOn: false });
-});

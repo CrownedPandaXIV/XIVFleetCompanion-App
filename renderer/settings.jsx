@@ -422,7 +422,6 @@ const SETTINGS_TABS = [
   { key: 'general', label: 'General' },
   { key: 'database', label: 'Database' },
   { key: 'backups', label: 'Backups' },
-  { key: 'alerts', label: 'Discord Alerts' },
   { key: 'data', label: 'Data' },
   { key: 'setup', label: 'Setup Help' },
 ];
@@ -471,7 +470,7 @@ function PlayStyleSection() {
           <div className="alerts-help">
             {data.counts && `Your characters have ${data.counts.subs} sub${data.counts.subs === 1 ? '' : 's'} built and ${data.counts.retainers} retainer${data.counts.retainers === 1 ? '' : 's'} with a class. `}
             Showing: <strong className="play-style-now">{PLAY_STYLE_NAMES[data.style] || data.style}</strong>.
-            {' '}Tabs, Summary sections and Discord alerts for what you do not run are left out. With subs only, the Retainers tab is left out;
+            {' '}Tabs and Summary sections for what you do not run are left out. With subs only, the Retainers tab is left out;
             with retainers only, Salvage, Subs, Supplies, Parts and Route Optimization are.
           </div>
         </div>
@@ -652,12 +651,6 @@ function SettingsModal({ onClose, initialTab = null }) {
     } catch { /* not remembered */ }
     return 'general';
   });
-  // The dot on the Discord Alerts tab (see alertsNeedAttention).
-  const [alertSettings, setAlertSettings] = useState(null);
-  useEffect(() => {
-    window.api.getAlertSettings().then((result) => { if (result.success) setAlertSettings(result.settings); });
-  }, []);
-  const alertsWarning = alertsNeedAttention(alertSettings);
 
   function chooseTab(key) {
     setTab(key);
@@ -746,8 +739,8 @@ function SettingsModal({ onClose, initialTab = null }) {
     }
   }
 
-  // --- Warnings (General tab): low repair kits / ceruleum and the FC house warning, used by the
-  // Summary, the Roster's colours and the Discord alerts ---
+  // --- Warnings (General tab): low repair kits / ceruleum, the FC house warning and when a character
+  // counts as no longer synced, used by the Summary, the Roster's colours and its not-synced marks ---
   const [warnings, setWarnings] = useState(null);
   const [warningsStatus, setWarningsStatus] = useState('');
 
@@ -757,6 +750,7 @@ function SettingsModal({ onClose, initialTab = null }) {
         repairKitThreshold: String(result.repairKitThreshold),
         ceruleumThreshold: String(result.ceruleumThreshold),
         houseWarnDays: String(result.houseWarnDays),
+        notSyncedMinutes: String(result.notSyncedMinutes),
       });
     });
   }, []);
@@ -767,6 +761,7 @@ function SettingsModal({ onClose, initialTab = null }) {
       repairKitThreshold: Number(warnings.repairKitThreshold),
       ceruleumThreshold: Number(warnings.ceruleumThreshold),
       houseWarnDays: Number(warnings.houseWarnDays),
+      notSyncedMinutes: Number(warnings.notSyncedMinutes),
     });
     setWarningsStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
@@ -803,7 +798,6 @@ function SettingsModal({ onClose, initialTab = null }) {
           {SETTINGS_TABS.map((t) => (
             <button key={t.key} role="tab" aria-selected={tab === t.key} className={`settings-tab${tab === t.key ? ' active' : ''}`} onClick={() => chooseTab(t.key)}>
               {t.label}
-              {t.key === 'alerts' && alertsWarning && <span className="settings-tab-dot" title={alertsWarning} aria-label={alertsWarning} />}
             </button>
           ))}
         </div>
@@ -881,7 +875,14 @@ function SettingsModal({ onClose, initialTab = null }) {
                   {' '}days
                 </label>
               </div>
-              <div className="alerts-help">Used by the Summary, the Character Roster's red numbers and the Discord alerts. 0 turns a low-supply warning off; the house warning is 1 to 44 days (the game demolishes at 45).</div>
+              <div className="settings-row">
+                <label>
+                  A character counts as not synced when it is{' '}
+                  <input type="number" min="10" max="1440" className="warnings-not-synced" value={warnings.notSyncedMinutes} onChange={(e) => setWarnings({ ...warnings, notSyncedMinutes: e.target.value })} style={{ width: '70px' }} />
+                  {' '}minutes behind the rest of its account
+                </label>
+              </div>
+              <div className="alerts-help">Used by the Summary and the Character Roster's red numbers and not-synced marks. 0 turns a low-supply warning off; the house warning is 1 to 44 days (the game demolishes at 45); not synced is 10 to 1440 minutes.</div>
               <div className="settings-row">
                 <button onClick={saveWarnings}>Save</button>
                 {warningsStatus && <span className="save-status">{warningsStatus}</span>}
@@ -940,8 +941,6 @@ function SettingsModal({ onClose, initialTab = null }) {
           {tab === 'backups' && <BackupsSection />}
 
           {tab === 'setup' && <SetupHelpSection />}
-
-          {tab === 'alerts' && <AlertsSection onLoaded={setAlertSettings} />}
 
           {tab === 'data' && (
             <>

@@ -35,7 +35,7 @@ async function readSettings(client) {
 }
 
 // Every character with subs: what it holds, its use per day and days left; fleet totals; and the
-// ceruleum its Free Companies' credits can buy (fc-credits.js). Also used by the Discord summary.
+// ceruleum its Free Companies' credits can buy (fc-credits.js).
 async function loadSupplies(client) {
   const settings = await readSettings(client);
   const { latestCharacter } = await snapshotFragments(client);

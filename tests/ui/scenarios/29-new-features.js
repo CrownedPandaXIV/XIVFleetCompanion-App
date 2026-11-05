@@ -1,6 +1,6 @@
 // App 0.20.0: Summary's subs ready for new parts, ceruleum from FC credits (Supplies), loot per voyage
-// and venture income (Income), the Gil & Market tab, the PCs tab, Shopping List progress, the summary and
-// ready-for-parts choices in Settings → Discord Alerts, and right-click → Copy table / CSV on any table.
+// and venture income (Income), the Gil & Market tab, the PCs tab, Shopping List progress,
+// the not-synced setting in Settings → General → Warnings, and right-click → Copy table / CSV on any table.
 // The database version 8 tables are in the scratch database (db/schema.sql); this run adds two PCs, two
 // voyages and three venture rewards for a character with subs, and two market listings (one up for 10
 // days, one new).
@@ -145,19 +145,19 @@ module.exports = async (t) => {
   check(await ev(`(() => { const tr = document.querySelector('.shopping-parts tbody tr'); return tr.className.includes('shopping-done') && tr.querySelector('.shopping-made input[type=number]').value; })()`) === String(part.crafts),
     'reopened, the part is still ticked off');
 
-  // ---- Settings → Discord Alerts: ready for new parts and the summary ----
+  // ---- Settings → General → Warnings: when a character counts as not synced (was a Discord alert setting) ----
   await ev(`document.querySelector('.gear-button').click()`);
   await waitFor(`!!document.querySelector('.settings-tab.active')`, 'Settings');
-  await ev(`[...document.querySelectorAll('.settings-tab')].find((b) => b.innerText === 'Discord Alerts').click()`);
-  await waitFor(`!!document.querySelector('.alerts-summary-every')`, 'the summary choice', 20000);
-  check(await ev(`document.querySelector('.alerts-section').innerText.includes('A sub is ready for new parts')`), 'the ready-for-parts alert can be turned off');
-  await ev(`(() => { const s = document.querySelector('.alerts-summary-every'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '7'); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await waitFor(`!!document.querySelector('.alerts-summary-day')`, 'the summary day');
-  await clickText('.alerts-section button', 'Save Alert Settings');
-  await sleep(1000);
-  const summarySettings = await t.query(`SELECT setting_key, setting_value FROM fleet_economics_settings WHERE setting_key IN ('alert_summary_every', 'alert_summary_day', 'alert_summary_time') ORDER BY 1`);
-  check(JSON.stringify(summarySettings.map((r) => Number(r.setting_value))) === JSON.stringify([1, 7, 540]), 'a weekly summary on Monday at 09:00 is saved: ' + JSON.stringify(summarySettings));
-  await shot('summary-settings');
+  check(await ev(`![...document.querySelectorAll('.settings-tab')].some((b) => /discord/i.test(b.innerText))`), 'no Discord Alerts tab');
+  await ev(`[...document.querySelectorAll('.settings-tab')].find((b) => b.innerText === 'General').click()`);
+  await waitFor(`!!document.querySelector('input.warnings-not-synced')`, 'the not-synced setting', 20000);
+  check(await ev(`document.querySelector('input.warnings-not-synced').value`) === '30', 'not synced starts at 30 minutes');
+  await ev(`(() => { const el = document.querySelector('input.warnings-not-synced'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '45'); el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await clickText('.settings-warnings button', 'Save');
+  await waitFor(`(document.querySelector('.settings-warnings .save-status') || {}).innerText === 'Saved.'`, 'the warnings saved');
+  const notSynced = await t.query(`SELECT setting_value::int AS v FROM fleet_economics_settings WHERE setting_key = 'not_synced_after_minutes'`);
+  check(notSynced.length === 1 && notSynced[0].v === 45, 'not synced after 45 minutes is saved: ' + JSON.stringify(notSynced));
+  await shot('warnings-settings');
 };
 
 module.exports.before = async (db) => {
@@ -193,6 +193,5 @@ module.exports.after = async (db) => {
   await db.query('DELETE FROM companion_venture_result');
   await db.query('DELETE FROM companion_market_listing');
   await db.query(`DELETE FROM tier3_settings WHERE setting_key = 'shopping_progress'`);
-  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key IN ('fc_credit_tank_cost', 'market_stale_days', 'alert_summary_every', 'alert_summary_day', 'alert_summary_time')`);
-  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key LIKE 'alert\\_%'`);
+  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key IN ('fc_credit_tank_cost', 'market_stale_days', 'not_synced_after_minutes')`);
 };

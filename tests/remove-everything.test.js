@@ -39,7 +39,7 @@ test('PostgreSQL the app installed is removed whole, with the other databases in
   assert.match(plan.removes[0], /^PostgreSQL, with every database in it \("fleet", and also "mine"\)/);
   assert.ok(plan.removes.includes('The app itself'));
   assert.deepStrictEqual(re.removalSteps(plan, { backup: true, removeTailscale: true }).map((s) => s.label), [
-    'Make a final backup', 'Remove the backup and alert tasks', 'Remove PostgreSQL, remove Tailscale (Windows asks for permission)',
+    'Make a final backup', 'Remove the backup task', 'Remove PostgreSQL, remove Tailscale (Windows asks for permission)',
   ]);
 });
 

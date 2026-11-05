@@ -171,7 +171,7 @@ async function ventureValues(client, since, windowDays) {
 }
 
 // Loot per voyage and venture income over `windowDays` (the Income tab's choice by default), with market
-// values when `universalis` (universalis.js) is given. Also used by the Discord summary (alerts/run.js).
+// values when `universalis` (universalis.js) is given.
 async function loadLoot(client, { universalis = null, windowDays: days = null } = {}) {
   const windowDays = days || await incomeWindowDays(client);
   const since = new Date(Date.now() - windowDays * DAY);
@@ -300,7 +300,7 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
     windowDays,
     subs: subRows,
     routes: loot.routes,
-    // salvage: pieces of salvage brought back (the Discord summary says it).
+    // salvage: pieces of salvage brought back.
     totals: { ...loot.totals, salvage: salvagePieces(voyages) },
     ventures,
     ventureTotals: {
@@ -323,7 +323,7 @@ async function staleDays(client) {
 }
 
 // Gil per account and the retainers' listings, compared with live prices when `universalis` (universalis.js)
-// is given. Also used by the Discord undercut alert (alerts/run.js).
+// is given.
 async function loadMarket(client, { universalis = null } = {}) {
   const { latestCharacter } = await snapshotFragments(client);
   const characters = (await client.query(`SELECT c.cid::text AS cid, c.name, c.world, c.account_label, c.gil FROM ${latestCharacter} c`)).rows;

@@ -4,7 +4,13 @@
 // PowerShell backup scripts made ("Fleet database backup"), so its settings can be taken over and it
 // can be removed.
 const { run } = require('./tools');
-const { taskToRun } = require('../alerts/schedule');
+
+// The command a task runs, from `schtasks /Query /V /FO LIST` ("Task To Run: ..."); null when it is not
+// there (Windows in another language words the line differently).
+function taskToRun(output) {
+  const line = String(output || '').split(/\r?\n/).find((l) => /^\s*Task To Run:/i.test(l));
+  return line ? line.replace(/^\s*Task To Run:\s*/i, '').trim() : null;
+}
 
 const TASK_NAME = 'XIV Fleet Companion backup';
 const LEGACY_TASK_NAME = 'Fleet database backup';
@@ -102,7 +108,7 @@ async function backupScheduleStatus(expectedCommand) {
   return status;
 }
 
-module.exports = {
+module.exports = { taskToRun,
   TASK_NAME, LEGACY_TASK_NAME, taskCommand, registerScript, psQuote, parseLegacyCommand, parseStartTime, listValue,
   installBackupSchedule, removeTask, removeBackupSchedule, removeLegacySchedule, backupScheduleStatus,
 };

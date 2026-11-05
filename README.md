@@ -4,8 +4,7 @@ Your whole FFXIV submarine and retainer fleet in one window, across every accoun
 
 The app reads what the [XIV Fleet Companion plugin](https://github.com/CrownedPandaXIV/XIVFleetCompanion) sends from
 each game, and turns it into one view of your fleet: which subs are back, what they brought home, what's running
-low, which parts to build next, and what your retainers are up to. It can also ping you on Discord when something
-needs you, and back up your data every night.
+low, which parts to build next, and what your retainers are up to. It can also back up your data every night.
 
 ## What you need
 
@@ -83,8 +82,8 @@ At the end it shows what to type on your other PCs, and how to install the plugi
 
 You can run it again any time from **Settings → Setup Help → Set up this PC**, for example to add Tailscale later.
 Uninstalling the app never removes PostgreSQL, your database or Tailscale, so you can take the app off the database
-PC and leave the database running for your other PCs. Uninstalling does remove the daily backup and Discord alert
-tasks on that PC, since they need the app. To keep daily backups, turn them on from another PC (see
+PC and leave the database running for your other PCs. Uninstalling does remove the daily backup task on that PC,
+since it needs the app. To keep daily backups, turn them on from another PC (see
 [Backups from a PC without the database](#backups-from-a-pc-without-the-database)).
 
 **Done with the app on a PC?** **Settings → Setup Help → Remove everything** takes it all off: the app, its settings,
@@ -170,37 +169,12 @@ Handy everywhere:
 - **Right-click a table** to export it to CSV or copy it straight into a spreadsheet.
 - **Settings → General → What do you run?** Choose subs only or retainers only, and the app hides everything you
   don't use.
+- **Settings → General → Warnings**: when repair kits and ceruleum count as low, how long before a Free Company house
+  warning, and how far a character can fall behind the rest of its account before it's marked as not synced.
 - **Live market prices** (Settings → General): turn this on to see Universalis market prices next to vendor prices,
   to spot listings someone sells cheaper, and to see on the Shopping List whether each sub part is cheaper to buy or
   to make, from the world, data center or region you pick. Only item numbers and world, data center or region names
   are sent.
-
-## Discord alerts
-
-The app can post to a Discord channel and @mention you when something needs attention:
-
-- subs back in port for a while, or retainers sitting without a venture,
-- ceruleum or repair kits running low,
-- a Free Company house that hasn't been entered in a while (houses get demolished after 45 days),
-- a sub ready for new parts,
-- a PC that stopped syncing, or where AutoRetainer isn't running,
-- someone undercutting your market listings (with live prices on),
-- the nightly backup failing,
-- the database itself not answering.
-
-Each problem is posted once, repeated every few hours while it lasts, and gets a "Resolved" line when it's fixed. You
-can pause alerts, go quiet (no @mention) for a few hours, or set quiet hours every night. You can also get a daily or
-weekly summary.
-
-**To set it up**, on the PC that's always on (usually the one with the database), go to **Settings → Discord Alerts**
-and click **How to set this up**. In short:
-
-1. In Discord, make a webhook for your channel (Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL).
-2. Paste it in the app and click **Save**.
-3. Add your Discord user ID so the alerts ping you.
-4. Click **Send Test Message**, then **Check every 5 minutes**.
-
-Everything else (which alerts, how often) can be changed from any PC.
 
 ## Backups
 
@@ -221,7 +195,7 @@ PC is back on.
 - **Restore from a file...** does the same with a backup kept anywhere else, such as a USB drive or another PC's backup
   folder.
 
-If a backup fails, the Discord alerts tell you.
+If a backup fails, **Settings → Backups** says so, with the reason.
 
 ### Backups from a PC without the database
 
@@ -343,7 +317,7 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
   Companies, inventories and the market. `shared/` has the pieces used all over (table columns, CSV, what you run).
 - `setup/` is "Set up this PC" (the downloads, with their checksums, in `setup/installers.js`), Setup Help, "Let
   other PCs connect", "New database on this PC" and "Remove everything".
-- `alerts/` is the Discord alerts, `backups/` the backups, `updater.js` the automatic updates (`update-status.js`
+- `backups/` is the backups, `updater.js` the automatic updates (`update-status.js`
   turns them into what Settings → General → Updates shows).
 - `app-log.js` writes the app's log (logs\app.log), and `user-data-folder.js` picks the folder the settings and
   the log are kept in.

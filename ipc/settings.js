@@ -3,6 +3,7 @@
 const { app, ipcMain } = require('electron');
 const { createPgClient, loadPostgresConfig, savePostgresConfig, withClient, connectionStatus } = require('../db');
 const { DEMOLITION_DAYS, warnDaysSetting } = require('../characters/house-warning');
+const { BEHIND_MINUTES_KEY, BEHIND_MINUTES_DEFAULT, BEHIND_MINUTES_LIMITS, behindMinutesSetting } = require('../characters/not-synced');
 
 // The app's version (from package.json), shown in Settings.
 ipcMain.handle('get-app-version', () => app.getVersion());
@@ -149,7 +150,7 @@ ipcMain.handle('settings:get-low-thresholds', async () => {
   return withClient(async (client) => {
     const result = await client.query(
       `SELECT setting_key, setting_value FROM fleet_economics_settings
-       WHERE setting_key IN ('low_repair_kit_threshold', 'low_ceruleum_threshold', 'house_warn_days')`
+       WHERE setting_key IN ('low_repair_kit_threshold', 'low_ceruleum_threshold', 'house_warn_days', $1)`, [BEHIND_MINUTES_KEY]
     );
     const byKey = {};
     for (const row of result.rows) byKey[row.setting_key] = Number(row.setting_value);
@@ -157,17 +158,22 @@ ipcMain.handle('settings:get-low-thresholds', async () => {
       success: true,
       repairKitThreshold: byKey.low_repair_kit_threshold ?? 0,
       ceruleumThreshold: byKey.low_ceruleum_threshold ?? 0,
-      houseWarnDays: warnDaysSetting(byKey.house_warn_days)
+      houseWarnDays: warnDaysSetting(byKey.house_warn_days),
+      notSyncedMinutes: behindMinutesSetting(byKey[BEHIND_MINUTES_KEY] ?? null)
     };
   }, (err) => {
-    return { success: false, error: err.message, repairKitThreshold: 0, ceruleumThreshold: 0, houseWarnDays: warnDaysSetting(null) };
+    return { success: false, error: err.message, repairKitThreshold: 0, ceruleumThreshold: 0, houseWarnDays: warnDaysSetting(null), notSyncedMinutes: BEHIND_MINUTES_DEFAULT };
   });
 });
 
-ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshold, ceruleumThreshold, houseWarnDays }) => {
+ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshold, ceruleumThreshold, houseWarnDays, notSyncedMinutes }) => {
   // The house warning (days since an FC house was last entered) is saved alongside, when given.
   if (houseWarnDays !== undefined && !(Number.isInteger(houseWarnDays) && houseWarnDays >= 1 && houseWarnDays < DEMOLITION_DAYS)) {
     return { success: false, error: `The house warning must be a whole number of days from 1 to ${DEMOLITION_DAYS - 1}.` };
+  }
+  const [minBehind, maxBehind] = BEHIND_MINUTES_LIMITS;
+  if (notSyncedMinutes !== undefined && !(Number.isInteger(notSyncedMinutes) && notSyncedMinutes >= minBehind && notSyncedMinutes <= maxBehind)) {
+    return { success: false, error: `Not synced must be a whole number of minutes from ${minBehind} to ${maxBehind}.` };
   }
   return withClient(async (client) => {
     await client.query(
@@ -188,6 +194,14 @@ ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshol
          VALUES ('house_warn_days', $1, now())
          ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
         [houseWarnDays]
+      );
+    }
+    if (notSyncedMinutes !== undefined) {
+      await client.query(
+        `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
+        [BEHIND_MINUTES_KEY, notSyncedMinutes]
       );
     }
     return { success: true };
