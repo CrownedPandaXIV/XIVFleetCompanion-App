@@ -135,7 +135,124 @@ function UpdateBanner() {
     <div className="update-banner" role="status">
       Version {ready.version} is ready.{' '}
       <button onClick={restart}>Restart to update</button>
+      <button className="update-whats-new" onClick={() => window.api.openReleaseNotes(ready.version)}>What's new</button>
       {' '}It is also installed the next time you close the app.
+    </div>
+  );
+}
+
+// The changelog's versions (shared/changelog.js): each version's date and its notes, bold and code kept, as text.
+function ChangelogParts({ parts }) {
+  return parts.map((p, i) => (p.bold ? <strong key={i}>{p.text}</strong> : p.code ? <code key={i}>{p.text}</code> : <React.Fragment key={i}>{p.text}</React.Fragment>));
+}
+function ChangelogVersions({ versions }) {
+  return versions.map((v) => {
+    const groups = [];
+    for (const b of v.blocks) {
+      if (b.type === 'li') {
+        const last = groups[groups.length - 1];
+        if (b.sub && last && last.type === 'ul' && last.items.length) last.items[last.items.length - 1].subs.push(b);
+        else if (last && last.type === 'ul') last.items.push({ ...b, subs: [] });
+        else groups.push({ type: 'ul', items: [{ ...b, subs: [] }] });
+      } else groups.push(b);
+    }
+    return (
+      <div key={v.version} className="changelog-version">
+        <h4>Version {v.version}{v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? <span className="changelog-date"> · {v.date}</span> : null}</h4>
+        {groups.map((g, i) => (g.type === 'ul' ? (
+          <ul key={i}>
+            {g.items.map((item, j) => (
+              <li key={j}>
+                <ChangelogParts parts={item.parts} />
+                {item.subs.length > 0 && <ul>{item.subs.map((sub, k) => <li key={k}><ChangelogParts parts={sub.parts} /></li>)}</ul>}
+              </li>
+            ))}
+          </ul>
+        ) : <p key={i}><ChangelogParts parts={g.parts} /></p>))}
+      </div>
+    );
+  });
+}
+
+// Shown once after the app has updated (ipc/updates.js): what changed in each version since this PC last ran
+// one, until "Got it". A new install shows nothing.
+function WhatsNewBox() {
+  const [news, setNews] = useState(null);
+  useEffect(() => { window.api.getWhatsNew().then((r) => setNews(r && r.versions.length ? r : null)); }, []);
+  if (!news) return null;
+  const dismiss = () => { window.api.markWhatsNewSeen(); setNews(null); };
+  const several = news.versions.length > 1;
+  return (
+    <div className="update-banner whats-new" role="status">
+      <div className="whats-new-head">
+        <strong>Updated to version {news.current}.</strong>
+        {' '}{several ? `What's new in the ${news.versions.length} versions since you last opened the app:` : "What's new:"}
+        <button className="whats-new-done" onClick={dismiss}>Got it</button>
+      </div>
+      <div className="whats-new-list"><ChangelogVersions versions={news.versions} /></div>
+    </div>
+  );
+}
+
+// "New game data is available" (db/game-data-notice.js): asked when the window opens and every hour (GitHub itself
+// at most once a day). Update now runs the same check and update as Settings > Data > Game Data, backing up the old
+// game data first; Later hides it on this PC until something newer changes.
+const GAME_DATA_NOTICE_EVERY_MS = 60 * 60 * 1000;
+
+function GameDataBanner() {
+  const [notice, setNotice] = useState(null);
+  const [phase, setPhase] = useState('idle'); // idle | checking | updating | done
+  const [message, setMessage] = useState('');
+  const load = () => window.api.getGameDataNotice().then((r) => setNotice(r && r.success && r.available ? r : null));
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, GAME_DATA_NOTICE_EVERY_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const finish = (text) => { setMessage(text); setPhase('done'); load(); };
+  const plain = (tables) => tables.map((t) => t.table.replace(/^ffxiv_/, '')).join(', ');
+  async function update() {
+    setPhase('checking');
+    const checked = await window.api.checkGameData();
+    if (!checked.success) return finish(`The game data couldn't be checked: ${checked.error}`);
+    const changed = checked.tables.filter((t) => t.status === 'ok');
+    const blocked = checked.tables.filter((t) => t.status === 'blocked');
+    if (!changed.length) {
+      return finish(blocked.length
+        ? `The game data couldn't be downloaded (${blocked[0].reason}). Try again later, or from Settings > Data > Game Data.`
+        : 'The game data is already up to date.');
+    }
+    setPhase('updating');
+    const applied = await window.api.applyGameData({ backupFirst: true });
+    if (!applied.success) return finish(`The game data couldn't be updated: ${applied.error}`);
+    const updated = applied.results.filter((r) => r.status === 'updated');
+    const failed = applied.results.filter((r) => r.status === 'failed').concat(blocked);
+    finish(`Game data updated (${updated.length} table${updated.length === 1 ? '' : 's'})${failed.length ? `, except ${plain(failed)}` : ''}.`
+      + ' The old game data was backed up first; Settings > Data > Game Data can put it back.');
+  }
+  const later = () => { window.api.gameDataNoticeLater(notice.newest); setNotice(null); };
+
+  if (phase === 'done') {
+    return (
+      <div className="update-banner game-data-banner" role="status">
+        {message} <button onClick={() => { setPhase('idle'); setMessage(''); }}>Close</button>
+      </div>
+    );
+  }
+  if (phase === 'checking' || phase === 'updating') {
+    return (
+      <div className="update-banner game-data-banner" role="status">
+        {phase === 'checking' ? 'Downloading the new game data to see what changed...' : 'Updating the game data...'} This takes a minute or two.
+      </div>
+    );
+  }
+  if (!notice) return null;
+  return (
+    <div className="update-banner game-data-banner" role="status">
+      New game data is available (it changed on {new Date(notice.newest).toLocaleDateString()}, usually after a game patch).{' '}
+      <button onClick={update}>Update now</button>
+      <button onClick={later}>Later</button>
     </div>
   );
 }
@@ -267,6 +384,7 @@ function PluginDataStatus({ refreshKey }) {
 
 function App() {
   const [rows, setRows] = useState(null);
+  const [ownerSkips, setOwnerSkips] = useState([]);
   const [error, setError] = useState(null);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
@@ -327,6 +445,7 @@ function App() {
     const result = await window.api.getRoster();
     if (result.success) {
       setRows(sortRows(result.rows));
+      setOwnerSkips(result.ownerSkips || []);
       setError(null);
     } else {
       setError(result.error);
@@ -429,6 +548,8 @@ function App() {
 
         <ConnectionBanner status={connection} />
         <UpdateBanner />
+        <WhatsNewBox />
+        <GameDataBanner />
         <DatabaseBanner />
 
         {showSettings && (
@@ -493,6 +614,9 @@ function App() {
             {!error && rows !== null && rows.length === 0 && (
               <div className="status">No rows found.</div>
             )}
+
+            {!error && rows !== null && <NoLabelNote characters={rows.filter((r) => !r.account_label).length} />}
+            {!error && rows !== null && <NotSyncedAnywhereNote characters={ownerSkips} />}
 
             {!error && rows !== null && rows.length > 0 && groupByAccountEnabled &&
               groupByAccount(rosterRows).map((group) => (

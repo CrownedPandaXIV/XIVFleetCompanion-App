@@ -19,5 +19,9 @@ autoUpdater.checkForUpdates = async () => {
   later(2500, () => autoUpdater.emit('update-downloaded', { version: '9.9.9' }));
 };
 autoUpdater.quitAndInstall = () => {};
+// Where it was told to look (updater.js, test versions on or off), kept in feed.json in the app's data folder.
+autoUpdater.setFeedURL = (feed) => {
+  if (process.env.UI_TEST_PROFILE) require('fs').writeFileSync(require('path').join(process.env.UI_TEST_PROFILE, 'feed.json'), JSON.stringify(feed));
+};
 
 module.exports = { autoUpdater };

@@ -34,6 +34,10 @@ function PcProblemsCell({ problems }) {
 }
 
 // ctx.newest: the newest plugin version any PC runs; ctx.minVersion: the oldest this app works fully with.
+// "12 (2 left out) (3 left to another setup)": the characters a setup synced, those unticked in its settings, and
+// those it left to the setup they last logged in on (plugin 1.0.2).
+const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another setup)` : ''}`;
+
 const PC_COLUMN_DEFS = [
   {
     key: 'pc', label: 'PC', locked: true, sort: (p) => p.pc_name,
@@ -60,7 +64,15 @@ const PC_COLUMN_DEFS = [
     sort: (p) => String(p.plugin_version || '').split('.').map((n) => n.padStart(5, '0')).join('.'),
   },
   { key: 'last_sync', label: 'Last sync', cell: (p) => pcAgo(p.last_sync_at), sort: (p) => (p.last_sync_at ? -Date.parse(p.last_sync_at) : null) },
-  { key: 'characters', label: 'Characters', cell: (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}`, sort: (p) => p.characters_synced },
+  { key: 'characters', label: 'Characters', sort: (p) => p.characters_synced,
+    cell: (p) => pcCharacters(p),
+    td: (p) => (
+      <td title={p.characters_elsewhere
+        ? `${p.characters_elsewhere} of the characters this setup's AutoRetainer has last logged in on another setup, so that setup syncs them (the Roster's Synced By column says which).`
+        : undefined}>
+        {pcCharacters(p)}
+      </td>
+    ) },
   {
     key: 'autoretainer', label: 'AutoRetainer',
     td: (p) => <td className={p.autoretainer_ready === false ? 'supply-warn' : ''} title="AutoRetainer running (needed: nothing syncs without it)">{pcYes(p.autoretainer_ready)}</td>,
@@ -120,6 +132,9 @@ function PcsView({ refreshKey }) {
         on a PC also shows its result here. A PC no longer used can be removed with the × beside its name.
       </div>
       {removeError && <div className="error">Could not remove the PC: {removeError}</div>}
+      <SharedSyncWarning characters={data.sharedSync} />
+      <NoLabelNote setups={data.pcs.filter((p) => !p.account_label).length} />
+      <NotSyncedAnywhereNote characters={data.ownerSkips} />
       {data.moved && data.moved.waiting.length > 0 && (
         <div className="pcs-update-plugin pcs-moved" role="status">
           <strong>The database moved here from {data.moved.from} {pcAgo(data.moved.at)}.</strong> Still to switch over:

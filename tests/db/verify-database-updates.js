@@ -80,18 +80,18 @@ const indexes = async (c) => (await c.query(
                    ALTER TABLE companion_retainer_lookup DROP COLUMN items_seen_at;
                    ALTER TABLE companion_submarine_snapshot DROP COLUMN slot;
                    ALTER TABLE companion_metric_latest DROP COLUMN label;
-                   DROP TABLE companion_database_move, companion_rankup_forecast;`);
+                   DROP TABLE companion_database_move, companion_rankup_forecast, companion_character_login, companion_game_data_check;`);
     const r = await ensureDatabase(c);
     assert.deepStrictEqual(r.applied.slice().sort(), [
       'added companion_market_listing', 'added companion_metric_history_metric_idx', 'added companion_metric_latest.label',
       'added companion_pc_status', 'added companion_retainer_lookup.items_seen_at', 'added companion_submarine_snapshot.slot',
       'added companion_venture_result', 'added companion_venture_result_received_idx', 'added companion_voyage_loot.leg',
-      'update 10: database_move', 'update 11: rankup_forecasts']);
+      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check']);
     assert.deepStrictEqual((await columns(c)).slice().sort(), refColumns.slice().sort());
     assert.deepStrictEqual(await indexes(c), refIndexes);
     const slots = (await c.query('SELECT sub_name, slot FROM companion_submarine_snapshot ORDER BY sub_name')).rows;
     assert.deepStrictEqual(slots, [{ sub_name: 'Renamed', slot: null }, { sub_name: 'Submersible-2', slot: 2 }]);
-    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }]);
+    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }]);
     await c.end();
   });
 

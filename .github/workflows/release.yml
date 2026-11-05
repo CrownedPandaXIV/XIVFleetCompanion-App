@@ -71,3 +71,5 @@ jobs:
         npm ci
         npm run dist
         bash .github/scripts/publish-installer.sh "$(node -p "require('./package.json').version")"
+        # Copies with "Get test versions" on look at the testing release: it gets this version too when it's newer.
+        bash .github/scripts/publish-testing.sh "$(node -p "require('./package.json').version")" --if-newer

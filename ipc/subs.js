@@ -1,6 +1,7 @@
 // Submarines: the Subs view (routes, gil/day, speed/range), low fuel/repair warnings, Craft? toggle.
 const { ipcMain } = require('electron');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { loadSharedCharacters } = require('../characters/shared-sync');
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const forecastVoyages = require('../subs/voyage-forecast');
@@ -463,7 +464,10 @@ ipcMain.handle('get-fleet-warnings', async () => {
         low_ceruleum: r.ceruleum < ceruleumThreshold
       }));
 
-    return { success: true, rows: warnings, notSynced, repairKitThreshold, ceruleumThreshold };
+    // Characters two setups of the plugin keep overwriting (characters/shared-sync.js).
+    const sharedSync = await loadSharedCharacters(client, latestCharacter);
+
+    return { success: true, rows: warnings, notSynced, sharedSync, repairKitThreshold, ceruleumThreshold };
   }, (err) => {
     return { success: false, error: err.message };
   });

@@ -52,6 +52,15 @@ itself. This can take a minute or two.
 **Settings → General → Updates** shows which version you have and what the update check is doing, and **Check for
 updates** looks straight away.
 
+After an update, the app shows what changed in each version since you last opened it, until you click **Got it**.
+**What's new** on the update bar, and in **Settings → General → Updates**, shows the same any time.
+
+**Trying new versions first:** tick **Get test versions** in **Settings → General → Updates**, and that PC gets new
+versions to try before everyone else (they're numbered like `1.6.0-test.12`). It still gets every normal update too.
+Turning it off keeps the version you have until a normal version is newer. A test version can still have problems, so
+this is for whoever wants to try things first. The plugin has its own test builds: see
+[the download page](https://github.com/CrownedPandaXIV/XIVFleetCompanion-Releases) for how to get them in Dalamud.
+
 ## First-time setup
 
 The first time the app starts, it asks what this PC is for:
@@ -87,7 +96,8 @@ app's own database and login are removed. On a PC the database was moved away fr
 password in **Settings → Database**, click **Test Connection**, then **Save**.
 
 On a brand-new database, the app fills in the game data (item names, recipes, worlds and so on) by itself the first
-time it connects. That takes a minute or two, and a note at the top of the window says when it's done.
+time it connects. That takes a minute or two, and a note at the top of the window says when it's done. After that, a bar
+at the top says when new game data is available (usually after a game patch), with an **Update now** button.
 
 Your password is encrypted with Windows' own protection and never leaves this PC.
 
@@ -105,12 +115,42 @@ You never need to run anything on the database by hand.
 - **Tailscale** covers setting it up on every PC, with a **Test connection** button that says in plain words what's
   wrong if a PC can't reach the database.
 
+### More than one account
+
+Give each game account its own setup of AutoRetainer and Fleet Companion (for example, separate XIVLauncher setups),
+with its own account label in the plugin's settings (the Roster and the PCs tab point out any without one). Each setup
+notes when a character logs in on it, and only the setup a character last logged in on syncs it (plugin 1.0.2 or
+newer), so an old copy of a character left in another setup's AutoRetainer can't overwrite it. There's no time limit:
+after a long break, each character still belongs to the setup it last logged in on.
+
+One setup used for several accounts (the same AutoRetainer and plugin, logging into each account in turn) still syncs
+every character correctly. But the account label belongs to the setup, so all of its characters share one label, and
+the app can't tell those accounts apart in the Account column, the Roster or Trends.
+
+The same goes for Allagan Tools, FC Tracker and Submarine Tracker: they keep their data per character or Free Company,
+so a shared setup syncs all of it, under its one label. And a setup leaves alone their data too (bags, retainers' items,
+FC chests, house details, voyage loot) for any character that last logged in on another setup.
+
+The Roster's **Synced By** column names the setup each character last logged in on, and the PCs tab says how many
+characters each setup left to another one. A character unticked in a setup's plugin settings never counts as that
+setup's, so unticking it on one PC (say, a laptop) never stops another PC that does sync it. If a character's setup
+keeps syncing but leaves it out (its AutoRetainer lost it), no setup sends it any more: the Roster and the PCs tab say
+which character, and logging in as it once on the right setup fixes it.
+
+With an older plugin, or before a character has logged in since the update, each setup syncs every character its
+AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
+keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
+update every setup to plugin 1.0.2 or newer, then log in as the character once on the setup that plays it. If you'd
+rather not wait, on the setup that doesn't play the character, open AutoRetainer's settings → **Advanced → Character
+Synchronization** and click **Prune deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can
+keep a backup).
+
 ## What's in the app
 
 | Tab | What it shows |
 | --- | --- |
 | **Summary** | Everything that needs you, at a glance: idle subs, low supplies, FC houses at risk, retainers without a venture. |
-| **Character Roster** | Every character with gil, ceruleum and repair kits. Drag to reorder; group by account. |
+| **Character Roster** | Every character with gil, ceruleum and repair kits, and which setup of the plugin syncs it. Drag to reorder; group by account. |
 | **Free Companies** | Each FC with its house and when it was last entered. |
 | **Salvage** | The salvage you're holding and what it's worth. |
 | **Subs** | Every sub, when it's back, and its next rank-up and build change, with how close the rank-up dates have come. |
@@ -324,6 +364,11 @@ GitHub then tags the release, builds the installer and publishes it to
 pick it up. That needs the `RELEASES_TOKEN` secret: a token that can write to that repository.
 `npm run dist` builds the installer locally into `dist/`.
 
+**A test version first:** push the branch to `testing` (`git push origin dev:testing --force`). GitHub builds it as
+`<version>-test.<run>` and puts it on the `testing` pre-release of XIVFleetCompanion-Releases, where only copies with
+**Get test versions** on look (`update-feed.js`, `.github/workflows/test-release.yml`). Every normal release also goes
+there when it's newer, so testers never miss one.
+
 Version numbers follow [Semantic Versioning](https://semver.org):
 
 - **0.1.0 → 0.1.1** for fixes,
@@ -335,3 +380,8 @@ Version numbers follow [Semantic Versioning](https://semver.org):
 **Settings → Data → Game Data** refreshes the `ffxiv_` tables (items, recipes, worlds and so on) from
 [xivapi/ffxiv-datamining](https://github.com/xivapi/ffxiv-datamining). Before applying an update it can save a copy of
 those tables inside the database, and those copies can be restored from the same screen.
+
+You don't have to remember to look: once a day the app asks GitHub whether any of those files have changed since the
+last update (only their dates, a few kilobytes), and says so in a bar under the header. **Update now** there does the
+same check and update, backing up the old tables first; **Later** hides it on that PC until something newer changes.
+With the app open on several PCs, only one of them asks each day.

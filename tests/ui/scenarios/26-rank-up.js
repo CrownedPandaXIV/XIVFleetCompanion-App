@@ -71,6 +71,22 @@ module.exports = async (t) => {
     || (kind(statuses[i - 1]) === kind(s) && (kind(s) !== 1 || secs(statuses[i - 1]) <= secs(s))));
   check(statuses.length > 0 && kind(statuses[0]) === 0 && kind(statuses[statuses.length - 1]) === 2 && ordered,
     'Status sorts by return: waiting first, then soonest back, in port last: ' + statuses.slice(0, 4).join(', ') + ' ... ' + statuses.slice(-2).join(', '));
+
+  // Every countdown runs off one clock, so subs back at the same moment always show the same time: read over a few
+  // seconds, there are never more different countdowns than different return times (the test data has 80
+  // characters' subs back at exactly the same times).
+  const returnTimes = (await t.query(`SELECT count(DISTINCT return_time)::int AS n FROM companion_submarine_snapshot
+    WHERE return_time > extract(epoch FROM now()) + 5`))[0].n;
+  let mostShown = 0;
+  for (let i = 0; i < 12; i++) {
+    const shown = await ev(`(() => {
+      const i = [...document.querySelector('thead').querySelectorAll('th')].findIndex(th => th.innerText.trim().toLowerCase().startsWith('status'));
+      return new Set([...document.querySelectorAll('tbody tr')].map(r => r.children[i].innerText.trim()).filter(s => /^\\d+:\\d\\d:\\d\\d$/.test(s))).size;
+    })()`);
+    mostShown = Math.max(mostShown, shown);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  check(mostShown > 0 && mostShown <= returnTimes, `subs back together tick together: at most ${mostShown} different countdowns for ${returnTimes} return times`);
   await ev(`[...document.querySelectorAll('.controls button')].find(b => b.innerText.trim() === 'Reset Sorting').click()`);
 
   const gus = await subRow('Gus Kitteh 6', 'Sub4');

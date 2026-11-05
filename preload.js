@@ -82,6 +82,12 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => invoke('install-update'),
   getUpdateStatus: () => invoke('updates:status'),
   checkForUpdates: () => invoke('updates:check'),
+  setTestVersions: (on) => invoke('updates:set-testing', on),
+  // What's new (ipc/updates.js): { current, versions } not yet shown on this PC; marking them seen; the recent ones.
+  getWhatsNew: () => invoke('whats-new:get'),
+  markWhatsNewSeen: () => invoke('whats-new:seen'),
+  getRecentChanges: () => invoke('whats-new:recent'),
+  openReleaseNotes: (version) => invoke('whats-new:open-release', version),
   onUpdateStatus: (callback) => {
     const listener = (event, status) => callback(status);
     ipcRenderer.on('update-status', listener);
@@ -131,6 +137,8 @@ contextBridge.exposeInMainWorld('api', {
   getGameDataStatus: () => invoke('game-data-status'),
   checkGameData: () => invoke('game-data-check'),
   applyGameData: (options) => invoke('game-data-apply', options),
+  getGameDataNotice: () => invoke('game-data-notice:get'),
+  gameDataNoticeLater: (newest) => invoke('game-data-notice:later', newest),
   listGameDataBackups: () => invoke('game-data-backups'),
   createGameDataBackup: () => invoke('game-data-backup-create'),
   restoreGameDataBackup: (name) => invoke('game-data-backup-restore', name),

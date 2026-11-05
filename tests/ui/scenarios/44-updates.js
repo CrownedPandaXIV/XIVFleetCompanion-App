@@ -23,11 +23,25 @@ module.exports = async (t) => {
   await waitFor(`/Version 9\\.9\\.9 is downloaded/.test(${section}.innerText)`, 'the downloaded version', 10000);
   check(true, 'then says the new version is downloaded');
   check(await ev(`!!document.querySelector('.update-banner') && document.querySelector('.update-banner').innerText.includes('Version 9.9.9 is ready')`), 'and the "Restart to update" bar appears');
+  check(await ev(`!!document.querySelector('.update-banner .update-whats-new')`), 'with a What\'s new button (the release notes on GitHub)');
 
   const log = fs.readFileSync(path.join(t.profile, 'logs', 'app.log'), 'utf8');
   const lines = log.split(/\r?\n/).filter((l) => l.includes('Update:')).map((l) => l.replace(/^.*?Update: /, ''));
   check(JSON.stringify(lines) === JSON.stringify(['up to date.', 'found version 9.9.9, downloading it.', 'version 9.9.9 is downloaded and ready to install.']),
     `the log has each step once: ${JSON.stringify(lines)}`);
+
+  // Get test versions: off on a normal version, looks at the "testing" release once on, back to the releases once off.
+  const feed = () => JSON.parse(fs.readFileSync(path.join(t.profile, 'feed.json'), 'utf8'));
+  const toggle = `${section}.querySelector('.test-versions-toggle')`;
+  check(await ev(`!!${toggle} && !${toggle}.checked`), 'Get test versions is there, and off');
+  check(feed().provider === 'github', 'normal versions come from the newest release: ' + JSON.stringify(feed()));
+  await ev(`${toggle}.click()`);
+  await waitFor(`${toggle}.checked && ${section}.innerText.includes('every normal update too')`, 'test versions on', 5000);
+  check(feed().provider === 'generic' && /releases\/download\/testing$/.test(feed().url), 'test versions come from the testing release: ' + JSON.stringify(feed()));
+  check(JSON.parse(fs.readFileSync(path.join(t.profile, 'test-versions.json'), 'utf8')).testing === true, 'remembered on this PC');
+  await ev(`${toggle}.click()`);
+  await waitFor(`!${toggle}.checked`, 'test versions off', 5000);
+  check(feed().provider === 'github', 'and back to the normal releases when turned off');
 };
 
 module.exports.env = () => ({ XIV_FLEET_TEST_FAKE_UPDATER: path.join(__dirname, '..', 'fake-updater.js') });

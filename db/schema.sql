@@ -197,6 +197,7 @@ CREATE TABLE companion_pc_status (
     check_to_fix           int,
     check_at               timestamptz,
     db_user                text,       -- the login the plugin uses (plugin 0.14.0, database update 10)
+    characters_elsewhere   int,        -- left to another setup at the last sync (plugin 1.0.2, database update 12)
     PRIMARY KEY (pc_name, account_label)
 );
 
@@ -281,6 +282,16 @@ CREATE TABLE companion_rankup_forecast (
     PRIMARY KEY (cid, slot, rank, made_at)
 );
 CREATE INDEX companion_rankup_forecast_made_at ON companion_rankup_forecast (made_at);
+
+-- Where each character last logged in (plugin 1.0.2, database update 12): the plugin setup (PC and account label)
+-- that last had it logged in is the only one that syncs it, so an old copy in another setup's AutoRetainer can't
+-- overwrite it.
+CREATE TABLE companion_character_login (
+    cid           numeric     PRIMARY KEY,
+    pc_name       text        NOT NULL,
+    account_label text        NOT NULL,
+    logged_in_at  timestamptz NOT NULL
+);
 
 -- ---------------------------------------------------------------------------------------------------
 -- Written by the app (your settings and choices)
@@ -367,6 +378,16 @@ CREATE TABLE companion_game_data_log (
     applied_at timestamptz NOT NULL DEFAULT now(),
     source     jsonb,
     summary    jsonb
+);
+
+-- The app's daily look for new game data (app 1.6.0, database update 12), shared by every PC so only one asks
+-- GitHub each day. One row.
+CREATE TABLE companion_game_data_check (
+    id            int         PRIMARY KEY CHECK (id = 1),
+    checked_at    timestamptz NOT NULL,
+    changes       jsonb       NOT NULL DEFAULT '{}',
+    checked_since timestamptz,
+    confirmed_at  timestamptz
 );
 
 -- Which database updates have been applied (db/apply-updates.js): version 9 is this layout as of the

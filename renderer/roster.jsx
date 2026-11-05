@@ -3,6 +3,9 @@
 // The Character Roster's own columns. `cell` draws a row's cell, `sort` gives the value to sort by, and
 // `cellStyle` is optional. Anything else comes from the master list (column-catalog.js).
 // Roster columns only for subs, and only for retainers (Settings → What do you run?).
+// "Account 2 on DESKTOP-1": the setup a character last logged in on, or "—" with none recorded.
+const syncedBy = (row) => (row.login_pc ? `${row.login_label || '(no label)'} on ${row.login_pc}` : '—');
+
 const ROSTER_SUB_COLUMNS = ['ceruleum', 'repairKits', 'submarines'];
 const ROSTER_RETAINER_COLUMNS = ['retainers'];
 
@@ -17,7 +20,14 @@ const ROSTER_COLUMN_DEFS = [
   { key: 'repairKits', label: 'Repair Kits', cell: (row) => row.repair_kits, sort: (r) => Number(r.repair_kits), cellStyle: (row) => ({ color: row.low_repair ? '#e57373' : undefined }) },
   { key: 'retainers', label: 'Retainers', cell: (row) => row.retainer_count, sort: (r) => r.retainer_count },
   { key: 'submarines', label: 'Submarines', cell: (row) => row.submarine_count, sort: (r) => r.submarine_count },
-  { key: 'lastSynced', label: 'Last Synced', cell: (row) => new Date(row.snapshot_at).toLocaleString(), sort: (r) => new Date(r.snapshot_at).getTime() }
+  { key: 'lastSynced', label: 'Last Synced', cell: (row) => new Date(row.snapshot_at).toLocaleString(), sort: (r) => new Date(r.snapshot_at).getTime() },
+  // The setup (PC and account label) the character last logged in on: only it syncs the character (plugin 1.0.2).
+  { key: 'syncedBy', label: 'Synced By', sort: (r) => syncedBy(r), cell: (row) => syncedBy(row),
+    td: (row) => (
+      <td className="synced-by" title={row.login_pc
+        ? `Last logged in on this setup ${new Date(row.logged_in_at).toLocaleString()}. Only this setup syncs the character; others that have it leave it alone.`
+        : 'No login recorded yet (it needs plugin 1.0.2): every setup that has the character syncs it.'}>{syncedBy(row)}</td>
+    ) }
 ];
 // Master-list columns the Roster already has of its own.
 const ROSTER_DUPLICATE_EXTRAS = ['x_world', 'x_gil', 'x_ceruleum', 'x_repair_kits', 'x_retainers', 'x_submarines', 'x_last_synced', 'x_house', 'x_fc_name', 'x_fc_points'];
@@ -141,7 +151,9 @@ function RosterTable({ rows, onReorder, onRemove, cols, sortColumn, sortDirectio
           <tr key={row.cid} data-cid={row.cid}>
             <td className="row-tools"><span className="drag-handle" title="Drag to reorder">⠿</span><RemoveCharacterButton row={row} onRemove={onRemove} /></td>
             {cols.visibleDefs.map((def) => (
-              <td key={def.key} style={def.cellStyle ? def.cellStyle(row) : undefined}>{def.cell(row)}</td>
+              def.td
+                ? <React.Fragment key={def.key}>{def.td(row)}</React.Fragment>
+                : <td key={def.key} style={def.cellStyle ? def.cellStyle(row) : undefined}>{def.cell(row)}</td>
             ))}
           </tr>
         ))}

@@ -1,0 +1,42 @@
+name: Test release
+
+# A test version of the app, for trying before everyone gets it: pushing to the testing branch builds the
+# installer as "<version>-test.<run number>" (package.json's version, so 1.6.0-test.12 for 1.6.0) and puts it on
+# the "testing" pre-release of CrownedPandaXIV/XIVFleetCompanion-Releases. Only copies of the app with Settings →
+# General → Updates → Get test versions on look there (update-feed.js). Normal releases (release.yml) are unchanged,
+# and also go to the testing release when they're newer, so testers get every normal update too.
+#
+# Needs the RELEASES_TOKEN secret, as release.yml does. Without it nothing is published (the step says so).
+on:
+  push:
+    branches: [ testing ]
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+
+    - name: Build and publish the test version
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        if [ -z "$GH_TOKEN" ]; then echo "No RELEASES_TOKEN secret: the test version is not published."; exit 0; fi
+        base=$(node -p "require('./package.json').version")
+        version="${base}-test.${GITHUB_RUN_NUMBER}"
+        echo "Test version: ${version}"
+        npm ci
+        npm version "$version" --no-git-tag-version
+        npm run dist
+        bash .github/scripts/publish-testing.sh "$version"

@@ -484,6 +484,78 @@ function NotSyncedTag({ behindMs }) {
   );
 }
 
+// Characters two setups of the plugin keep overwriting (characters/shared-sync.js), on the Summary and the PCs tab:
+// what is happening and the two ways to fix it. characters: [{ cid, name, world, labels }].
+function SharedSyncWarning({ characters }) {
+  if (!characters || characters.length === 0) return null;
+  const label = (l) => l || '(no label)';
+  const line = (c) => `${c.name || `Character ${c.cid}`}${c.world ? ` (${c.world})` : ''}: ${c.labels.map(label).join(' and ')}`;
+  const one = characters.length === 1;
+  return (
+    <div className="pcs-update-plugin shared-sync" role="status">
+      <strong>
+        {one ? `${line(characters[0])}.` : `${characters.length} characters are synced by more than one setup of the plugin.`}
+      </strong>
+      {one ? ' This character is synced by more than one setup of the plugin.' : ''} Each setup overwrites the
+      other's subs and account label for {one ? 'it' : 'them'}, usually because one setup's AutoRetainer still has an
+      old copy of {one ? 'it' : 'them'}. To fix it:
+      <ol>
+        <li>Update Fleet Companion to plugin 1.0.2 or newer on every setup.</li>
+        <li>
+          Log in as {one ? 'the character' : 'each character'} once on the setup that plays it. From then on, only
+          the setup a character last logged in on syncs it, so the old copy is left alone.
+        </li>
+        <li>
+          If you'd rather not wait, tidy AutoRetainer on the setup that doesn't play {one ? 'the character' : 'a character'}: in
+          AutoRetainer's settings, open Advanced → Character Synchronization and click Prune deleted characters
+          (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup).
+        </li>
+      </ol>
+      {!one && (
+        <details>
+          <summary>Which characters</summary>
+          <ul className="shared-sync-list">{characters.map((c) => <li key={c.cid}>{line(c)}</li>)}</ul>
+        </details>
+      )}
+      <span className="alerts-help">This goes away once {one ? 'its label has' : 'their labels have'} stopped switching for 3 days.</span>
+    </div>
+  );
+}
+
+// Characters, or setups of the plugin (PCs tab), with no account label: the app can't tell which account they are
+// on, setups on one PC share a row on the PCs tab, and two setups syncing the same character can't be spotted.
+function NoLabelNote({ characters = 0, setups = 0 }) {
+  if (!characters && !setups) return null;
+  const what = setups
+    ? `${setups} setup${setups === 1 ? '' : 's'} of the plugin ${setups === 1 ? 'has' : 'have'} no account label`
+    : `${characters} character${characters === 1 ? ' has' : 's have'} no account label`;
+  return (
+    <div className="supplies-note no-label-note">
+      <span className="note-warn">{what},</span> so the app can't tell which account {setups ? (setups === 1 ? 'it syncs' : 'they sync') : (characters === 1 ? 'it is on' : 'they are on')} or
+      spot two setups syncing the same character. In each setup's Fleet Companion plugin settings, fill in Account Label,
+      for example with the account's name.
+    </div>
+  );
+}
+
+// Characters no setup syncs (characters/owner-skips.js): the setup a character last logged in on is the only one that
+// syncs it, and that setup is syncing without it, usually because its AutoRetainer no longer has it. (A character
+// unticked on a setup is never that setup's, from plugin 1.0.2's second test build on, so it doesn't end up here.)
+function NotSyncedAnywhereNote({ characters }) {
+  if (!characters || characters.length === 0) return null;
+  const setup = (c) => `${c.label || '(no label)'} on ${c.pc}`;
+  const one = characters.length === 1;
+  return (
+    <div className="supplies-note not-synced-anywhere">
+      <span className="note-warn">{one ? '1 character isn\'t' : `${characters.length} characters aren't`} synced by any setup of the plugin:</span>{' '}
+      {characters.map((c) => `${c.name} (${c.world}, last logged in on ${setup(c)})`).join('; ')}. Only the setup a character last
+      logged in on syncs it, and {one ? 'that setup is' : 'those setups are'} syncing without {one ? 'it' : 'them'}, usually because
+      its AutoRetainer no longer has {one ? 'it' : 'them'}. Log in as {one ? 'it' : 'each'} once on the setup that
+      should sync {one ? 'it' : 'them'}.
+    </div>
+  );
+}
+
 function formatHouse(row) {
   if (!row.has_house) return '—';
   const district = row.district_name || `City ${row.house_city}`;
