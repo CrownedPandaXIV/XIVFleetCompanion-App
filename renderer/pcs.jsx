@@ -121,6 +121,7 @@ function PcsView({ refreshKey }) {
       </div>
       {removeError && <div className="error">Could not remove the PC: {removeError}</div>}
       <SharedSyncWarning characters={data.sharedSync} />
+      <NoLabelNote setups={data.pcs.filter((p) => !p.account_label).length} />
       {data.moved && data.moved.waiting.length > 0 && (
         <div className="pcs-update-plugin pcs-moved" role="status">
           <strong>The database moved here from {data.moved.from} {pcAgo(data.moved.at)}.</strong> Still to switch over:

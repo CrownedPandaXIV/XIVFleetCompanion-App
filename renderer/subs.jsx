@@ -8,19 +8,36 @@ function formatCountdown(secondsRemaining) {
   return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
+// One clock for every countdown on the tab: a single timer that ticks once a second while any countdown is
+// showing, so all of them change together (and subs back at the same moment always show the same time) instead
+// of each running its own timer.
+const subsClock = { now: Math.floor(Date.now() / 1000), listeners: new Set(), timer: null };
+function subscribeSubsClock(listener) {
+  subsClock.listeners.add(listener);
+  if (!subsClock.timer) {
+    subsClock.now = Math.floor(Date.now() / 1000);
+    subsClock.timer = setInterval(() => {
+      subsClock.now = Math.floor(Date.now() / 1000);
+      for (const l of subsClock.listeners) l();
+    }, 1000);
+  }
+  return () => {
+    subsClock.listeners.delete(listener);
+    if (subsClock.listeners.size === 0) { clearInterval(subsClock.timer); subsClock.timer = null; }
+  };
+}
+const noSubscription = () => () => {};
+
 // Status cell for a sub row: In Port, Returned / Awaiting Collection, or
 // while it is out, a live HH:MM:SS countdown to return_time. Only ticks
-// while it is out - no timer runs for In Port or Returned rows.
+// while it is out - no clock runs for In Port or Returned rows.
 function SubStatusCell({ returnTime }) {
-  const [nowEpoch, setNowEpoch] = useState(() => Math.floor(Date.now() / 1000));
+  const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
   const returnEpoch = returnTime ? Number(returnTime) : 0;
+  const ticking = returnEpoch > 0 && returnEpoch > Math.max(openedAt, subsClock.now);
+  // The clock's time, or when this cell first showed if that is later (the clock keeps its last time while stopped).
+  const nowEpoch = React.useSyncExternalStore(ticking ? subscribeSubsClock : noSubscription, () => Math.max(openedAt, subsClock.now));
   const isDeployed = returnEpoch > 0 && returnEpoch > nowEpoch;
-
-  useEffect(() => {
-    if (!isDeployed) return;
-    const interval = setInterval(() => setNowEpoch(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(interval);
-  }, [isDeployed]);
 
   if (!returnEpoch) return 'In Port';
   if (!isDeployed) return 'Returned / Awaiting Collection';

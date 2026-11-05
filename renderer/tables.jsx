@@ -517,6 +517,22 @@ function SharedSyncWarning({ characters }) {
   );
 }
 
+// Characters, or setups of the plugin (PCs tab), with no account label: the app can't tell which account they are
+// on, setups on one PC share a row on the PCs tab, and two setups syncing the same character can't be spotted.
+function NoLabelNote({ characters = 0, setups = 0 }) {
+  if (!characters && !setups) return null;
+  const what = setups
+    ? `${setups} setup${setups === 1 ? '' : 's'} of the plugin ${setups === 1 ? 'has' : 'have'} no account label`
+    : `${characters} character${characters === 1 ? ' has' : 's have'} no account label`;
+  return (
+    <div className="supplies-note no-label-note">
+      <span className="warning">{what},</span> so the app can't tell which account {setups ? (setups === 1 ? 'it syncs' : 'they sync') : (characters === 1 ? 'it is on' : 'they are on')} or
+      spot two setups syncing the same character. In each setup's Fleet Companion plugin settings, fill in Account Label,
+      for example with the account's name.
+    </div>
+  );
+}
+
 function formatHouse(row) {
   if (!row.has_house) return '—';
   const district = row.district_name || `City ${row.house_city}`;

@@ -16,6 +16,12 @@ No database or plugin change.
   name the character and both labels, and say how to fix it on the setup that doesn't play it: AutoRetainer's
   **Advanced → Character Synchronization → Prune deleted characters**, or the plugin's **Only sync the characters I
   tick**. The warning goes away once the label has stopped switching for 3 days.
+- **A note when a character or a setup of the plugin has no account label.** Without one, the app can't tell which
+  account a character is on, setups on one PC share a row on the PCs tab, and the warning above can't work. The
+  Roster and the PCs tab say how many have none and where to fill it in (each setup's plugin settings, Account
+  Label). Plugin 1.0.2 says the same in the game.
+- **The Subs tab's countdowns tick together.** They run off one clock instead of one timer each, so subs back at the
+  same moment always show the same time.
 
 ## 1.5.0 - 2026-10-20
 

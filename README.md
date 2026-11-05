@@ -111,7 +111,7 @@ You never need to run anything on the database by hand.
 ### More than one account
 
 Give each game account its own setup of AutoRetainer and Fleet Companion (for example, separate XIVLauncher setups),
-with its own account label in the plugin's settings. Each setup syncs every character its AutoRetainer knows, so if one
+with its own account label in the plugin's settings (the Roster and the PCs tab point out any without one). Each setup syncs every character its AutoRetainer knows, so if one
 setup's AutoRetainer still has an old copy of another account's character, the two setups keep overwriting that
 character's subs and label. The Summary and the PCs tab warn when that happens. To fix it, on the setup that doesn't
 play the character, either open AutoRetainer's settings → **Advanced → Character Synchronization** and click **Prune

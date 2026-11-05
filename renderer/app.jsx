@@ -549,6 +549,8 @@ function App() {
               <div className="status">No rows found.</div>
             )}
 
+            {!error && rows !== null && <NoLabelNote characters={rows.filter((r) => !r.account_label).length} />}
+
             {!error && rows !== null && rows.length > 0 && groupByAccountEnabled &&
               groupByAccount(rosterRows).map((group) => (
                 <div key={group.label} className="account-group">
