@@ -1,4 +1,4 @@
-// Checks the views plugin 2.0 reads (database update 14, db/updates/014_fleet_views.sql) against the app's own code
+// Checks the views plugin 2.0 reads (db/views.sql) against the app's own code
 // on a real Postgres: fleet_supplies_view against what the Supplies tab works out (ipc/supplies.js: metricWindow,
 // usageRate, runway, restockAmount), fleet_subs_view against the Subs tab's part letters and status, and
 // fleet_summary_view against counts made here. Hand-made cases first, then a few hundred random histories. Set
@@ -94,6 +94,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings');
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
+    await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
     const now = Date.now();
     const ago = (h) => now - h * HOUR;
 
