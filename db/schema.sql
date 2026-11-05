@@ -568,7 +568,7 @@ $$;
 -- and is ignored, divided by the days from the window start (or its first value, when later) to that sync. The last
 -- value recorded at or before the window start is the starting point; for what's in the bags, the value at the last
 -- sync counts too. It comes from what's held in bags and retainers together (item_qty:...) when that covers a day,
--- otherwise from the bags. The history is read in one pass, not character by character.
+-- otherwise from the bags. Each character's history is read along its index, so nothing has to be sorted.
 --
 -- per_day NULL: not enough history yet; per_day 0: none used, so days_left is NULL (they never run out).
 CREATE OR REPLACE VIEW fleet_supplies_view AS
@@ -594,43 +594,49 @@ series AS (
   CROSS JOIN (VALUES ('ceruleum', 'item_qty:10155', true), ('ceruleum', 'ceruleum', false),
                      ('repair_kits', 'item_qty:10373', true), ('repair_kits', 'repair_kits', false)) m(supply, metric, held)
 ),
-points AS (
-  -- the starting point: the last value at or before the window start
-  SELECT se.id, b.recorded_at AS at, b.value, 0 AS ord
-  FROM series se CROSS JOIN settings st
-  CROSS JOIN LATERAL (
-    SELECT h.recorded_at, h.value FROM companion_metric_history h
-    WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric AND h.recorded_at <= st.window_start
-    ORDER BY h.recorded_at DESC LIMIT 1) b
-  UNION ALL
-  -- everything recorded in the window, up to the last sync
-  SELECT se.id, h.recorded_at, h.value, 0
-  FROM companion_metric_history h CROSS JOIN settings st
-  JOIN series se ON se.cid = h.subject_id AND se.metric = h.metric
-  WHERE h.subject_type = 'character' AND h.metric IN ('item_qty:10155', 'ceruleum', 'item_qty:10373', 'repair_kits')
-    AND h.recorded_at > st.window_start AND h.recorded_at <= se.as_of
-  UNION ALL
-  -- what's in the bags at the last sync
-  SELECT id, as_of, now_value, 1 FROM series WHERE now_value IS NOT NULL
-),
-ordered AS (
-  SELECT p.id, p.at, p.value,
-         lag(p.value) OVER (PARTITION BY p.id ORDER BY p.at, p.ord) AS earlier
-  FROM points p JOIN series se ON se.id = p.id
-  WHERE p.at <= se.as_of
-),
+-- Each series in one pass along its index (newest first, so nothing is sorted): the drops between the values
+-- recorded in the window, plus the drop from the starting point to the oldest of them and from the newest of them
+-- (or the starting point) to the bags' value at the last sync.
 used AS (
-  SELECT o.id, min(o.at) AS first_at,
-         coalesce(sum(greatest(o.earlier - o.value, 0)) FILTER (WHERE o.at > st.window_start), 0) AS used
-  FROM ordered o CROSS JOIN settings st
-  GROUP BY o.id
+  SELECT se.id, base.at AS base_at, base.value AS base_value, w.drops, w.oldest_at, w.oldest_value, w.newest_value,
+         se.now_value, se.as_of, st.window_start
+  FROM series se CROSS JOIN settings st
+  -- the starting point: the last value at or before the window start (and the last sync)
+  LEFT JOIN LATERAL (
+    SELECT h.recorded_at AS at, h.value FROM companion_metric_history h
+    WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+      AND h.recorded_at <= least(st.window_start, se.as_of)
+    ORDER BY h.recorded_at DESC LIMIT 1) base ON true
+  -- everything recorded in the window, up to the last sync
+  CROSS JOIN LATERAL (
+    SELECT coalesce(sum(greatest(older - value, 0)), 0) AS drops,
+           min(at) AS oldest_at,
+           max(value) FILTER (WHERE older IS NULL) AS oldest_value,  -- the last one read has nothing older
+           max(value) FILTER (WHERE newest) AS newest_value          -- the first one read
+    FROM (
+      SELECT h.recorded_at AS at, h.value,
+             lead(h.value) OVER newest_first AS older,
+             row_number() OVER newest_first = 1 AS newest
+      FROM companion_metric_history h
+      WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+        AND h.recorded_at > st.window_start AND h.recorded_at <= se.as_of
+      WINDOW newest_first AS (ORDER BY h.recorded_at DESC)) inside) w
+),
+totals AS (
+  SELECT id, as_of, window_start,
+         coalesce(base_at, oldest_at, CASE WHEN now_value IS NOT NULL THEN as_of END) AS first_at,
+         drops
+         + CASE WHEN base_value IS NOT NULL AND oldest_value IS NOT NULL THEN greatest(base_value - oldest_value, 0) ELSE 0 END
+         + CASE WHEN now_value IS NOT NULL AND as_of > window_start AND coalesce(newest_value, base_value) IS NOT NULL
+                THEN greatest(coalesce(newest_value, base_value) - now_value, 0) ELSE 0 END AS used
+  FROM used
 ),
 rates AS (
   SELECT se.cid, se.supply, se.held,
-         CASE WHEN extract(epoch FROM (se.as_of - greatest(st.window_start, u.first_at))) / 86400 >= 1
-              THEN u.used::double precision / (extract(epoch FROM (se.as_of - greatest(st.window_start, u.first_at))) / 86400) END AS per_day
-  FROM series se CROSS JOIN settings st
-  JOIN used u ON u.id = se.id
+         CASE WHEN t.first_at IS NOT NULL  -- no values at all: not enough history
+                   AND extract(epoch FROM (t.as_of - greatest(t.window_start, t.first_at))) / 86400 >= 1
+              THEN t.used::double precision / (extract(epoch FROM (t.as_of - greatest(t.window_start, t.first_at))) / 86400) END AS per_day
+  FROM series se JOIN totals t ON t.id = se.id
 ),
 per_day AS (
   SELECT ch.*,
