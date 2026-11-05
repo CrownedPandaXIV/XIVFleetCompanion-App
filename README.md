@@ -121,6 +121,10 @@ One setup used for several accounts (the same AutoRetainer and plugin, logging i
 every character correctly. But the account label belongs to the setup, so all of its characters share one label, and
 the app can't tell those accounts apart in the Account column, the Roster or Trends.
 
+The same goes for Allagan Tools, FC Tracker and Submarine Tracker: they keep their data per character or Free Company,
+so a shared setup syncs all of it, under its one label. And a setup leaves alone their data too (bags, retainers' items,
+FC chests, house details, voyage loot) for any character that last logged in on another setup.
+
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
 keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
