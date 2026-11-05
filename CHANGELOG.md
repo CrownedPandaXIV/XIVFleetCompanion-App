@@ -26,8 +26,9 @@ hand.
 - **Who syncs each character.** The Roster's new **Synced By** column names the setup (account label and PC) each
   character last logged in on, which with plugin 1.0.2 is the only one that syncs it. The PCs tab says how many
   characters each setup left to another one.
-- **A note when no setup syncs a character.** If a character's setup keeps syncing but leaves it out (it's unticked in
-  that setup's plugin settings, or its AutoRetainer lost it), the Roster and the PCs tab name it and say where to tick it.
+- **A note when no setup syncs a character.** If a character's setup keeps syncing but leaves it out (its AutoRetainer
+  lost it), the Roster and the PCs tab name it; logging in as it once on the right setup fixes it. A character unticked
+  in a setup's plugin settings never counts as that setup's, so unticking it on one PC never stops another that syncs it.
 - **What's new after an update.** The first time the app opens after updating, it shows what changed in each version
   since you last opened it, until you click **Got it**. The **Restart to update** bar has a **What's new** button too,
   and **Settings → General → Updates → What's new** shows the recent versions any time.

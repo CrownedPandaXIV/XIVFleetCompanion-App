@@ -132,9 +132,10 @@ so a shared setup syncs all of it, under its one label. And a setup leaves alone
 FC chests, house details, voyage loot) for any character that last logged in on another setup.
 
 The Roster's **Synced By** column names the setup each character last logged in on, and the PCs tab says how many
-characters each setup left to another one. If a character's setup keeps syncing but leaves it out (it's unticked in
-that setup's plugin settings), no setup sends it any more: the Roster and the PCs tab say which character and where to
-tick it.
+characters each setup left to another one. A character unticked in a setup's plugin settings never counts as that
+setup's, so unticking it on one PC (say, a laptop) never stops another PC that does sync it. If a character's setup
+keeps syncing but leaves it out (its AutoRetainer lost it), no setup sends it any more: the Roster and the PCs tab say
+which character, and logging in as it once on the right setup fixes it.
 
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups

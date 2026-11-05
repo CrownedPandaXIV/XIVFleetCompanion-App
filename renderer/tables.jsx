@@ -539,7 +539,8 @@ function NoLabelNote({ characters = 0, setups = 0 }) {
 }
 
 // Characters no setup syncs (characters/owner-skips.js): the setup a character last logged in on is the only one that
-// syncs it, and that setup is syncing without it, so it's unticked there or that setup's AutoRetainer lost it.
+// syncs it, and that setup is syncing without it, usually because its AutoRetainer no longer has it. (A character
+// unticked on a setup is never that setup's, from plugin 1.0.2's second test build on, so it doesn't end up here.)
 function NotSyncedAnywhereNote({ characters }) {
   if (!characters || characters.length === 0) return null;
   const setup = (c) => `${c.label || '(no label)'} on ${c.pc}`;
@@ -548,9 +549,9 @@ function NotSyncedAnywhereNote({ characters }) {
     <div className="supplies-note not-synced-anywhere">
       <span className="note-warn">{one ? '1 character isn\'t' : `${characters.length} characters aren't`} synced by any setup of the plugin:</span>{' '}
       {characters.map((c) => `${c.name} (${c.world}, last logged in on ${setup(c)})`).join('; ')}. Only the setup a character last
-      logged in on syncs it, and {one ? 'that setup is' : 'those setups are'} syncing without {one ? 'it' : 'them'}. In that setup's
-      Fleet Companion plugin settings, under Characters, tick {one ? 'it' : 'them'}; or log in as {one ? 'it' : 'each'} on the setup
-      that should sync {one ? 'it' : 'them'}.
+      logged in on syncs it, and {one ? 'that setup is' : 'those setups are'} syncing without {one ? 'it' : 'them'}, usually because
+      its AutoRetainer no longer has {one ? 'it' : 'them'}. Log in as {one ? 'it' : 'each'} once on the setup that
+      should sync {one ? 'it' : 'them'}.
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // Characters no setup of the plugin syncs: the setup a character last logged in on is the only one that syncs it
 // (plugin 1.0.2, companion_character_login), so when that setup keeps syncing but leaves the character out (it is
-// unticked in that setup's plugin settings, or its AutoRetainer no longer has it), nobody sends it. No Electron here
+// its AutoRetainer no longer has it), nobody sends it. A character unticked on a setup is never that setup's (plugin
+// 1.0.2 records logins only of characters a setup syncs, and gives up ones unticked since), so it isn't counted here. No Electron here
 // (tests/owner-skips.test.js).
 
 // How far behind its setup's last sync a character must be to count: well over any sync interval.

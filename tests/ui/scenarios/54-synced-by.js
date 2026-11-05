@@ -1,6 +1,6 @@
 // Who syncs each character (plugin 1.0.2: only the setup a character last logged in on syncs it): the Roster's
 // Synced By column, the PCs tab's count of characters a setup left to another one, and the note when a character's
-// setup is syncing without it (unticked there), so no setup sends it. The setup's last sync is put two hours ahead
+// setup is syncing without it (its AutoRetainer lost it), so no setup sends it. The setup's last sync is put two hours ahead
 // so the fixture characters count as left behind by it.
 const BEX = '18014498578000001';
 const CAL = '18014498578000002';
@@ -17,7 +17,7 @@ module.exports = async (t) => {
   await waitFor(`!!document.querySelector('.not-synced-anywhere')`, 'the not synced note', 10000);
   const note = await ev(`document.querySelector('.not-synced-anywhere').innerText.replace(/\\s+/g, ' ')`);
   check(note.startsWith("1 character isn't synced by any setup of the plugin: Bex Kitteh 1 (Cuchulainn, last logged in on Account 2 on UITEST-PC).")
-    && note.includes('under Characters, tick it'), 'the Roster says which character no setup syncs, and how to fix it: ' + note);
+    && note.includes('Log in as it once on the setup that should sync it.') && !/\btick\b/.test(note), 'the Roster says which character no setup syncs, and how to fix it: ' + note);
   await shot('synced-by-roster');
 
   await nav('PCs');
