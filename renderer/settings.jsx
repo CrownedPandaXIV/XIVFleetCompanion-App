@@ -377,6 +377,8 @@ function GameDataSection() {
 // The installed app also looks by itself when it starts and every hour.
 function UpdatesSection() {
   const [info, setInfo] = useState(null);
+  const [recent, setRecent] = useState(null);
+  const showRecent = () => (recent ? setRecent(null) : window.api.getRecentChanges().then((r) => setRecent(r.versions)));
   useEffect(() => {
     window.api.getUpdateStatus().then(setInfo);
     return window.api.onUpdateStatus((status) => setInfo((i) => ({ ...(i || {}), status })));
@@ -393,6 +395,11 @@ function UpdatesSection() {
         <span className={`save-status updates-status${status.state === 'error' ? ' supply-warn' : ''}`}>{status.text}</span>
       </div>
       {!status.source && <div className="alerts-help">The app also looks by itself when it starts and every hour, and downloads a new version in the background.</div>}
+      <div className="settings-row">
+        <button className="whats-new-open" onClick={showRecent}>{recent ? "Hide what's new" : "What's new"}</button>
+        <span className="alerts-help">What changed in this version and the few before it.</span>
+      </div>
+      {recent && <div className="whats-new-list settings-whats-new"><ChangelogVersions versions={recent} /></div>}
     </section>
   );
 }

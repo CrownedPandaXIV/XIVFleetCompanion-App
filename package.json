@@ -51,6 +51,7 @@
       "!.github/**",
       "!*.md",
       "LICENSE.md",
+      "CHANGELOG.md",
       "!config.json"
     ],
     "win": {

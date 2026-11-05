@@ -23,6 +23,7 @@ module.exports = async (t) => {
   await waitFor(`/Version 9\\.9\\.9 is downloaded/.test(${section}.innerText)`, 'the downloaded version', 10000);
   check(true, 'then says the new version is downloaded');
   check(await ev(`!!document.querySelector('.update-banner') && document.querySelector('.update-banner').innerText.includes('Version 9.9.9 is ready')`), 'and the "Restart to update" bar appears');
+  check(await ev(`!!document.querySelector('.update-banner .update-whats-new')`), 'with a What\'s new button (the release notes on GitHub)');
 
   const log = fs.readFileSync(path.join(t.profile, 'logs', 'app.log'), 'utf8');
   const lines = log.split(/\r?\n/).filter((l) => l.includes('Update:')).map((l) => l.replace(/^.*?Update: /, ''));

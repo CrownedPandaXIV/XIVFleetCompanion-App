@@ -52,6 +52,9 @@ itself. This can take a minute or two.
 **Settings → General → Updates** shows which version you have and what the update check is doing, and **Check for
 updates** looks straight away.
 
+After an update, the app shows what changed in each version since you last opened it, until you click **Got it**.
+**What's new** on the update bar, and in **Settings → General → Updates**, shows the same any time.
+
 ## First-time setup
 
 The first time the app starts, it asks what this PC is for:

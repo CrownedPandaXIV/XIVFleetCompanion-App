@@ -135,7 +135,61 @@ function UpdateBanner() {
     <div className="update-banner" role="status">
       Version {ready.version} is ready.{' '}
       <button onClick={restart}>Restart to update</button>
+      <button className="update-whats-new" onClick={() => window.api.openReleaseNotes(ready.version)}>What's new</button>
       {' '}It is also installed the next time you close the app.
+    </div>
+  );
+}
+
+// The changelog's versions (shared/changelog.js): each version's date and its notes, bold and code kept, as text.
+function ChangelogParts({ parts }) {
+  return parts.map((p, i) => (p.bold ? <strong key={i}>{p.text}</strong> : p.code ? <code key={i}>{p.text}</code> : <React.Fragment key={i}>{p.text}</React.Fragment>));
+}
+function ChangelogVersions({ versions }) {
+  return versions.map((v) => {
+    const groups = [];
+    for (const b of v.blocks) {
+      if (b.type === 'li') {
+        const last = groups[groups.length - 1];
+        if (b.sub && last && last.type === 'ul' && last.items.length) last.items[last.items.length - 1].subs.push(b);
+        else if (last && last.type === 'ul') last.items.push({ ...b, subs: [] });
+        else groups.push({ type: 'ul', items: [{ ...b, subs: [] }] });
+      } else groups.push(b);
+    }
+    return (
+      <div key={v.version} className="changelog-version">
+        <h4>Version {v.version}{v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? <span className="changelog-date"> · {v.date}</span> : null}</h4>
+        {groups.map((g, i) => (g.type === 'ul' ? (
+          <ul key={i}>
+            {g.items.map((item, j) => (
+              <li key={j}>
+                <ChangelogParts parts={item.parts} />
+                {item.subs.length > 0 && <ul>{item.subs.map((sub, k) => <li key={k}><ChangelogParts parts={sub.parts} /></li>)}</ul>}
+              </li>
+            ))}
+          </ul>
+        ) : <p key={i}><ChangelogParts parts={g.parts} /></p>))}
+      </div>
+    );
+  });
+}
+
+// Shown once after the app has updated (ipc/updates.js): what changed in each version since this PC last ran
+// one, until "Got it". A new install shows nothing.
+function WhatsNewBox() {
+  const [news, setNews] = useState(null);
+  useEffect(() => { window.api.getWhatsNew().then((r) => setNews(r && r.versions.length ? r : null)); }, []);
+  if (!news) return null;
+  const dismiss = () => { window.api.markWhatsNewSeen(); setNews(null); };
+  const several = news.versions.length > 1;
+  return (
+    <div className="update-banner whats-new" role="status">
+      <div className="whats-new-head">
+        <strong>Updated to version {news.current}.</strong>
+        {' '}{several ? `What's new in the ${news.versions.length} versions since you last opened the app:` : "What's new:"}
+        <button className="whats-new-done" onClick={dismiss}>Got it</button>
+      </div>
+      <div className="whats-new-list"><ChangelogVersions versions={news.versions} /></div>
     </div>
   );
 }
@@ -429,6 +483,7 @@ function App() {
 
         <ConnectionBanner status={connection} />
         <UpdateBanner />
+        <WhatsNewBox />
         <DatabaseBanner />
 
         {showSettings && (

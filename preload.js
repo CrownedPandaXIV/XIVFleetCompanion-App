@@ -82,6 +82,11 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => invoke('install-update'),
   getUpdateStatus: () => invoke('updates:status'),
   checkForUpdates: () => invoke('updates:check'),
+  // What's new (ipc/updates.js): { current, versions } not yet shown on this PC; marking them seen; the recent ones.
+  getWhatsNew: () => invoke('whats-new:get'),
+  markWhatsNewSeen: () => invoke('whats-new:seen'),
+  getRecentChanges: () => invoke('whats-new:recent'),
+  openReleaseNotes: (version) => invoke('whats-new:open-release', version),
   onUpdateStatus: (callback) => {
     const listener = (event, status) => callback(status);
     ipcRenderer.on('update-status', listener);
