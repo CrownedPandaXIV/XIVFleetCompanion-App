@@ -17,6 +17,8 @@ do by hand.
   not entered for the house warning's days (or with no date yet), characters below the low-supply warnings,
   characters no longer synced, and setups where AutoRetainer wasn't running. The same rules as the app's Summary;
   characters no longer synced are left out of the low-supply counts there too.
+- **A new submarine icon** for the app's window, taskbar and installer: steel blue with amber portholes, drawn clear at
+  every size from 16 to 256 pixels. It matches the plugin's new picture.
 - The views live in one file the app applies again whenever it changes, so later versions can improve them without a
   database update each time (update 15 records which version a database has). An older copy of the app never
   replaces a newer one's views.
