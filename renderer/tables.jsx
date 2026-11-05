@@ -484,6 +484,39 @@ function NotSyncedTag({ behindMs }) {
   );
 }
 
+// Characters two setups of the plugin keep overwriting (characters/shared-sync.js), on the Summary and the PCs tab:
+// what is happening and the two ways to fix it. characters: [{ cid, name, world, labels }].
+function SharedSyncWarning({ characters }) {
+  if (!characters || characters.length === 0) return null;
+  const label = (l) => l || '(no label)';
+  const line = (c) => `${c.name || `Character ${c.cid}`}${c.world ? ` (${c.world})` : ''}: ${c.labels.map(label).join(' and ')}`;
+  const one = characters.length === 1;
+  return (
+    <div className="pcs-update-plugin shared-sync" role="status">
+      <strong>
+        {one ? `${line(characters[0])}.` : `${characters.length} characters are synced by more than one setup of the plugin.`}
+      </strong>
+      {one ? ' This character is synced by more than one setup of the plugin.' : ''} Each setup overwrites the
+      other's subs and account label for {one ? 'it' : 'them'}, usually because one setup's AutoRetainer still has an
+      old copy of {one ? 'it' : 'them'}. To fix it, on the setup that doesn't play {one ? 'the character' : 'a character'}:
+      <ul>
+        <li>
+          Tidy AutoRetainer: in AutoRetainer's settings, open Advanced → Character Synchronization and click Prune deleted
+          characters (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup).
+        </li>
+        <li>Or, in Fleet Companion's plugin settings, choose "Only sync the characters I tick" and tick only that account's characters.</li>
+      </ul>
+      {!one && (
+        <details>
+          <summary>Which characters</summary>
+          <ul className="shared-sync-list">{characters.map((c) => <li key={c.cid}>{line(c)}</li>)}</ul>
+        </details>
+      )}
+      <span className="alerts-help">This goes away once {one ? 'its label has' : 'their labels have'} stopped switching for 3 days.</span>
+    </div>
+  );
+}
+
 function formatHouse(row) {
   if (!row.has_house) return '—';
   const district = row.district_name || `City ${row.house_city}`;

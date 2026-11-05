@@ -3,6 +3,18 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.6.0 - unreleased
+
+No database or plugin change.
+
+- **A warning when two setups of the plugin sync the same character.** Each setup stamps a character with its own
+  account label and replaces its subs with what its AutoRetainer knows, so when one setup's AutoRetainer still has an
+  old copy of another account's character, the two keep overwriting each other (subs disappear, the Parts tab asks
+  for starter parts, labels switch back and forth). The Summary and the PCs tab now name each such character and the
+  labels it switches between, and say how to fix it: AutoRetainer's Advanced → Character Synchronization → Prune
+  deleted characters on the setup that doesn't play it, or the plugin's "Only sync the characters I tick". Found from
+  the account label changes the database already logs; it goes away once a label stops switching for 3 days.
+
 ## 1.5.0 - 2026-10-20
 
 No database or plugin change.

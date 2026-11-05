@@ -5,6 +5,7 @@ const { ipcMain } = require('electron');
 const { MIN_PLUGIN_VERSION } = require('../shared/plugin-version');
 const { withClient, snapshotFragments } = require('../db');
 const { readMoveNote } = require('../db/database-move');
+const { loadSharedCharacters } = require('../characters/shared-sync');
 const { WINDOW_CHOICES } = require('../subs/supply-runway');
 const { DEFAULT_WINDOW_DAYS } = require('../subs/income');
 const { voyagesFrom, lootSummary, ventureSummary, ventureMarketGil, marketLoot } = require('../subs/loot');
@@ -105,6 +106,7 @@ ipcMain.handle('get-pcs', () => withDetails(async (client) => {
     minPluginVersion: MIN_PLUGIN_VERSION,
     unreported: accounts.filter((a) => !reported.has(a.account_label)),
     moved,
+    sharedSync: await loadSharedCharacters(client, latestCharacter),
   };
 }));
 

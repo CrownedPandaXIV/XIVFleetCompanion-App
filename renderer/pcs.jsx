@@ -120,6 +120,7 @@ function PcsView({ refreshKey }) {
         on a PC also shows its result here. A PC no longer used can be removed with the × beside its name.
       </div>
       {removeError && <div className="error">Could not remove the PC: {removeError}</div>}
+      <SharedSyncWarning characters={data.sharedSync} />
       {data.moved && data.moved.waiting.length > 0 && (
         <div className="pcs-update-plugin pcs-moved" role="status">
           <strong>The database moved here from {data.moved.from} {pcAgo(data.moved.at)}.</strong> Still to switch over:

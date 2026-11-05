@@ -137,6 +137,7 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
 function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses = { subs: true, retainers: true } }) {
   const [warnings, setWarnings] = useState(null);
   const [notSynced, setNotSynced] = useState([]);
+  const [sharedSync, setSharedSync] = useState([]);
   const [thresholds, setThresholds] = useState({ repairKitThreshold: 0, ceruleumThreshold: 0, houseWarnDays: 7 });
   const [houseWarnings, setHouseWarnings] = useState(null);
   const [salvageTotal, setSalvageTotal] = useState(null);
@@ -165,6 +166,7 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
       if (result.success) {
         setWarnings(result.rows);
         setNotSynced(result.notSynced || []);
+        setSharedSync(result.sharedSync || []);
         setThresholds((t) => ({ ...t, repairKitThreshold: result.repairKitThreshold, ceruleumThreshold: result.ceruleumThreshold }));
       } else {
         setError(result.error);
@@ -210,6 +212,7 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
 
   return (
     <div>
+      <SharedSyncWarning characters={sharedSync} />
       <div className="controls summary-thresholds">
         <span>
           Warnings: {uses.subs && (

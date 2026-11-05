@@ -105,6 +105,16 @@ You never need to run anything on the database by hand.
 - **Tailscale** covers setting it up on every PC, with a **Test connection** button that says in plain words what's
   wrong if a PC can't reach the database.
 
+### More than one account
+
+Give each game account its own setup of AutoRetainer and Fleet Companion (for example, separate XIVLauncher setups),
+with its own account label in the plugin's settings. Each setup syncs every character its AutoRetainer knows, so if one
+setup's AutoRetainer still has an old copy of another account's character, the two setups keep overwriting that
+character's subs and label. The Summary and the PCs tab warn when that happens. To fix it, on the setup that doesn't
+play the character, either open AutoRetainer's settings → **Advanced → Character Synchronization** and click **Prune
+deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup), or in Fleet
+Companion's plugin settings choose **Only sync the characters I tick** and tick only that account's characters.
+
 ## What's in the app
 
 | Tab | What it shows |
