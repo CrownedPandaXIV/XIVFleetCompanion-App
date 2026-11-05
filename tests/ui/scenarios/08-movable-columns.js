@@ -9,7 +9,7 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster rows');
   await sleep(500);
 
-  const DEFAULT = ['name', 'world', 'fc', 'fc points', 'house', 'gil', 'ceruleum', 'repair kits', 'retainers', 'submarines', 'last synced'];
+  const DEFAULT = ['name', 'world', 'fc', 'fc points', 'house', 'gil', 'ceruleum', 'repair kits', 'retainers', 'submarines', 'last synced', 'synced by'];
   const clean = `.innerText.trim().toLowerCase().replace(/[\\u25B2\\u25BC]/g,'').trim()`;
   // The first cell of each row holds the drag handle and the Remove ×; it is not a column.
   const headers = () => ev(`[...document.querySelector('thead').querySelectorAll('th')].slice(1).map(th=>th${clean})`);
