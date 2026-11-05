@@ -3,7 +3,7 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
-## 1.7.0 - unreleased
+## 1.7.0 - 2026-11-05
 
 Goes with plugin 1.0.3. The app updates the database by itself (update 13); nothing to do by hand.
 
