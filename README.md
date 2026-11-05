@@ -119,10 +119,11 @@ after a long break, each character still belongs to the setup it last logged in 
 
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
-keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it, on the
-setup that doesn't play the character, either open AutoRetainer's settings → **Advanced → Character Synchronization** and click **Prune
-deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup), or in Fleet
-Companion's plugin settings choose **Only sync the characters I tick** and tick only that account's characters.
+keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
+update every setup to plugin 1.0.2 or newer, then log in as the character once on the setup that plays it. If you'd
+rather not wait, on the setup that doesn't play the character, open AutoRetainer's settings → **Advanced → Character
+Synchronization** and click **Prune deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can
+keep a backup).
 
 ## What's in the app
 

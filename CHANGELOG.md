@@ -25,10 +25,10 @@ Goes with plugin 1.0.2. The app adds two tables to the database by itself (updat
 - **A warning when two setups of the plugin sync the same character.** If one setup's AutoRetainer still has an old
   copy of a character another account plays, the two setups keep overwriting each other: its subs can disappear, the
   Parts tab asks for starter parts, and its account label switches back and forth. The Summary and the PCs tab now
-  name the character and both labels, and say how to fix it on the setup that doesn't play it: AutoRetainer's
-  **Advanced → Character Synchronization → Prune deleted characters**, or the plugin's **Only sync the characters I
-  tick**. With plugin 1.0.2 on every setup, it stops by itself once the character logs in on its own setup. The
-  warning goes away once the label has stopped switching for 3 days.
+  name the character and both labels, and say how to fix it: update every setup to plugin 1.0.2, then log in as the
+  character once on the setup that plays it. If you'd rather not wait, AutoRetainer's **Advanced → Character
+  Synchronization → Prune deleted characters** on the other setup fixes it straight away. The warning goes away once
+  the label has stopped switching for 3 days.
 - **A note when a character or a setup of the plugin has no account label.** Without one, the app can't tell which
   account a character is on, setups on one PC share a row on the PCs tab, and the warning above can't work. The
   Roster and the PCs tab say how many have none and where to fill it in (each setup's plugin settings, Account

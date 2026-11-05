@@ -12,10 +12,13 @@ module.exports = async (t) => {
   await waitFor(`!!document.querySelector('.shared-sync')`, 'the warning on the Summary', 20000);
   const summary = await text();
   check(/^Bex Kitteh 1 \(\w+\): Account 2 and Account R\./.test(summary), 'names the character and both labels: ' + summary.split('\n')[0]);
-  check(/Advanced → Character Synchronization/.test(summary) && /Prune deleted characters/.test(summary) && /JustBackup/.test(summary),
-    "points to AutoRetainer's Character Synchronization first");
-  check(/Only sync the characters I tick/.test(summary), 'and the plugin setting as the other way');
-  check(/plugin 1\.0\.2 or newer on every setup, this stops by itself once the character logs in on its setup/.test(summary.replace(/\s+/g, ' ')), 'says newer plugins stop it by themselves');
+  const flat = summary.replace(/\s+/g, ' ');
+  const steps = await ev(`[...document.querySelectorAll('.shared-sync ol > li')].map((li) => li.innerText.replace(/\\s+/g, ' '))`);
+  check(steps.length === 3 && /plugin 1\.0\.2 or newer on every setup/.test(steps[0]) && /^Log in as the character once on the setup that plays it/.test(steps[1]),
+    'first: plugin 1.0.2 on every setup, then log in once on the right setup: ' + JSON.stringify(steps));
+  check(/Advanced → Character Synchronization/.test(steps[2] || '') && /Prune deleted characters/.test(flat) && /JustBackup/.test(flat),
+    "AutoRetainer's Character Synchronization as the quicker way");
+  check(!/Only sync the characters I tick/.test(flat), 'no longer suggests syncing only ticked characters');
   check(!/Cal Kitteh 2/.test(summary), 'a label changed once is not counted');
   await shot('shared-sync-summary');
 

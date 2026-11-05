@@ -498,25 +498,26 @@ function SharedSyncWarning({ characters }) {
       </strong>
       {one ? ' This character is synced by more than one setup of the plugin.' : ''} Each setup overwrites the
       other's subs and account label for {one ? 'it' : 'them'}, usually because one setup's AutoRetainer still has an
-      old copy of {one ? 'it' : 'them'}. To fix it, on the setup that doesn't play {one ? 'the character' : 'a character'}:
-      <ul>
+      old copy of {one ? 'it' : 'them'}. To fix it:
+      <ol>
+        <li>Update Fleet Companion to plugin 1.0.2 or newer on every setup.</li>
         <li>
-          Tidy AutoRetainer: in AutoRetainer's settings, open Advanced → Character Synchronization and click Prune deleted
-          characters (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup).
+          Log in as {one ? 'the character' : 'each character'} once on the setup that plays it. From then on, only
+          the setup a character last logged in on syncs it, so the old copy is left alone.
         </li>
-        <li>Or, in Fleet Companion's plugin settings, choose "Only sync the characters I tick" and tick only that account's characters.</li>
-      </ul>
+        <li>
+          If you'd rather not wait, tidy AutoRetainer on the setup that doesn't play {one ? 'the character' : 'a character'}: in
+          AutoRetainer's settings, open Advanced → Character Synchronization and click Prune deleted characters
+          (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup).
+        </li>
+      </ol>
       {!one && (
         <details>
           <summary>Which characters</summary>
           <ul className="shared-sync-list">{characters.map((c) => <li key={c.cid}>{line(c)}</li>)}</ul>
         </details>
       )}
-      <span className="alerts-help">
-        With plugin 1.0.2 or newer on every setup, this stops by itself once {one ? 'the character logs' : 'each character logs'} in
-        on {one ? 'its' : 'its own'} setup: only the setup a character last logged in on syncs it. This goes away once {one ? 'its label has' : 'their labels have'} stopped
-        switching for 3 days.
-      </span>
+      <span className="alerts-help">This goes away once {one ? 'its label has' : 'their labels have'} stopped switching for 3 days.</span>
     </div>
   );
 }
