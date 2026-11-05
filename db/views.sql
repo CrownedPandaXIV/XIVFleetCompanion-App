@@ -8,7 +8,7 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_summary_view, fleet_subs_view, fleet_supplies_view CASCADE;
+DROP VIEW IF EXISTS fleet_alerts_view, fleet_summary_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
 
 -- A sub part's class letter, from its item number (as subs/submarine-builds.js SUB_PART_CLASS; the test checks
 -- they match). Anything else shows as its number.
@@ -142,9 +142,28 @@ LEFT JOIN companion_character_current c ON c.cid = s.cid
 LEFT JOIN character_sort_order so ON so.cid = s.cid
 WHERE s.level > 0;
 
+-- Characters the plugin no longer syncs: unticked or gone from AutoRetainer, so their last data stays and falls behind
+-- the rest of their account (as characters/not-synced.js). Behind by at least Settings → General → Warnings' "not
+-- synced" minutes (10 to 1440, 30 by default). Their supplies are left out of the low-supply warnings, as in the app.
+CREATE OR REPLACE VIEW fleet_not_synced_view AS
+WITH setting AS (
+  SELECT coalesce((SELECT setting_value::int FROM fleet_economics_settings
+                   WHERE setting_key = 'not_synced_after_minutes' AND setting_value = round(setting_value)
+                     AND setting_value BETWEEN 10 AND 1440), 30) AS minutes
+),
+accounts AS (
+  SELECT coalesce(nullif(account_label, ''), 'Ungrouped') AS account, max(last_synced_at) AS newest
+  FROM companion_character_current GROUP BY 1
+)
+SELECT c.cid, c.name, c.world, c.account_label, a.newest - c.last_synced_at AS behind
+FROM companion_character_current c
+JOIN accounts a ON a.account = coalesce(nullif(c.account_label, ''), 'Ungrouped')
+CROSS JOIN setting st
+WHERE a.newest - c.last_synced_at >= make_interval(mins => st.minutes);
+
 -- The fleet at a glance, one row: subs back and out and when the next one is back, retainers on and off ventures,
--- characters below the low-supply warnings (Settings → General → Warnings; 0 turns one off) and the soonest a
--- character runs out of either.
+-- characters below the low-supply warnings (Settings → General → Warnings; 0 turns one off; characters no longer
+-- synced are left out, as in the app) and the soonest a character runs out of either.
 CREATE OR REPLACE VIEW fleet_summary_view AS
 WITH thresholds AS (
   SELECT
@@ -170,5 +189,68 @@ supplies AS (
          (count(*) FILTER (WHERE t.repair_kits > 0 AND f.repair_kits < t.repair_kits))::int AS low_repair_kits,
          min(least(f.ceruleum_days_left, f.repair_kits_days_left)) AS soonest_runs_out_days
   FROM fleet_supplies_view f CROSS JOIN thresholds t
+  WHERE f.cid NOT IN (SELECT cid FROM fleet_not_synced_view)
 )
 SELECT subs.*, retainers.*, supplies.* FROM subs, retainers, supplies;
+
+-- What needs attention, one row each, worst first (as the app's Summary warnings): level 'danger' or 'warn', kind,
+-- who (subject) and what (detail).
+--   house          an FC house nobody has entered for the house warning's days (Settings → General → Warnings, 1 to
+--                  44, 7 by default) or more, or with no date yet; 'danger' from 30 days (the game demolishes at 45)
+--   low_ceruleum   a character with subs below the low-ceruleum warning (left out when no longer synced)
+--   low_repair_kits  the same for repair kits
+--   not_synced     a character the plugin no longer syncs (fleet_not_synced_view)
+--   autoretainer   a setup of the plugin that synced in the last day but found AutoRetainer not running
+-- Subs back and waiting are counted live by the plugin from fleet_subs_view, so they're not here.
+CREATE OR REPLACE VIEW fleet_alerts_view AS
+WITH settings AS (
+  SELECT
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_ceruleum_threshold'), 0) AS ceruleum,
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_repair_kit_threshold'), 0) AS repair_kits,
+    coalesce((SELECT setting_value::int FROM fleet_economics_settings
+              WHERE setting_key = 'house_warn_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 44), 7) AS house_days
+),
+houses AS (
+  SELECT DISTINCT ON (fc_id) fc_id, fc_name, has_house
+  FROM companion_character_housing WHERE fc_id IS NOT NULL
+  ORDER BY fc_id, updated_at DESC
+),
+visited AS (
+  SELECT fc_id, max(house_last_visited) AS last_visited
+  FROM companion_character_housing WHERE fc_id IS NOT NULL GROUP BY fc_id
+),
+house_ages AS (
+  SELECT h.fc_id, coalesce(h.fc_name, 'FC ' || h.fc_id) AS fc_name, v.last_visited,
+         CASE WHEN v.last_visited IS NOT NULL
+              THEN greatest(0, floor(extract(epoch FROM (now() - v.last_visited)) / 86400))::int END AS days
+  FROM houses h LEFT JOIN visited v ON v.fc_id = h.fc_id
+  WHERE h.has_house
+),
+supplies AS (
+  SELECT c.cid, c.name || ' (' || c.world || ')' AS who, coalesce(c.ceruleum, 0) AS ceruleum, coalesce(c.repair_kits, 0) AS repair_kits
+  FROM companion_character_current c
+  WHERE EXISTS (SELECT 1 FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0)
+    AND c.cid NOT IN (SELECT cid FROM fleet_not_synced_view)
+)
+SELECT CASE WHEN days IS NULL OR days < 30 THEN 'warn' ELSE 'danger' END AS level, 'house' AS kind, fc_name AS subject,
+       CASE WHEN days IS NULL THEN 'house: no date yet for when it was last entered'
+            WHEN days >= 45 THEN 'house not entered for ' || days || ' days: past 45, the game can demolish it any time'
+            ELSE 'house not entered for ' || days || ' day' || CASE WHEN days = 1 THEN '' ELSE 's' END
+                 || '; demolished after ' || (45 - days) || ' more' END AS detail,
+       coalesce(days, 0) AS weight
+FROM house_ages, settings st WHERE days IS NULL OR days >= st.house_days
+UNION ALL
+SELECT 'warn', 'low_ceruleum', s.who, s.ceruleum || ' ceruleum (warning below ' || st.ceruleum::int || ')', 0
+FROM supplies s, settings st WHERE st.ceruleum > 0 AND s.ceruleum < st.ceruleum
+UNION ALL
+SELECT 'warn', 'low_repair_kits', s.who, s.repair_kits || ' repair kits (warning below ' || st.repair_kits::int || ')', 0
+FROM supplies s, settings st WHERE st.repair_kits > 0 AND s.repair_kits < st.repair_kits
+UNION ALL
+SELECT 'warn', 'not_synced', name || ' (' || world || ')',
+       'no longer synced (' || floor(extract(epoch FROM behind) / 3600)::int || ' h behind its account): unticked in the plugin, or its AutoRetainer no longer has it', 0
+FROM fleet_not_synced_view
+UNION ALL
+SELECT 'warn', 'autoretainer', pc_name || CASE WHEN account_label <> '' THEN ' (' || account_label || ')' ELSE '' END,
+       'AutoRetainer was not running at its last sync, so nothing syncs from there', 0
+FROM companion_pc_status WHERE autoretainer_ready = false AND last_sync_at > now() - interval '1 day'
+ORDER BY 1, 2, 5 DESC, 3;

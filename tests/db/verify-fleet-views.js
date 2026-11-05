@@ -11,6 +11,8 @@ const assert = require('node:assert');
 const { metricWindow } = require('../../db/metric-window');
 const { DAY, usageRate, runway, restockAmount } = require('../../subs/supply-runway');
 const { SUB_PART_CLASS, partLetter } = require('../../subs/submarine-builds');
+const { notSyncedCharacters } = require('../../characters/not-synced');
+const { daysSince, houseLevel } = require('../../characters/house-warning');
 
 let n = 0;
 async function scenario(name, fn) {
@@ -91,7 +93,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   await admin.query(`CREATE DATABASE ${NAME}`);
   const client = new Client({ host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: NAME });
   await client.connect();
-  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings');
+  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status');
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
@@ -218,6 +220,53 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.strictEqual(Number(s.next_return_time), secs + 3600);
       const soonest = Math.min(...supplies.flatMap((r) => [r.ceruleum_days_left, r.repair_kits_days_left]).filter((d) => d !== null));
       assert.ok(close(s.soonest_runs_out_days, soonest), `soonest ${s.soonest_runs_out_days} vs ${soonest}`);
+    });
+    await scenario('alerts: houses, low supplies, characters no longer synced and AutoRetainer, by the app\'s own rules', async () => {
+      await clear();
+      await setting(client, 'low_ceruleum_threshold', 100);
+      await setting(client, 'low_repair_kit_threshold', 10);
+      await setting(client, 'house_warn_days', 7);
+      // Account A: Aki low on both; Bex low but no longer synced (2 hours behind); Cal fine. Account B: Dee without subs, low.
+      await character(client, 1, { name: 'Aki', ceruleum: 50, repairKits: 5, label: 'A' });
+      await character(client, 2, { name: 'Bex', ceruleum: 1, repairKits: 1, label: 'A', syncedHoursAgo: 2 });
+      await character(client, 3, { name: 'Cal', ceruleum: 500, repairKits: 50, label: 'A' });
+      await character(client, 4, { name: 'Dee', ceruleum: 0, repairKits: 0, label: 'B', subs: false });
+      const day = 86400 * 1000;
+      const houses = [[11, 'Fresh', true, 1], [12, 'Getting old', true, 9], [13, 'Danger', true, 33], [14, 'Gone soon', true, 50], [15, 'No date', true, null], [16, 'No house', false, 60]];
+      for (const [fc, fcName, has, days] of houses) {
+        // Two members: the newer visit counts, and the newest row gives the name.
+        await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, has_house, house_last_visited, updated_at) VALUES
+          ($1, $2, 'Old name', $3, $4, now() - interval '1 day'), ($5, $2, $6, $3, $7, now())`,
+        [fc * 10, fc, has, days === null ? null : new Date(now - (days + 3) * day), fc * 10 + 1, fcName, days === null ? null : new Date(now - days * day - 3600 * 1000)]);
+      }
+      await client.query(`INSERT INTO companion_pc_status (pc_name, account_label, last_sync_at, autoretainer_ready) VALUES
+        ('DESKTOP-1', 'A', now() - interval '5 minutes', false), ('LAPTOP', '', now() - interval '3 days', false), ('DESKTOP-2', 'B', now(), true)`);
+      const { rows } = await client.query('SELECT level, kind, subject, detail FROM fleet_alerts_view');
+
+      // What the app's own code makes of the same data.
+      const chars = (await client.query('SELECT cid::text AS cid, name, world, account_label, last_synced_at, ceruleum, repair_kits, EXISTS (SELECT 1 FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0) AS subs FROM companion_character_current c')).rows;
+      const behind = notSyncedCharacters(chars, 30);
+      const want = [];
+      for (const [, fcName, has, days] of houses) {
+        if (!has) continue;
+        const d = daysSince(days === null ? null : new Date(now - days * day - 3600 * 1000), Date.now());
+        const level = houseLevel(d, 7);
+        if (level !== 'ok') want.push(`${level === 'danger' ? 'danger' : 'warn'} house ${fcName}`);
+      }
+      for (const c of chars.filter((c) => c.subs && !behind.has(c.cid))) {
+        if (c.ceruleum < 100) want.push(`warn low_ceruleum ${c.name} (Maduin)`);
+        if (c.repair_kits < 10) want.push(`warn low_repair_kits ${c.name} (Maduin)`);
+      }
+      for (const c of chars.filter((c) => behind.has(c.cid))) want.push(`warn not_synced ${c.name} (Maduin)`);
+      want.push('warn autoretainer DESKTOP-1 (A)');
+      assert.deepStrictEqual(rows.map((r) => `${r.level} ${r.kind} ${r.subject}`).sort(), want.sort());
+      assert.strictEqual(rows[0].kind, 'house', 'worst first: the oldest houses');
+      assert.strictEqual(rows[0].subject, 'Gone soon');
+      assert.match(rows[0].detail, /past 45, the game can demolish it any time/);
+      assert.match(rows.find((r) => r.subject === 'Getting old').detail, /not entered for 9 days; demolished after 36 more/);
+      assert.match(rows.find((r) => r.subject === 'No date').detail, /no date yet/);
+      const { rows: [s] } = await client.query('SELECT low_ceruleum, low_repair_kits FROM fleet_summary_view');
+      assert.deepStrictEqual([s.low_ceruleum, s.low_repair_kits], [1, 1], 'the summary leaves out Bex (no longer synced) too');
     });
   } finally {
     await client.end();

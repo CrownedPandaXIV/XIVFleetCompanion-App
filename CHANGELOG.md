@@ -13,6 +13,10 @@ do by hand.
   ceruleum and repair kits, how many it uses a day, days left and how many to buy; and the fleet at a glance. The
   database works out the use per day itself (the same way as the Supplies tab), so the plugin reads a few dozen rows
   instead of weeks of history. Nothing in the app changes.
+- **What needs attention**, for the plugin's in-game Summary and its line in the game's info bar: Free Company houses
+  not entered for the house warning's days (or with no date yet), characters below the low-supply warnings,
+  characters no longer synced, and setups where AutoRetainer wasn't running. The same rules as the app's Summary;
+  characters no longer synced are left out of the low-supply counts there too.
 - The views live in one file the app applies again whenever it changes, so later versions can improve them without a
   database update each time (update 15 records which version a database has). An older copy of the app never
   replaces a newer one's views.
