@@ -88,6 +88,8 @@ jobs:
       run: node tests/db/parts-fixture.js
     - name: Work out the Subs tab's routes, rank-up dates and Look ahead for made-up fleets (the answers the plugin's own working out is checked against)
       run: node tests/db/routes-fixture.js
+    - name: Ask the Trends tab's calls about a made-up history (the answers the plugin's own Trends page is checked against)
+      run: node tests/db/trends-fixture.js
     - name: Work out live market prices from canned Universalis listings (the answers the plugin's own Universalis code is checked against)
       run: node tests/market-fixture.js
     - name: Verify the venture reward totals

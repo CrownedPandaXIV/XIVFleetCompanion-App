@@ -72,6 +72,57 @@ function trendFormatTime(ms) {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// A line over its span (as the plugin's TrendsMath.Stats): now, at the start (its first recorded point), the change and
+// its share of the start, the change a day on average (between the first and last points with a value), lowest and highest.
+function trendStats(values, timestamps) {
+  let first = -1;
+  let last = -1;
+  values.forEach((v, i) => { if (v !== null) { if (first < 0) first = i; last = i; } });
+  if (first < 0) return { current: null, start: null, change: null, percent: null, perDay: null, low: null, high: null };
+  const current = values[last];
+  const start = values[first];
+  const change = current - start;
+  const known = values.filter((v) => v !== null);
+  const days = (timestamps[last] - timestamps[first]) / TREND_DAY;
+  return {
+    current, start, change,
+    percent: start !== 0 ? (change / Math.abs(start)) * 100 : null,
+    perDay: days > 0 ? change / days : null,
+    low: Math.min(...known), high: Math.max(...known),
+  };
+}
+
+const trendSigned = (n) => (n === null || n === undefined ? '—' : `${n > 0 ? '+' : ''}${trendFullNumber(n)}`);
+const trendTone = (n) => (n > 0 ? 'tone-good' : n < 0 ? 'tone-warn' : undefined);
+
+// Under a chart of several lines: each one's value now, its change over the span (and its share of the start), a day on
+// average, and its lowest and highest (as the plugin's).
+function TrendStatsTable({ timestamps, series }) {
+  return (
+    <table className="trend-stats">
+      <thead>
+        <tr><th>Line</th><th>Now</th><th>Change</th><th>Change %</th><th title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</th><th>Lowest</th><th>Highest</th></tr>
+      </thead>
+      <tbody>
+        {series.map((s, i) => {
+          const st = trendStats(s.values, timestamps);
+          return (
+            <tr key={i}>
+              <td><span className="trend-key" style={{ background: s.color }} /> {s.name}</td>
+              <td>{trendFullNumber(st.current)}</td>
+              <td className={trendTone(st.change)}>{trendSigned(st.change)}</td>
+              <td className={trendTone(st.change)}>{st.percent === null ? '—' : `${st.percent > 0 ? '+' : ''}${st.percent.toFixed(1)}%`}</td>
+              <td>{trendSigned(st.perDay)}</td>
+              <td>{trendFullNumber(st.low)}</td>
+              <td>{trendFullNumber(st.high)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function trendHexToRgba(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -444,7 +495,6 @@ function TrendsView({ refreshKey, preset }) {
 
   const hasData = chartSeries.some((s) => s.values.some((v) => v !== null));
   const latest = (values) => { for (let i = values.length - 1; i >= 0; i--) if (values[i] !== null) return values[i]; return null; };
-  const firstValue = (values) => { for (let i = 0; i < values.length; i++) if (values[i] !== null) return values[i]; return null; };
   const latestById = {};
   if (scope !== 'fleet') selection.forEach((sel, i) => { if (chartSeries[i]) latestById[sel.id] = latest(chartSeries[i].values); });
   const scopeHint = scope === 'characters' && metric && metric.key.startsWith('salvage')
@@ -517,9 +567,10 @@ function TrendsView({ refreshKey, preset }) {
       {result && (
         <div>
           {chartSeries.length === 1 && hasData && (() => {
-            const now = latest(chartSeries[0].values);
-            const start = firstValue(chartSeries[0].values);
-            const change = now !== null && start !== null ? now - start : null;
+            const st = trendStats(chartSeries[0].values, result.timestamps);
+            const now = st.current;
+            const start = st.start;
+            const change = st.change;
             return (
               <div className="trend-summary">
                 <div>
@@ -534,6 +585,10 @@ function TrendsView({ refreshKey, preset }) {
                       <span className="trend-summary-sub"> ({change > 0 ? '+' : ''}{((change / Math.abs(start)) * 100).toFixed(1)}%)</span>
                     )}
                   </div>
+                </div>
+                <div>
+                  <div className="trend-summary-label" title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</div>
+                  <div className="trend-summary-value">{trendSigned(st.perDay)}</div>
                 </div>
               </div>
             );
@@ -573,6 +628,7 @@ function TrendsView({ refreshKey, preset }) {
           )}
           {mode === 'table' && hasData && <div className="trend-note" style={{ marginTop: '4px' }}>Drag the bottom-right corner of the table to make it taller or shorter.</div>}
           {hasData && mode === 'chart' && <div className="trend-note" style={{ marginTop: '6px' }}>Drag across the chart to zoom into that span.</div>}
+          {hasData && chartSeries.length > 1 && <TrendStatsTable timestamps={result.timestamps} series={chartSeries} />}
         </div>
       )}
     </div>
@@ -681,7 +737,7 @@ function SummaryTrendTiles({ refreshKey, onOpenTrend, uses = { subs: true, retai
               <div style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
               <div style={{ color: '#8a8f9a', fontSize: '12px', minHeight: '16px' }}>
                 {change === null ? (tiles ? 'No history yet' : '') : (
-                  <span>
+                  <span className={trendTone(change)}>
                     {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}
                   </span>
                 )}
@@ -809,7 +865,7 @@ function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, re
             <div className="trend-card-value">
               <strong>{trendFullNumber(current)}</strong>
               {change !== null && (
-                <span className="trend-summary-sub"> {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}</span>
+                <span className={`trend-summary-sub ${trendTone(change) || ''}`}> {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}</span>
               )}
             </div>
           )}

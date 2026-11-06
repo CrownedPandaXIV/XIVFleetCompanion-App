@@ -107,6 +107,11 @@ do by hand.
 - **Craft first's market board prices have the same hover** as the other sections: what buying the ones still to make
   costs, from the cheapest listing up (with "only X of Y for sale" when there aren't enough). The totals stay for
   parts and raw materials.
+- **Trends: a day on average, and a table of lines.** Beside a single line's now and change, its change a day on
+  average; under a chart comparing characters or Free Companies, each one's now, change, change %, a day on average,
+  lowest and highest (as the plugin's new Trends page). Rises are green and falls amber on the Summary's tiles and the
+  tab charts, as in the plugin. The plugin's Trends page is checked against the app's answers for a made-up history
+  (tests/db/trends-fixture.js).
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row

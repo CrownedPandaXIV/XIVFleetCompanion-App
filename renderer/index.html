@@ -621,9 +621,14 @@
     .trend-legend-item { display: inline-flex; align-items: center; gap: 8px; color: #8a8f9a; }
     .trend-legend-item strong { color: #e6e6e6; font-weight: 600; }
     .trend-summary { display: flex; gap: 40px; margin: 4px 0 6px; }
+    table.trend-stats { margin-top: 12px; width: auto; }
+    table.trend-stats td, table.trend-stats th { padding: 4px 14px 4px 0; text-align: right; white-space: nowrap; }
+    table.trend-stats td:first-child, table.trend-stats th:first-child { text-align: left; }
     .trend-summary-label { color: #8a8f9a; font-size: 12px; }
     .trend-summary-value { font-size: 26px; font-weight: 600; color: #ffffff; }
     .trend-summary-sub { font-size: 14px; font-weight: 400; color: #8a8f9a; }
+    .trend-summary-sub.tone-good { color: var(--good); }
+    .trend-summary-sub.tone-warn { color: var(--warn); }
     .u-select { background: rgba(57, 135, 229, 0.18); }
     .trend-table-box { box-sizing: border-box; overflow: auto; resize: vertical; min-height: 160px; border: 1px solid #23262e; border-radius: 4px; }
     .trend-table-box table { margin: 0; }
