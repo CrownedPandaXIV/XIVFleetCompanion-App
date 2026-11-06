@@ -390,16 +390,16 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       await character(client, 1, { name: 'Aki', label: 'B' });
       await character(client, 2, { name: 'Bex', label: 'A' });
       await character(client, 3, { name: 'Cal', label: null });
-      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 11 WHEN 2 THEN 11 WHEN 3 THEN 12 END');
+      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 9232379236109516811 WHEN 2 THEN 9232379236109516811 WHEN 3 THEN 12 END');
       await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 5), (2, 3)');
       const day = 86400 * 1000;
       const at = (days) => new Date(Date.now() - days * day - 3600 * 1000);
-      // FC 11: a house entered 9 days ago (two members' rows: the newer details win). FC 12-17: no house, founded at
+      // FC 9232379236109516811 (a real-sized id, past a signed 64-bit number): a house entered 9 days ago (two members' rows: the newer details win). FC 12-17: no house, founded at
       // different times, ranks good, low, missing and not a number. FC 18: a house with no date.
       await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, fc_points, fc_rank, total_members, has_house,
           house_city, house_ward, house_plot, house_last_visited, fc_home_world_id, fc_founding_date, fc_eligibility_override, updated_at) VALUES
-        (1, 11, 'Old name', 'Aki', 10, '8', 3, true, 8, 12, 30, $1, 34, NULL, NULL, now() - interval '1 day'),
-        (2, 11, 'Cute Kittehs!', 'Aki', 52000, '8', 3, true, 8, 12, 30, $2, 34, NULL, NULL, now()),
+        (1, 9232379236109516811, 'Old name', 'Aki', 10, '8', 3, true, 8, 12, 30, $1, 34, NULL, NULL, now() - interval '1 day'),
+        (2, 9232379236109516811, 'Cute Kittehs!', 'Aki', 52000, '8', 3, true, 8, 12, 30, $2, 34, NULL, NULL, now()),
         (3, 12, 'Young', 'Cal', 0, '7', 1, false, NULL, NULL, NULL, NULL, 63, $3, NULL, now()),
         (31, 13, 'Ready', 'X', 0, ' 6', 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
         (32, 14, 'Low rank', 'X', 0, '3', 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
@@ -434,10 +434,10 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       await character(client, 1, { name: 'Aki', label: 'A' });
       await character(client, 2, { name: 'Bex', label: 'B' });
       await character(client, 3, { name: 'Cal', label: 'B' });
-      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 11 WHEN 2 THEN 11 WHEN 3 THEN 12 END');
+      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 9232379236109516811 WHEN 2 THEN 9232379236109516811 WHEN 3 THEN 12 END');
       await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 5), (2, 3), (3, 9)');
       await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, updated_at) VALUES
-        (1, 11, 'Kittehs', 'aki', now()), (2, 11, 'Kittehs', 'aki', now() - interval '1 day'), (3, 12, NULL, 'Nobody', now())`);
+        (1, 9232379236109516811, 'Kittehs', 'aki', now()), (2, 9232379236109516811, 'Kittehs', 'aki', now() - interval '1 day'), (3, 12, NULL, 'Nobody', now())`);
       await client.query(`INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name, hire_order_index) VALUES (100, 1, 'Ret A', 0), (101, 1, '', 1)`);
       const containers = [0, 3, 1000, 2000, 2001, 2003, 2004, 2500, 2501, 2502, 3200, 3500, 4000, 4101, 25000, 27010, 9999];
       let slot = 0;
@@ -446,7 +446,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       const empty = ['(2, 2, 0, 0, 10155, 0)', '(3, 3, 1, 1, 10155, 7)', '(77, 77, 0, 0, 10373, 1)'];
       await client.query(`INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES ${[...own, ...retainer, ...empty].join(', ')}`);
       await client.query(`INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES
-        (11, 20000, 0, 10155, 100), (11, 20004, 1, 10155, 1), (11, 22000, 0, 1, 500000), (11, 22001, 0, 2, 9), (12, 21000, 0, 10155, 3), (12, 20010, 1, 10155, 0)`);
+        (9232379236109516811, 20000, 0, 10155, 100), (9232379236109516811, 20004, 1, 10155, 1), (9232379236109516811, 22000, 0, 1, 500000), (9232379236109516811, 22001, 0, 2, 9), (12, 21000, 0, 10155, 3), (12, 20010, 1, 10155, 0)`);
       const rows = (await client.query('SELECT * FROM fleet_holdings_view')).rows;
       assert.strictEqual(rows.length, own.length + retainer.length + 2 + 5, 'every stack with something in it (2 more bags, 5 FC stacks)');
       // The app's own names for the places (characters/item-locations.js), and its chest holders (characters/fc-chest.js).

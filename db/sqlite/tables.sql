@@ -3,7 +3,9 @@
 -- this file yet; the one-file version itself comes near the end of 2.x.
 --
 -- How PostgreSQL's types are kept here:
---   numeric ids (characters, FCs, retainers)  INTEGER (they fit in 64 bits)
+--   character and retainer ids              INTEGER (they fit in a signed 64-bit number)
+--   Free Company ids                         TEXT: the game's go past a signed 64-bit number (up to 18,446,744,073,709,551,615),
+--                                            which is all SQLite's INTEGER holds; it would keep them as rounded REALs
 --   timestamptz / timestamp                    REAL, Unix seconds (fractions allowed), so times can be subtracted
 --   boolean                                    INTEGER, 0 or 1
 --   text[] (a setup's problems)                TEXT, one per line
@@ -20,7 +22,7 @@ CREATE TABLE companion_character_current (
     retainer_count  INTEGER,
     submarine_count INTEGER,
     num_sub_slots   INTEGER,
-    fc_id           INTEGER,
+    fc_id           TEXT,     -- see below: too big for INTEGER
     first_seen_at   REAL NOT NULL,
     last_synced_at  REAL NOT NULL
 );
@@ -81,7 +83,7 @@ CREATE TABLE companion_retainer_lookup (
 
 CREATE TABLE companion_character_housing (
     cid                     INTEGER PRIMARY KEY,
-    fc_id                   INTEGER,
+    fc_id                   TEXT,
     fc_name                 TEXT,
     fc_points               INTEGER,
     fc_rank                 TEXT,
@@ -152,7 +154,7 @@ CREATE TABLE retainer_gear_targets (
 );
 
 CREATE TABLE companion_fc_inventory_snapshot (
-    fc_id             INTEGER NOT NULL,
+    fc_id             TEXT    NOT NULL,
     sorted_container  INTEGER NOT NULL,
     sorted_slot_index INTEGER NOT NULL,
     item_id           INTEGER NOT NULL,

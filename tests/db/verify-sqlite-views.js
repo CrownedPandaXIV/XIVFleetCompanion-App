@@ -140,7 +140,9 @@ function fleet(seed, now) {
     const behindHours = chance(0.15) ? random() * 200 : random() * 0.08;
     let cer = Math.floor(random() * 3000);
     let kits = Math.floor(random() * 300);
-    const fc = chance(0.8) ? 9230000000000000n + BigInt(Math.floor(random() * 25)) : null;
+    // Real-sized Free Company ids: past a signed 64-bit number, as the game's often are (SQLite keeps them as text).
+    const fcNumber = chance(0.8) ? 9232379236109516800n + BigInt(Math.floor(random() * 25)) : null;
+    const fc = fcNumber === null ? null : fcNumber.toString();
     t.companion_character_current.push({ cid, name: `Char${i}`, world: pick(['Maduin', 'Behemoth', 'Exodus']), account_label: label,
       gil: Math.floor(random() * 5e9), ceruleum: chance(0.05) ? null : cer, repair_kits: chance(0.05) ? null : kits,
       retainer_count: Math.floor(random() * 10), submarine_count: Math.floor(random() * 5), num_sub_slots: 4, fc_id: fc,
@@ -174,7 +176,7 @@ function fleet(seed, now) {
     }
     if (fc && chance(0.8)) {
       const visited = chance(0.15) ? null : ago(random() * 60 * 24);
-      t.companion_character_housing.push({ cid, fc_id: fc, fc_name: chance(0.1) ? null : `FC ${fc % 100n}${chance(0.3) ? ' (renamed)' : ''}`,
+      t.companion_character_housing.push({ cid, fc_id: fc, fc_name: chance(0.1) ? null : `FC ${fcNumber % 100n}${chance(0.3) ? ' (renamed)' : ''}`,
         fc_points: chance(0.2) ? null : Math.floor(random() * 1e5), has_house: chance(0.7), house_city: pick([2, 8, 9, 70, 111, 999]),
         house_ward: Math.floor(random() * 30) + 1, house_plot: Math.floor(random() * 60) + 1, house_last_visited: visited, updated_at: ago(random() * 100),
         fc_master: pick([`Char${i}`, `char${i}`, `Char${i + 1}`, 'Someone Else', null]), fc_rank: pick(['6', '8', ' 7', '3', 'x', null]),
