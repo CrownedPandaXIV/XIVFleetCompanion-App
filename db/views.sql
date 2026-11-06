@@ -14,7 +14,8 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
+DROP VIEW IF EXISTS fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
+  fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
   fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
   fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
   fleet_alerts_view, fleet_summary_view, fleet_retainer_counts_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
@@ -788,3 +789,63 @@ LEFT JOIN companion_retainer_lookup r ON r.retainer_id = l.retainer_id
 LEFT JOIN companion_character_current c ON c.cid = l.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = l.owner_cid
 CROSS JOIN fleet_market_settings_view st;
+
+-- ---- Routes (plugin 2.0's routes stage), as the app's Subs tab (ipc/subs.js loadSubmarines and addRankUps): each sub's
+-- route, gil a day after repair kits, speed and range, and when it ranks up and changes build. The plugin works these
+-- out itself (SubRoutes.cs), the same way, from these views and the game's own files (the sectors, ranks and parts:
+-- views here never read the game data tables). ----
+
+-- Every built sub with what its route and dates need: its route's stops (one byte each), when it's back, its
+-- experience into this rank, whether it's ticked Craft? and its Free Company (voyages are recorded by FC).
+CREATE OR REPLACE VIEW fleet_route_subs_view AS
+SELECT s.cid, s.sub_name, coalesce(s.slot, substring(s.sub_name FROM '^Submersible-([1-4])$')::int) AS slot,
+       s.level AS rank, s.part1, s.part2, s.part3, s.part4, s.points, s.return_time, s.current_exp, s.next_level_exp,
+       coalesce(t.craft_enabled, false) AS craft_enabled, CAST(c.fc_id AS text) AS fc_id
+FROM companion_submarine_snapshot s
+LEFT JOIN companion_character_current c ON c.cid = s.cid
+LEFT JOIN sub_craft_toggle t ON t.cid = s.cid AND t.sub_name = s.sub_name
+WHERE s.level > 0;
+
+-- Every Fight Club route (with or without a recommended build: Current Gil/Day matches a sub's route against all of
+-- them), with the ranks its builds need and the repair kit price from Settings (0 when not set).
+CREATE OR REPLACE VIEW fleet_route_fight_club_view AS
+SELECT f.id, f.route, f.hours, f.repair_times, f.gil_sub_day, f.rec_build_notes, f.unmod_min_rank, f.min_rank_build,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'), 0) AS repair_kit_cost
+FROM fight_club_routes f;
+
+-- Each built sub's slot rank and experience as recorded over the last 14 days (its bonus is measured from its last few
+-- voyages, its rate from the last week), plus the last value before, as db/metric-window.js reads them: a value
+-- recorded again unchanged is left out (the first and the newest stay).
+CREATE OR REPLACE VIEW fleet_sub_history_view AS
+WITH series AS (
+  SELECT DISTINCT s.cid, m.metric
+  FROM companion_submarine_snapshot s
+  CROSS JOIN (VALUES ('sub_rank:1'), ('sub_rank:2'), ('sub_rank:3'), ('sub_rank:4'),
+                     ('sub_exp:1'), ('sub_exp:2'), ('sub_exp:3'), ('sub_exp:4')) m(metric)
+  WHERE s.level > 0
+)
+SELECT se.cid, se.metric, w.recorded_at, w.value
+FROM series se
+CROSS JOIN LATERAL (
+  SELECT recorded_at, value FROM (
+    SELECT h.recorded_at, h.value, lead(h.value) OVER newest_first AS earlier, row_number() OVER newest_first AS n
+    FROM companion_metric_history h
+    WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+      AND h.recorded_at > now() - interval '14 days'
+    WINDOW newest_first AS (ORDER BY h.recorded_at DESC)) inside
+  WHERE n = 1 OR earlier IS DISTINCT FROM value) w
+UNION ALL
+SELECT se.cid, se.metric, b.recorded_at, b.value
+FROM series se
+CROSS JOIN LATERAL (
+  SELECT h.recorded_at, h.value FROM companion_metric_history h
+  WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+    AND h.recorded_at <= now() - interval '14 days'
+  ORDER BY h.recorded_at DESC LIMIT 1) b;
+
+-- The sectors of each voyage SubmarineTracker recorded over the last 14 days (by FC and its id for the sub), in the
+-- order they were run (leg) when known: a sub's bonus compares what each collection gave with its voyages' routes.
+CREATE OR REPLACE VIEW fleet_voyage_sectors_view AS
+SELECT CAST(v.fc_id AS text) AS fc_id, v.sub_register, v.sub_name, v.returned_at, v.sector, v.leg
+FROM companion_voyage_loot v
+WHERE v.returned_at >= now() - interval '14 days';

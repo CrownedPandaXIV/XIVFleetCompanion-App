@@ -43,6 +43,7 @@ CREATE TABLE companion_submarine_snapshot (
     part2          INTEGER,
     part3          INTEGER,
     part4          INTEGER,
+    points         BLOB,     -- the route's stops, one byte each
     return_time    INTEGER,  -- Unix seconds
     updated_at     REAL,
     current_exp    INTEGER,
@@ -164,6 +165,26 @@ CREATE TABLE companion_fc_inventory_snapshot (
     updated_at        REAL,
     PRIMARY KEY (fc_id, sorted_container, sorted_slot_index)
 );
+
+-- One row per sector of a voyage, as SubmarineTracker recorded it when the sub came back (sub_register: its id for the
+-- sub; leg: the order the sectors were run in, 1 first).
+CREATE TABLE companion_voyage_loot (
+    fc_id            TEXT    NOT NULL,
+    sub_register     INTEGER NOT NULL,
+    returned_at      REAL    NOT NULL,
+    sector           INTEGER NOT NULL,
+    sub_name         TEXT,
+    primary_item     INTEGER,
+    primary_count    INTEGER,
+    primary_hq       INTEGER,
+    additional_item  INTEGER,
+    additional_count INTEGER,
+    additional_hq    INTEGER,
+    valid            INTEGER,
+    leg              INTEGER,
+    PRIMARY KEY (fc_id, sub_register, returned_at, sector)
+);
+CREATE INDEX companion_voyage_loot_returned_idx ON companion_voyage_loot (returned_at);
 
 CREATE TABLE companion_venture_result (
     owner_cid     INTEGER NOT NULL,

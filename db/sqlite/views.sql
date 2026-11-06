@@ -18,6 +18,10 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_voyage_sectors_view;
+DROP VIEW IF EXISTS fleet_sub_history_view;
+DROP VIEW IF EXISTS fleet_route_fight_club_view;
+DROP VIEW IF EXISTS fleet_route_subs_view;
 DROP VIEW IF EXISTS fleet_market_listings_view;
 DROP VIEW IF EXISTS fleet_market_accounts_view;
 DROP VIEW IF EXISTS fleet_market_settings_view;
@@ -724,3 +728,54 @@ LEFT JOIN companion_retainer_lookup r ON r.retainer_id = l.retainer_id
 LEFT JOIN companion_character_current c ON c.cid = l.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = l.owner_cid
 CROSS JOIN fleet_market_settings_view st;
+
+-- Routes (the plugin's routes stage).
+
+CREATE VIEW fleet_route_subs_view AS
+SELECT s.cid, s.sub_name,
+       coalesce(s.slot, CASE WHEN s.sub_name GLOB 'Submersible-[1-4]' THEN CAST(substr(s.sub_name, 13, 1) AS INTEGER) END) AS slot,
+       s.level AS rank, s.part1, s.part2, s.part3, s.part4, s.points, s.return_time, s.current_exp, s.next_level_exp,
+       coalesce(t.craft_enabled, 0) AS craft_enabled, CAST(c.fc_id AS TEXT) AS fc_id
+FROM companion_submarine_snapshot s
+LEFT JOIN companion_character_current c ON c.cid = s.cid
+LEFT JOIN sub_craft_toggle t ON t.cid = s.cid AND t.sub_name = s.sub_name
+WHERE s.level > 0;
+
+CREATE VIEW fleet_route_fight_club_view AS
+SELECT f.id, f.route, f.hours, f.repair_times, f.gil_sub_day, f.rec_build_notes, f.unmod_min_rank, f.min_rank_build,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'), 0) AS repair_kit_cost
+FROM fight_club_routes f;
+
+CREATE VIEW fleet_sub_history_view AS
+WITH series AS (
+  SELECT DISTINCT s.cid, m.metric
+  FROM companion_submarine_snapshot s
+  CROSS JOIN (SELECT 'sub_rank:1' AS metric UNION ALL SELECT 'sub_rank:2' UNION ALL SELECT 'sub_rank:3' UNION ALL SELECT 'sub_rank:4'
+              UNION ALL SELECT 'sub_exp:1' UNION ALL SELECT 'sub_exp:2' UNION ALL SELECT 'sub_exp:3' UNION ALL SELECT 'sub_exp:4') m
+  WHERE s.level > 0
+),
+inside AS (
+  SELECT se.cid, se.metric, h.recorded_at, h.value,
+         lead(h.value) OVER (PARTITION BY se.cid, se.metric ORDER BY h.recorded_at DESC) AS earlier,
+         row_number() OVER (PARTITION BY se.cid, se.metric ORDER BY h.recorded_at DESC) AS n
+  FROM series se
+  JOIN companion_metric_history h ON h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+   AND h.recorded_at > ((julianday('now') - 2440587.5) * 86400.0) - 14 * 86400.0
+)
+SELECT cid, metric, recorded_at, value FROM inside WHERE n = 1 OR earlier IS NULL OR earlier <> value
+UNION ALL
+SELECT cid, metric, recorded_at, value FROM (
+  SELECT se.cid, se.metric,
+         (SELECT h.recorded_at FROM companion_metric_history h
+          WHERE h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+            AND h.recorded_at <= ((julianday('now') - 2440587.5) * 86400.0) - 14 * 86400.0 ORDER BY h.recorded_at DESC LIMIT 1) AS recorded_at,
+         (SELECT h.value FROM companion_metric_history h
+          WHERE h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+            AND h.recorded_at <= ((julianday('now') - 2440587.5) * 86400.0) - 14 * 86400.0 ORDER BY h.recorded_at DESC LIMIT 1) AS value
+  FROM series se) b
+WHERE b.recorded_at IS NOT NULL;
+
+CREATE VIEW fleet_voyage_sectors_view AS
+SELECT CAST(v.fc_id AS TEXT) AS fc_id, v.sub_register, v.sub_name, v.returned_at, v.sector, v.leg
+FROM companion_voyage_loot v
+WHERE v.returned_at >= ((julianday('now') - 2440587.5) * 86400.0) - 14 * 86400.0;

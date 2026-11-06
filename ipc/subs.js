@@ -54,7 +54,7 @@ async function loadSubmarines(client) {
 
   const { rankStatsById, partStatsByClassSlot } = await loadStatTables(client);
 
-  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`)).rows;
+  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
   const topRank = Math.max(0, ...[...rankStatsById.keys()].filter((r) => rankStatsById.get(r).speed !== null));
 
@@ -214,8 +214,8 @@ async function loadVoyageRoutes(client, since) {
 async function addRankUps(client, subs) {
   const game = await loadRankUpGameData(client);
   const stats = await loadStatTables(client);
-  const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules')).rows;
-  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`)).rows;
+  const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules ORDER BY id')).rows;
+  const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
   const top = rankUp.maxRank(game.expToNext);
 
