@@ -67,7 +67,7 @@ test('prices for a world, its data center and its region, asked once and kept fo
   assert.strictEqual(cheapestListing(maduin.listings.world.get(5111)).price, 30);
   assert.deepStrictEqual(cheapestListing(maduin.listings.dc.get(5111)), { price: 20, world: 'Golem' });
   assert.deepStrictEqual(cheapestListing(maduin.listings.region.get(5111)), { price: 10, world: 'Siren' });
-  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=20&entries=0')), calls.join(' '));
+  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=100&entries=0')), calls.join(' '));
   const asked = calls.length;
   await u.marketFor(['Maduin'], [5111]);
   assert.strictEqual(calls.length, asked, 'kept: not asked again');

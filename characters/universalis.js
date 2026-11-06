@@ -11,7 +11,9 @@ const DEFAULT_URL = 'https://universalis.app';
 const USER_AGENT = 'XIVFleetCompanion';
 const BATCH = 50; // item ids per request
 const PARALLEL = 4; // requests at once
-const LISTINGS = 20; // listings per item, cheapest first
+// Listings per item, cheapest first: enough that the Shopping List's "buying all of them" covers what a fleet needs
+// (with 20, a material needed in the thousands looked short when plenty more was for sale).
+const LISTINGS = 100;
 const KEEP_MS = 30 * 60 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
 

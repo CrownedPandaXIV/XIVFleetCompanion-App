@@ -58,19 +58,19 @@ const SHOPPING_CRAFT_DEFS = shoppingItemDefs('craft');
 const SHOPPING_GATHER_DEFS = shoppingItemDefs('gather');
 
 // Live Market Prices on: the cheapest market board listing, with its world when prices are from a data
-// center or region ("45,000 gil (Halicarnassus)"), or "none listed". When fewer are listed than needed, "only
-// 3 of 5 listed"; hover says what buying all those needed costs, going up the listings.
+// center or region ("45,000 gil (Halicarnassus)"), or "none listed". When fewer are for sale than needed, "only
+// 3 of 5 for sale"; hover says what buying all those needed costs, from the cheapest listing up.
 function ShoppingMarketPrice({ listed, buying, kind }) {
   if (!listed) return <span className="shopping-note" title="Nobody is selling it there right now.">none listed</span>;
   const short = buying && buying.got < buying.wanted;
-  const title = buying
-    ? `Buying ${buying.wanted === 1 ? 'it' : `all ${buying.wanted}`}: ${shoppingGil(buying.gil)}, going up the listings from the cheapest` +
-      (short ? `. Only ${buying.got} of ${buying.wanted} are listed there; that price is for those.` : '.')
-    : undefined;
+  const title = !buying ? undefined : short
+    ? `Only ${buying.got.toLocaleString()} of the ${buying.wanted.toLocaleString()} needed are for sale there: ${shoppingGil(buying.gil)} for those, from the cheapest listing up. `
+      + `The other ${(buying.wanted - buying.got).toLocaleString()} can't be bought there right now.`
+    : `Buying ${buying.wanted === 1 ? 'it' : `all ${buying.wanted.toLocaleString()}`} from the cheapest listing up: ${shoppingGil(buying.gil)}.`;
   return (
     <span title={title}>
       <ShoppingGil gil={listed.price} />{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}
-      {short && <span className="shopping-note shopping-too-few tone-warn"> · only {buying.got} of {buying.wanted} listed</span>}
+      {short && <span className="shopping-note shopping-too-few tone-warn"> · only {buying.got.toLocaleString()} of {buying.wanted.toLocaleString()} for sale</span>}
     </span>
   );
 }
@@ -259,9 +259,9 @@ function ShoppingPriceScope({ market, onChange }) {
 // Where the prices are from, the totals for buying instead, and anything that went wrong.
 function ShoppingMarketNote({ market, totals }) {
   if (market.error) return <div className="error">Market board prices are not shown: {market.error}</div>;
-  // " (2 not listed, 1 with too few listed)"
+  // " (2 not listed, 1 with too few for sale)"
   const missing = (none, few) => {
-    const bits = [none && `${none} not listed`, few && `${few} with too few listed`].filter(Boolean);
+    const bits = [none && `${none} not listed`, few && `${few} with too few for sale`].filter(Boolean);
     return bits.length ? ` (${bits.join(', ')})` : '';
   };
   return (
