@@ -30,6 +30,9 @@ const VIEWS = [
   ['fleet_fcs_view', ['fc_id']],
   ['fleet_holdings_view', 'all'], // several stacks can sit in the same place: compared as whole rows
   ['fleet_item_totals_view', ['item_id', 'hq']],
+  ['fleet_salvage_view', ['cid']],
+  ['fleet_income_view', ['cid']],
+  ['fleet_venture_income_view', ['owner_cid', 'item_id']],
 ];
 
 let n = 0;
@@ -41,9 +44,9 @@ async function scenario(name, fn) {
 // 0/1) and lists (text[], one per line).
 const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorded_at', 'items_seen_at', 'house_last_visited',
   'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
-  'logged_in_at', 'last_sync_at', 'check_at']);
+  'logged_in_at', 'last_sync_at', 'check_at', 'received_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
-  'submarinetracker_found', 'venture_stats_found']);
+  'submarinetracker_found', 'venture_stats_found', 'hq']);
 const LISTS = new Set(['problems']);
 
 // Puts the same rows in both: rows are plain objects, times in Unix seconds.
@@ -131,8 +134,10 @@ function fleet(seed, now) {
   const PARTS = [21792, 21795, 21797, 22527, 23904, 24346, 24349, 24353, 24358, 24361, 24366];
   const t = { companion_character_current: [], character_sort_order: [], companion_submarine_snapshot: [], companion_metric_history: [],
     companion_retainer_lookup: [], companion_character_housing: [], companion_character_login: [], companion_pc_status: [],
-    companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [] };
-  const item = () => (chance(0.1) ? 1000000 : 0) + pick([1, 2, 5, 10155, 10373, 22500, 22507, 40000 + Math.floor(random() * 300)]);
+    companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [], companion_venture_result: [] };
+  const SALVAGE = [22500, 22501, 22502, 22503, 22504, 22505, 22506, 22507];
+  const chests = new Map();
+  const item = () => (chance(0.1) ? 1000000 : 0) + pick([1, 2, 5, 10155, 10373, 22500, 22503, 22504, 22507, 40000 + Math.floor(random() * 300)]);
   let retainerId = 33777097243660300n;
   for (let i = 0; i < 160; i++) {
     const cid = 18014498578000000n + BigInt(i);
@@ -168,6 +173,34 @@ function fleet(seed, now) {
       if (chance(0.3)) t.companion_metric_history.push({ recorded_at: ago(h), subject_type: 'character', subject_id: cid, metric: 'repair_kits', value: kits });
       if (totals && chance(0.25)) t.companion_metric_history.push({ recorded_at: ago(h), subject_type: 'character', subject_id: cid, metric: 'item_qty:10155', value: cer + 100 });
       if (totals && chance(0.25)) t.companion_metric_history.push({ recorded_at: ago(h), subject_type: 'character', subject_id: cid, metric: 'item_qty:10373', value: kits + 7 });
+    }
+    // Salvage coming in and going out, items stored for a new source, salvage taken out of the FC chest at the same
+    // moment, and repair kits: each character at its own moment in the hour, so FC members never share one.
+    const counts = SALVAGE.map(() => Math.floor(random() * 5));
+    let sources = 2;
+    const salvageSpan = chance(0.1) ? 0 : Math.floor(random() * 40 * 24);
+    for (let h = salvageSpan; h >= Math.ceil(behindHours); h--) {
+      const at = ago(h) - i * 0.37;
+      if (chance(0.03)) t.companion_metric_history.push({ recorded_at: at, subject_type: 'character', subject_id: cid, metric: 'inventory_sources', value: ++sources });
+      for (const [k, id] of SALVAGE.entries()) {
+        if (!chance(0.06)) continue;
+        const before = counts[k];
+        counts[k] = chance(0.7) ? counts[k] + 1 + Math.floor(random() * 4) : Math.max(0, counts[k] - Math.floor(random() * 6));
+        if (fc && counts[k] > before && chance(0.3)) {
+          const had = chests.get(`${fc}|${id}`) ?? 20;
+          const left = Math.max(0, had - Math.floor(random() * 4));
+          chests.set(`${fc}|${id}`, left);
+          t.companion_metric_history.push({ recorded_at: at, subject_type: 'fc', subject_id: fc, metric: `item_qty:${id}`, value: left });
+        }
+        t.companion_metric_history.push({ recorded_at: at, subject_type: 'character', subject_id: cid, metric: `item_qty:${id}`, value: counts[k] });
+      }
+    }
+    // Venture rewards over the last 40 days.
+    const rewards = chance(0.6) ? Math.floor(random() * 40) : 0;
+    for (let r = 0; r < rewards; r++) {
+      t.companion_venture_result.push({ owner_cid: chance(0.05) ? 999n + BigInt(i) : cid, retainer_name: `Ret${i}-${Math.floor(random() * 4)}`,
+        received_at: ago(random() * 40 * 24) - r * 0.01, item_id: pick([5111, 6000, 22500, 22506, 40000 + Math.floor(random() * 50)]), hq: chance(0.2),
+        quantity: 1 + Math.floor(random() * 20), venture_id: chance(0.2) ? null : Math.floor(random() * 800) });
     }
     // As the plugin does at a sync: values recorded at exactly the moment the character last synced.
     if (chance(0.5)) {
@@ -228,13 +261,17 @@ function fleet(seed, now) {
 }
 
 const SETTINGS = [
-  { low_ceruleum_threshold: 100, low_repair_kit_threshold: 10, supply_window_days: 14, restock_target_days: 14, not_synced_after_minutes: 30, house_warn_days: 7 },
-  { low_ceruleum_threshold: 0, low_repair_kit_threshold: 0, supply_window_days: 3, restock_target_days: 30, not_synced_after_minutes: 10, house_warn_days: 1 },
+  { low_ceruleum_threshold: 100, low_repair_kit_threshold: 10, supply_window_days: 14, restock_target_days: 14, not_synced_after_minutes: 30, house_warn_days: 7,
+    income_window_days: 7, repair_kit_cost: 1730 },
+  { low_ceruleum_threshold: 0, low_repair_kit_threshold: 0, supply_window_days: 3, restock_target_days: 30, not_synced_after_minutes: 10, house_warn_days: 1,
+    income_window_days: 3, repair_kit_cost: 0 },
   // Odd values: a threshold with a fraction (the warning text rounds it), a window that isn't a choice (14 instead),
   // a restock with a fraction, a not-synced setting that isn't whole (30 instead), a house warning out of range (7).
-  { low_ceruleum_threshold: 2500.5, low_repair_kit_threshold: 150.5, supply_window_days: 5, restock_target_days: 45.5, not_synced_after_minutes: 30.5, house_warn_days: 50 },
-  { low_ceruleum_threshold: 900, low_repair_kit_threshold: 90, supply_window_days: 30, restock_target_days: 1, not_synced_after_minutes: 1440, house_warn_days: 44 },
-  { low_ceruleum_threshold: 400, supply_window_days: 7, restock_target_days: 90 }, // some unset: their defaults
+  { low_ceruleum_threshold: 2500.5, low_repair_kit_threshold: 150.5, supply_window_days: 5, restock_target_days: 45.5, not_synced_after_minutes: 30.5, house_warn_days: 50,
+    income_window_days: 5, repair_kit_cost: 1999.5 },
+  { low_ceruleum_threshold: 900, low_repair_kit_threshold: 90, supply_window_days: 30, restock_target_days: 1, not_synced_after_minutes: 1440, house_warn_days: 44,
+    income_window_days: 30, repair_kit_cost: 2500 },
+  { low_ceruleum_threshold: 400, supply_window_days: 7, restock_target_days: 90, income_window_days: 14 }, // some unset: their defaults
 ];
 
 (async () => {

@@ -2,7 +2,7 @@
 // on a real Postgres: fleet_supplies_view against what the Supplies tab works out (ipc/supplies.js: metricWindow,
 // usageRate, runway, restockAmount), fleet_subs_view against the Subs tab's part letters and status, and
 // fleet_summary_view against counts made here; 2.x's Roster, Retainers and PCs views (fleet_roster_view against
-// characters/roster-warnings.js and the Roster's house text, the others against what their tabs read). Hand-made cases first, then a few hundred random histories. Set
+// characters/roster-warnings.js and the Roster's house text, the others against what their tabs read); and the Salvage, Income and venture views against the Salvage and Income tabs' own working out, run here (ipc/inventory.js, ipc/income.js). Hand-made cases first, then a few hundred random histories. Set
 // PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE for a scratch server, as its administrator: it makes and drops a
 // database named fleet_views_check.
 const fs = require('fs');
@@ -20,6 +20,24 @@ const { fcDirectorySql, fcDirectoryRows } = require('../../characters/fc-directo
 const { buildSnapshotFragments } = require('../../db/snapshot-fragments');
 const { placeLabel, MONEY_CONTAINERS } = require('../../characters/item-locations');
 const { chestHolders } = require('../../characters/fc-chest');
+const { ventureTotals } = require('../../subs/loot');
+const Module = require('module');
+
+// The Salvage and Income tabs' own working out (ipc/inventory.js get-salvage, ipc/income.js loadIncome), run here on
+// the check's database: Electron is stood in for (they register their calls with it when loaded) and their database
+// connection is the check's own.
+const handlers = new Map();
+let appClient = null;
+const original = Module._load;
+Module._load = function load(request, ...rest) {
+  if (request === 'electron') return { ipcMain: { handle(name, fn) { handlers.set(name, fn); } }, app: { getPath: () => '.', getVersion: () => '0' }, safeStorage: {}, BrowserWindow: { getAllWindows: () => [] } };
+  return original.call(this, request, ...rest);
+};
+const appDb = require('../../db');
+appDb.withClient = async (fn, onError) => { try { return await fn(appClient); } catch (e) { if (onError) return onError(e); throw e; } };
+const { SALVAGE_PRICES } = require('../../ipc/inventory');
+const { loadIncome } = require('../../ipc/income');
+Module._load = original;
 
 let n = 0;
 async function scenario(name, fn) {
@@ -83,6 +101,48 @@ async function history(client, rows) {
   [rows.map((r) => r.cid), rows.map((r) => r.metric), rows.map((r) => r.at), rows.map((r) => r.value)]);
 }
 
+// Inserts history rows for Free Companies [{ fc, metric, at (ms), value }].
+async function fcHistory(client, rows) {
+  if (!rows.length) return;
+  await client.query(`INSERT INTO companion_metric_history (subject_type, subject_id, metric, recorded_at, value)
+    SELECT 'fc', fc, metric, to_timestamp(at / 1000.0), value FROM unnest($1::numeric[], $2::text[], $3::float8[], $4::numeric[]) AS t(fc, metric, at, value)`,
+  [rows.map((r) => r.fc), rows.map((r) => r.metric), rows.map((r) => r.at), rows.map((r) => r.value)]);
+}
+
+// What the Income tab works out for each character with subs (ipc/income.js loadIncome; the view leaves out its Fight
+// Club expected figures), by cid.
+async function appIncome(client) {
+  appClient = client;
+  const result = await loadIncome(client);
+  return { out: new Map(result.rows.map((r) => [String(r.cid), r])), windowDays: result.windowDays, kitCost: result.kitCost };
+}
+
+async function compareIncome(client) {
+  const { out, windowDays, kitCost } = await appIncome(client);
+  const rows = (await client.query('SELECT * FROM fleet_income_view')).rows;
+  assert.strictEqual(rows.length, out.size, 'one row per character with subs');
+  let enough = 0;
+  for (const r of rows) {
+    const e = out.get(String(r.cid));
+    assert.ok(e, `character ${r.cid} has subs`);
+    assert.strictEqual(r.window_days, windowDays);
+    assert.strictEqual(Number(r.kit_cost), kitCost);
+    assert.strictEqual(r.enough, e.enough, `${r.cid}: enough history (view ${r.span_days}, app ${e.spanDays})`);
+    // The app's clock and the database's differ by a moment: allow a few seconds.
+    assert.ok(Math.abs(Number(r.span_days) - e.spanDays) < 1e-4, `${r.cid}: span ${r.span_days} against ${e.spanDays}`);
+    if (!e.enough) continue;
+    enough++;
+    const got = { pieces: Number(r.pieces), fromChest: Number(r.from_chest), firstStored: Number(r.first_stored), salvageGil: Number(r.salvage_gil),
+      kitsUsed: Number(r.kits_used), kitGil: Number(r.kit_gil), net: Number(r.net) };
+    const want = { pieces: e.pieces, fromChest: e.fromChest, firstStored: e.firstStored, salvageGil: e.salvageGil, kitsUsed: e.kitsUsed, kitGil: e.kitGil, net: e.net };
+    assert.deepStrictEqual(got, want, `${r.cid}`);
+    for (const [col, field] of [['per_day', 'perDay'], ['salvage_per_day', 'salvagePerDay'], ['kit_per_day', 'kitPerDay']]) {
+      assert.ok(Math.abs(r[col] - e[field]) <= 1e-4 * Math.max(1, Math.abs(e[field])), `${r.cid} ${col}: view ${r[col]}, app ${e[field]}`);
+    }
+  }
+  return { rows: rows.length, enough };
+}
+
 async function character(client, cid, { name = `C${cid}`, ceruleum = 0, repairKits = 0, syncedHoursAgo = 0, subs = true, label = 'acct1' } = {}) {
   await client.query(`INSERT INTO companion_character_current (cid, name, world, account_label, ceruleum, repair_kits, last_synced_at)
     VALUES ($1, $2, 'Maduin', $3, $4, $5, now() - make_interval(secs => $6))`, [cid, name, label, ceruleum, repairKits, syncedHoursAgo * 3600]);
@@ -100,10 +160,16 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   await admin.query(`CREATE DATABASE ${NAME}`);
   const client = new Client({ host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: NAME });
   await client.connect();
-  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets, companion_fc_inventory_snapshot');
+  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets, companion_fc_inventory_snapshot, companion_venture_result');
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
+    // The game data columns the Salvage and Income tabs read (a new database has the tables, empty, without them); the
+    // views read none of them.
+    await client.query(`ALTER TABLE ffxiv_item ADD COLUMN name text, ADD COLUMN pricelow text;
+      ALTER TABLE ffxiv_submarineexploration ADD COLUMN location text;
+      ALTER TABLE ffxiv_submarinerank ADD COLUMN speed_bonus text, ADD COLUMN range_bonus text;
+      ALTER TABLE ffxiv_submarinepart ADD COLUMN class text, ADD COLUMN slot text, ADD COLUMN speed text, ADD COLUMN range text`);
     const now = Date.now();
     const ago = (h) => now - h * HOUR;
 
@@ -478,6 +544,167 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       }
       const totals = (await client.query('SELECT * FROM fleet_item_totals_view')).rows;
       assert.deepStrictEqual(new Map(totals.map((t) => [t.item_id + (t.hq ? 1000000 : 0), Number(t.total)])), app);
+    });
+    await scenario('salvage: what the Salvage tab counts for each character, FC chests on the member it counts them on', async () => {
+      await clear();
+      await character(client, 1, { name: 'Aki', label: 'A' });
+      await character(client, 2, { name: 'Bex', label: 'B' });
+      await character(client, 3, { name: 'Cal', label: 'B' });
+      await character(client, 4, { name: 'Dee', label: 'B' });
+      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 9232379236109516811 WHEN 2 THEN 9232379236109516811 WHEN 3 THEN 12 END');
+      await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 5), (2, 3), (3, 9)');
+      await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, updated_at) VALUES (1, 9232379236109516811, 'Kittehs', 'Bex', now())`);
+      await client.query(`INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES
+        (1, 1, 0, 0, 22500, 3), (1, 1, 0, 1, 22500, 2), (1, 100, 10000, 0, 22507, 1), (1, 1, 4000, 0, 22503, 4), (1, 1, 0, 2, 10155, 9),
+        (2, 2, 0, 0, 22504, 0), (3, 3, 3200, 0, 22506, 1), (77, 77, 0, 0, 22500, 5), (4, 4, 0, 0, 10155, 1)`);
+      await client.query(`INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES
+        (9232379236109516811, 20000, 0, 22501, 10), (9232379236109516811, 20001, 0, 22505, 2), (12, 20000, 0, 22502, 1), (55, 20000, 0, 22502, 8)`);
+      appClient = client;
+      const app = await handlers.get('get-salvage')();
+      assert.ok(app.success, app.error);
+      const rows = (await client.query('SELECT * FROM fleet_salvage_view')).rows;
+      const view = new Map(rows.map((r) => [String(r.cid), r]));
+      assert.deepStrictEqual([...view.keys()].sort(), app.rows.map((r) => String(r.cid)).sort(), 'the same characters (only those holding salvage)');
+      for (const a of app.rows) {
+        const r = view.get(String(a.cid));
+        assert.deepStrictEqual([Number(r.standard), Number(r.extravagant), Number(r.gil), r.name, r.account_label, r.sort_index],
+          [a.standard_total, a.extravagant_total, a.calculated_gil, a.character_name, a.account_label, a.sort_index], a.character_name);
+        const pieces = Object.fromEntries(Object.keys(SALVAGE_PRICES).map((id) => [id, 0]));
+        for (const b of [...a.standard_breakdown, ...a.extravagant_breakdown]) pieces[b.item_id] = b.qty;
+        assert.deepStrictEqual(Object.fromEntries(Object.keys(SALVAGE_PRICES).map((id) => [id, Number(r[`q${id}`])])), pieces, `${a.character_name}: each piece`);
+      }
+      assert.strictEqual(Number(view.get('2').extravagant), 2, 'Bex leads Kittehs, so its chest is counted on Bex');
+    });
+
+    await scenario('income: hand-made cases give what the Income tab gives (chest, first-stored, kits, short history)', async () => {
+      await clear();
+      const at = (h) => ago(h) - 7 * 60 * 1000; // a few minutes off the hour, away from the window's edge
+      await character(client, 1, { name: 'Aki' });
+      await character(client, 2, { name: 'Bex' });
+      await character(client, 3, { name: 'Cal', syncedHoursAgo: 0 });
+      await character(client, 4, { name: 'Dee', subs: false });
+      await client.query('UPDATE companion_character_current SET fc_id = 9232379236109516811 WHERE cid IN (1, 2)');
+      await setting(client, 'repair_kit_cost', 2500);
+      await history(client, [
+        // Aki: 5 came in, 2 more taken out of the chest at the same moment, then 3 seen for the first time.
+        { cid: 1, metric: 'item_qty:22500', at: at(200), value: 4 },
+        { cid: 1, metric: 'item_qty:22500', at: at(100), value: 9 },
+        { cid: 1, metric: 'item_qty:22505', at: at(90), value: 0 },
+        { cid: 1, metric: 'item_qty:22505', at: at(50), value: 4 },
+        { cid: 1, metric: 'item_qty:22500', at: at(20), value: 12 },
+        { cid: 1, metric: 'item_qty:22500', at: at(10), value: 1 },
+        { cid: 1, metric: 'inventory_sources', at: at(100), value: 3 },
+        { cid: 1, metric: 'inventory_sources', at: at(20), value: 4 },
+        { cid: 1, metric: 'repair_kits', at: at(200), value: 50 },
+        { cid: 1, metric: 'repair_kits', at: at(60), value: 41 },
+        { cid: 1, metric: 'repair_kits', at: at(30), value: 60 },
+        { cid: 1, metric: 'repair_kits', at: at(5), value: 55 },
+        // Bex: kits in bags and retainers from before the window, so those count.
+        { cid: 2, metric: 'item_qty:22501', at: at(150), value: 1 },
+        { cid: 2, metric: 'item_qty:22501', at: at(40), value: 6 },
+        { cid: 2, metric: 'item_qty:10373', at: at(190), value: 100 },
+        { cid: 2, metric: 'item_qty:10373', at: at(30), value: 90 },
+        { cid: 2, metric: 'repair_kits', at: at(30), value: 1 },
+        // Cal: under a day of salvage history.
+        { cid: 3, metric: 'item_qty:22500', at: at(10), value: 1 },
+        { cid: 3, metric: 'item_qty:22500', at: at(2), value: 7 },
+      ]);
+      await fcHistory(client, [
+        { fc: '9232379236109516811', metric: 'item_qty:22505', at: at(90), value: 10 },
+        { fc: '9232379236109516811', metric: 'item_qty:22505', at: at(50), value: 8 },
+      ]);
+      const { rows, enough } = await compareIncome(client);
+      assert.deepStrictEqual([rows, enough], [3, 2], 'Aki, Bex and Cal have subs; Cal has under a day');
+      const aki = (await client.query('SELECT * FROM fleet_income_view WHERE cid = 1')).rows[0];
+      assert.deepStrictEqual([Number(aki.pieces), Number(aki.from_chest), Number(aki.first_stored)], [7, 2, 3], 'Aki: 5 + 2 came in, 2 from the chest, 3 first stored');
+      await setting(client, 'income_window_days', 3);
+      await compareIncome(client);
+      await setting(client, 'income_window_days', 30);
+      await compareIncome(client);
+    });
+
+    await scenario('income: 200 random histories (rises, drops, chest moves, first-time items, late syncs) match the Income tab', async () => {
+      await clear();
+      let seed = 7;
+      const random = () => {
+        seed = (seed + 0x6D2B79F5) | 0;
+        let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+      };
+      const ids = Object.keys(SALVAGE_PRICES);
+      const rows = [];
+      const chest = [];
+      const fcs = ['9232379236109516811', '9232379236109516900', '31'];
+      const chestCount = new Map();
+      for (let cid = 500; cid < 700; cid++) {
+        const fc = random() < 0.7 ? fcs[Math.floor(random() * fcs.length)] : null;
+        const minute = (cid - 500) * 0.25 + 1; // each character syncs at its own moment, so FC members never share one
+        const synced = random() < 0.2 ? random() * 200 : random() * 2;
+        const span = Math.floor(random() * 40 * 24);
+        const counts = Object.fromEntries(ids.map((id) => [id, Math.floor(random() * 5)]));
+        let kits = Math.floor(random() * 200);
+        let sources = 2;
+        const withTotals = random() < 0.5;
+        for (let h = span; h >= Math.ceil(synced); h--) {
+          const t = ago(h) - minute * 60 * 1000;
+          const newSource = random() < 0.03;
+          if (newSource) { sources++; rows.push({ cid, metric: 'inventory_sources', at: t, value: sources }); }
+          for (const id of ids) {
+            if (random() > 0.08) continue;
+            const before = counts[id];
+            if (random() < 0.7) counts[id] += 1 + Math.floor(random() * 4); else counts[id] = Math.max(0, counts[id] - Math.floor(random() * 6));
+            if (fc && counts[id] > before && random() < 0.3) {
+              const key = `${fc}|${id}`;
+              const had = chestCount.get(key) ?? 20;
+              const taken = Math.min(had, Math.floor(random() * 4));
+              chestCount.set(key, had - taken);
+              chest.push({ fc, metric: `item_qty:${id}`, at: t, value: had - taken });
+            }
+            rows.push({ cid, metric: `item_qty:${id}`, at: t, value: counts[id] });
+          }
+          if (random() < 0.2) { kits = random() < 0.1 ? kits + 50 : Math.max(0, kits - Math.floor(random() * 3)); rows.push({ cid, metric: 'repair_kits', at: t, value: kits }); }
+          if (withTotals && random() < 0.2) rows.push({ cid, metric: 'item_qty:10373', at: t, value: kits + 10 });
+          if (random() < 0.02) rows.push({ cid, metric: `item_qty:${ids[0]}`, at: t, value: counts[ids[0]] }); // an hourly reminder
+        }
+        await character(client, cid, { syncedHoursAgo: synced, subs: random() < 0.9 });
+        if (fc) await client.query('UPDATE companion_character_current SET fc_id = $2 WHERE cid = $1', [cid, fc]);
+      }
+      await history(client, rows);
+      await fcHistory(client, chest);
+      await setting(client, 'repair_kit_cost', 1730);
+      for (const w of [7, 3, 14, 30]) {
+        await setting(client, 'income_window_days', w);
+        const { enough } = await compareIncome(client);
+        assert.ok(enough > 50, `enough characters with history to compare (${enough})`);
+      }
+    });
+
+    await scenario('venture income: each character\'s rewards over the window, by item, leaving out characters not in the Roster', async () => {
+      await clear();
+      await character(client, 1, { name: 'Aki', label: 'A' });
+      await character(client, 2, { name: 'Bex', label: 'B' });
+      await setting(client, 'income_window_days', 7);
+      const rewards = [];
+      let k = 0;
+      for (const [owner, retainer, hoursAgo, item, hq, qty] of [
+        [1, 'Ret A', 1, 5111, false, 3], [1, 'Ret A', 2, 5111, true, 2], [1, 'Ret B', 3, 22500, false, 1], [1, 'Ret B', 200, 5111, false, 9],
+        [2, 'Ret C', 10, 6000, false, 1], [2, 'Ret C', 11, 6000, false, 1], [180144985774840040, 'Gone', 5, 6600, false, 67],
+      ]) rewards.push(`(${owner}, '${retainer}', now() - make_interval(secs => ${hoursAgo * 3600 + k++}), ${item}, ${hq}, ${qty})`);
+      await client.query(`INSERT INTO companion_venture_result (owner_cid, retainer_name, received_at, item_id, hq, quantity) VALUES ${rewards.join(', ')}`);
+      const recent = (await client.query(`SELECT * FROM companion_venture_result WHERE received_at > now() - interval '7 days'
+        AND owner_cid IN (SELECT cid FROM companion_character_current)`)).rows;
+      const want = new Map();
+      for (const t of ventureTotals(recent)) {
+        const key = `${t.owner_cid}|${t.item_id}`;
+        want.set(key, (want.get(key) || 0) + t.quantity);
+      }
+      const rows = (await client.query('SELECT * FROM fleet_venture_income_view')).rows;
+      assert.deepStrictEqual(new Map(rows.map((r) => [`${r.owner_cid}|${r.item_id}`, Number(r.quantity)])), want);
+      const aki = rows.filter((r) => String(r.owner_cid) === '1');
+      assert.deepStrictEqual([Number(aki[0].rewards), Number(aki[0].retainers), aki[0].window_days, aki[0].name], [3, 2, 7, 'Aki'], 'Aki: 3 rewards in the window from 2 retainers');
+      assert.strictEqual(rows.find((r) => r.item_id === 22500).salvage_price, 8000, 'salvage at its fixed price');
+      assert.ok(!rows.some((r) => String(r.owner_cid) === '180144985774840040'), 'a removed character is left out');
     });
   } finally {
     await client.end();

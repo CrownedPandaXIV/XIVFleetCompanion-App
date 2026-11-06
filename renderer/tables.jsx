@@ -3,6 +3,13 @@
 
 const { useState, useEffect, useRef } = React;
 
+// Every search box: matches when the text has every word typed, in any order, ignoring case ("diadochos healing"
+// finds "Diadochos Bottoms of Healing"). Nothing typed matches everything.
+function matchesWords(text, query) {
+  const haystack = String(text || '').toLowerCase();
+  return String(query || '').toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
 // Shared resizable-column mechanism, used by every table in the app.
 // Widths persist per-machine (localStorage), keyed by a stable
 // per-table id so different tables' column sets never collide.
@@ -238,7 +245,7 @@ function ColumnPicker({ cols }) {
   }, [open]);
 
   const term = search.trim().toLowerCase();
-  const matching = cols.available.filter((d) => !term || d.label.toLowerCase().includes(term) || (d.group || '').toLowerCase().includes(term));
+  const matching = cols.available.filter((d) => matchesWords(`${d.label} ${d.group || ''}`, term));
   const groups = [];
   for (const d of matching) {
     const name = d.group || 'This table';

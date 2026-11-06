@@ -584,28 +584,39 @@ series AS (
       ORDER BY h.recorded_at DESC LIMIT 1) b
   ) points
 ),
-spans AS (
-  SELECT ch.cid,
-         coalesce(greatest(ch.last_synced_at, (SELECT max(se.at) FROM series se WHERE se.subject_type = 'character' AND se.subject_id = ch.cid)),
-                  now()) AS end_at,
-         greatest(st.window_start, (SELECT min(se.at) FROM series se
-                                    WHERE se.subject_type = 'character' AND se.subject_id = ch.cid AND se.metric LIKE 'item_qty:225%')) AS salvage_from
-  FROM characters ch CROSS JOIN settings st
+-- Per character: its newest value and its first salvage value.
+reach AS (
+  SELECT subject_id AS cid, max(at) AS newest_at,
+         min(CASE WHEN metric LIKE 'item_qty:225%' THEN at END) AS salvage_first,
+         min(CASE WHEN metric = 'item_qty:10373' THEN at END) AS kits_total_first
+  FROM series WHERE subject_type = 'character'
+  GROUP BY subject_id
 ),
 windows AS (
-  SELECT cid, end_at, coalesce(salvage_from, end_at) AS from_at,
-         extract(epoch FROM (end_at - coalesce(salvage_from, end_at))) / 86400 AS span_days
-  FROM spans
+  SELECT ch.cid, ch.fc_id, r.kits_total_first, t.end_at, t.from_at, extract(epoch FROM (t.end_at - t.from_at)) / 86400 AS span_days
+  FROM characters ch CROSS JOIN settings st
+  LEFT JOIN reach r ON r.cid = ch.cid
+  CROSS JOIN LATERAL (
+    SELECT e.end_at, CASE WHEN r.salvage_first IS NOT NULL THEN greatest(st.window_start, r.salvage_first) ELSE e.end_at END AS from_at
+    FROM (SELECT coalesce(greatest(ch.last_synced_at, r.newest_at), now()) AS end_at) e) t
+),
+-- Moments items were stored for a new source, and salvage leaving an FC chest.
+new_sources AS (
+  SELECT DISTINCT subject_id AS cid, at FROM series
+  WHERE subject_type = 'character' AND metric = 'inventory_sources' AND value > prev
+),
+chest_drops AS (
+  SELECT subject_id AS fc_id, metric, at, max(prev - value) AS fell FROM series
+  WHERE subject_type = 'fc' AND prev > value
+  GROUP BY subject_id, metric, at
 ),
 rises AS (
-  SELECT ch.cid, CAST(substring(se.metric FROM 10) AS int) AS item_id, se.at, se.value - se.prev AS amount,
-         EXISTS (SELECT 1 FROM series so WHERE so.subject_type = 'character' AND so.subject_id = ch.cid
-                   AND so.metric = 'inventory_sources' AND so.at = se.at AND so.value > so.prev) AS first_stored,
-         coalesce((SELECT max(fc.prev - fc.value) FROM series fc WHERE fc.subject_type = 'fc' AND fc.subject_id = ch.fc_id
-                     AND fc.metric = se.metric AND fc.at = se.at AND fc.prev > fc.value), 0) AS chest_drop
-  FROM characters ch
-  JOIN windows w ON w.cid = ch.cid
-  JOIN series se ON se.subject_type = 'character' AND se.subject_id = ch.cid AND se.metric LIKE 'item_qty:225%'
+  SELECT w.cid, CAST(substring(se.metric FROM 10) AS int) AS item_id, se.value - se.prev AS amount,
+         ns.cid IS NOT NULL AS first_stored, coalesce(cd.fell, 0) AS chest_drop
+  FROM windows w
+  JOIN series se ON se.subject_type = 'character' AND se.subject_id = w.cid AND se.metric LIKE 'item_qty:225%'
+  LEFT JOIN new_sources ns ON ns.cid = w.cid AND ns.at = se.at
+  LEFT JOIN chest_drops cd ON cd.fc_id = w.fc_id AND cd.metric = se.metric AND cd.at = se.at
   WHERE se.at > w.from_at AND se.value > se.prev
 ),
 salvage AS (
@@ -617,14 +628,16 @@ salvage AS (
   FROM rises r JOIN prices p ON p.item_id = r.item_id
   GROUP BY r.cid
 ),
+-- Which repair kit history: those in bags and retainers when it reaches back to the start, else the bags.
+kit_series AS (
+  SELECT cid, from_at, CASE WHEN kits_total_first <= from_at THEN 'item_qty:10373' ELSE 'repair_kits' END AS metric
+  FROM windows
+),
 kits AS (
-  SELECT w.cid,
-         coalesce((SELECT sum(se.prev - se.value) FROM series se
-                   WHERE se.subject_type = 'character' AND se.subject_id = w.cid AND se.at > w.from_at AND se.prev > se.value
-                     AND se.metric = CASE WHEN EXISTS (SELECT 1 FROM series t WHERE t.subject_type = 'character' AND t.subject_id = w.cid
-                                                         AND t.metric = 'item_qty:10373' AND t.at <= w.from_at)
-                                          THEN 'item_qty:10373' ELSE 'repair_kits' END), 0) AS used
-  FROM windows w
+  SELECT ks.cid, coalesce(sum(CASE WHEN se.at > ks.from_at AND se.prev > se.value THEN se.prev - se.value END), 0) AS used
+  FROM kit_series ks
+  LEFT JOIN series se ON se.subject_type = 'character' AND se.subject_id = ks.cid AND se.metric = ks.metric
+  GROUP BY ks.cid
 )
 SELECT ch.cid, ch.name, ch.world, ch.account_label, ch.sort_index, ch.last_synced_at, ch.subs,
        w.span_days >= 1 AS enough, w.span_days,
@@ -647,6 +660,7 @@ CROSS JOIN settings st;
 
 -- Venture rewards AutoRetainer recorded over the Income window, as the Income tab's Retainer Ventures: one row per
 -- character and item (normal and high quality together), with that character's number of rewards and retainers.
+-- Characters no longer in the Roster are left out (their rewards stay recorded).
 -- The game's vendor price comes from the game's own files in the plugin; salvage_price is the fixed salvage price
 -- (as the app's), NULL for anything else.
 CREATE OR REPLACE VIEW fleet_venture_income_view AS
@@ -661,13 +675,13 @@ rewards AS (
 owners AS (
   SELECT owner_cid, count(*) AS rewards, count(DISTINCT retainer_name) AS retainers FROM rewards GROUP BY owner_cid
 )
-SELECT o.owner_cid, coalesce(c.name, 'Character ' || o.owner_cid) AS name, c.world, c.account_label, so.sort_index,
+SELECT o.owner_cid, c.name, c.world, c.account_label, so.sort_index,
        i.item_id, i.quantity,
        CASE i.item_id WHEN 22500 THEN 8000 WHEN 22501 THEN 9000 WHEN 22502 THEN 10000 WHEN 22503 THEN 13000
                       WHEN 22504 THEN 27000 WHEN 22505 THEN 28500 WHEN 22506 THEN 30000 WHEN 22507 THEN 34500 END AS salvage_price,
        o.rewards, o.retainers, st.window_days
 FROM owners o
 JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
-LEFT JOIN companion_character_current c ON c.cid = o.owner_cid
+JOIN companion_character_current c ON c.cid = o.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
 CROSS JOIN settings st;

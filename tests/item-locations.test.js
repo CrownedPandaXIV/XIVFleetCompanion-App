@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { placeLabel, groupByItem, likePattern } = require('../characters/item-locations');
+const { placeLabel, groupByItem, likePattern, likePatterns } = require('../characters/item-locations');
 
 test('places are named in plain words', () => {
   const label = (kind, container, extra = {}) => placeLabel({ kind, container, ...extra });
@@ -83,4 +83,23 @@ test('items come in name order', () => {
 test('search terms match anywhere, with % and _ taken literally', () => {
   assert.strictEqual(likePattern(' cobalt '), '%cobalt%');
   assert.strictEqual(likePattern('100%_x\\'), '%100\\%\\_x\\\\%');
+});
+
+test('searching word by word: one pattern per word, so every word must be in the name, in any order', () => {
+  assert.deepStrictEqual(likePatterns('  Diadochos   healing '), ['%Diadochos%', '%healing%']);
+  assert.deepStrictEqual(likePatterns('50%'), ['%50\\%%']);
+  assert.deepStrictEqual(likePatterns('   '), []);
+});
+
+test('equipped gear: worn by a character or a retainer, never in an FC chest', () => {
+  const { isEquipped } = require('../characters/item-locations');
+  assert.deepStrictEqual([1000, 1001, 1002, 0, 3200].map((container) => isEquipped({ kind: 'character', container })), [true, true, false, false, false]);
+  assert.deepStrictEqual([11000, 10000, 12002].map((container) => isEquipped({ kind: 'retainer', container })), [true, false, false]);
+  assert.strictEqual(isEquipped({ kind: 'fc', container: 1000 }), false);
+  const [item] = groupByItem([
+    { itemId: 1, name: 'Ring', who: 'Aki', kind: 'character', container: 1000, qty: 1 },
+    { itemId: 1, name: 'Ring', who: 'Aki', kind: 'retainer', container: 11000, retainerName: 'Ret', qty: 1 },
+    { itemId: 1, name: 'Ring', who: 'Aki', kind: 'character', container: 3200, qty: 2 },
+  ]);
+  assert.deepStrictEqual(item.places.map((p) => [p.where, p.equipped]), [['Armoury chest', false], ['Equipped', true], ['Retainer Ret (equipped)', true]]);
 });

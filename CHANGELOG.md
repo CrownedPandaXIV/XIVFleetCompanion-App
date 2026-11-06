@@ -33,6 +33,18 @@ do by hand.
   characters not in the Roster, are left out, and a venture with no end time counts as away. The game reads them every
   30 seconds instead of every 5 minutes, so a retainer caught between two ventures while AutoRetainer sends it out
   again clears within a minute.
+- **Salvage and Income for the game** (plugin 2.0's next pages): the salvage each character holds (with its Free
+  Company chest's, on the same member as the Salvage tab), each character's real net income from its subs over the
+  Income window (salvage that came in, less repair kits used, the same way as the Income tab), and the venture rewards
+  over that window. Fight Club's expected figures come later in 2.x, with routes.
+- **Retainer Ventures leaves out characters no longer in the Roster** (on the Income tab and the Summary's venture
+  income), as Trends does. A removed character showed as a long number with its old rewards; its rewards stay recorded,
+  so adding it back brings them back.
+- **Searching word by word**: every search box (Where is it?, the inventory item searches, the character and Free
+  Company pickers, Parts, Trends and the Columns list) now finds names with every word typed, in any order:
+  "diadochos healing" finds every piece of Diadochos healing gear.
+- **Hide equipped gear** on the Inventory tab's Characters, Fleet totals and Where is it?: leaves out gear being worn by
+  the characters and their retainers. One choice for all three, remembered.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.

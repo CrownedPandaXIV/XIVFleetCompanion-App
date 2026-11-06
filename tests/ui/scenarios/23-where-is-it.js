@@ -3,9 +3,11 @@
 // by that retainer (99); Test Ingot in an FC chest (7). Added for this run: 2 HQ Test Ore in Cal Kitteh
 // 2's saddlebag (counted with the normal ones), 1000 in a currency slot (never searched), 500 in Dara
 // Kitteh 3's bags and 3 in Bex's Free Company chest. Roster order is Bex (acct1), Cal (acct2), Dara
-// (acct0); results follow it and, by default, are grouped by account (acct0, acct1, acct2).
+// (acct0); results follow it and, by default, are grouped by account (acct0, acct1, acct2). Test Log, for searching word
+// by word and "Hide equipped gear": 2 in Dara's bags, 1 she wears and 1 Bex's first retainer wears.
 const CAL = '18014498578000002';
 const DARA = '18014498578000003';
+const BEX = '18014498578000001';
 
 module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, shot } = t;
@@ -32,7 +34,7 @@ module.exports = async (t) => {
   await type('t');
   check(/at least 2 letters/.test(await statusText()), 'one letter asks for more');
 
-  await type('test o');
+  await type('test ore');
   let found = await results();
   await shot('where-is-it');
   check(found.length === 1 && /^Test Ore\s+619 in 6 places$/.test(found[0].title), 'Test Ore: 619 in 6 places: ' + (found[0] && found[0].title));
@@ -62,9 +64,38 @@ module.exports = async (t) => {
 
   await type('TEST');
   found = await results();
-  check(found.map((f) => f.title.split(/\s{2,}|\s(?=\d)/)[0]).join(',') === 'Test Ingot,Test Ore', 'case does not matter, and only held items are listed: ' + found.map((f) => f.title).join(' / '));
+  check(found.map((f) => f.title.split(/\s{2,}|\s(?=\d)/)[0]).join(',') === 'Test Ingot,Test Log,Test Ore', 'case does not matter, and only held items are listed: ' + found.map((f) => f.title).join(' / '));
   const ingot = found.find((f) => f.title.startsWith('Test Ingot'));
   check(ingot && ingot.rows.length === 1 && ingot.rows[0][0] === 'Best Cats (FC)' && ingot.rows[0][2] === 'FC chest tab 2' && ingot.rows[0][3] === '7', 'FC chests show the FC and the tab: ' + JSON.stringify(ingot && ingot.rows));
+
+  // Word by word: every word, in any order.
+  await type('log test');
+  found = await results();
+  check(found.length === 1 && /^Test Log\s+4 in 3 places$/.test(found[0].title), 'the words in any order find Test Log: ' + found.map((f) => f.title).join(' / '));
+  await type('test ore ingot');
+  check(/Nothing held matches/.test(await statusText()), 'a name needs every word');
+
+  // Hide equipped gear: worn gear (on Dara and on Bex's retainer) is left out, and the total with it.
+  await type('log test');
+  const hideBox = `[...document.querySelectorAll('.where-is-it label')].find(l => l.innerText.includes('Hide equipped gear')).querySelector('input')`;
+  await ev(`${hideBox}.click()`);
+  await sleep(300);
+  found = await results();
+  check(found.length === 1 && /^Test Log\s+2 in 1 place$/.test(found[0].title) && found[0].rows.every((r) => !/Equipped|equipped/.test(r.join(' '))),
+    'with Hide equipped gear, only the 2 in the bags: ' + JSON.stringify(found));
+  // The same choice on Fleet: Test Log counts 2 there too, 4 without it.
+  await ev(`[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Fleet').click()`);
+  await waitFor(`!!document.querySelector('input.hide-equipped')`, 'Fleet totals');
+  await sleep(800);
+  const fleetLog = () => ev(`(() => { const tr = [...document.querySelectorAll('tbody tr')].find(r => r.innerText.includes('Test Log')); return tr ? [...tr.children].map((td) => td.innerText.trim()).join(' ') : null; })()`);
+  check(await ev(`document.querySelector('input.hide-equipped').checked`) === true, 'Fleet remembers the choice');
+  check(/Test Log 2$/.test(await fleetLog() || ''), 'Fleet totals without worn gear: ' + await fleetLog());
+  await ev(`document.querySelector('input.hide-equipped').click()`);
+  await sleep(300);
+  check(/Test Log 4$/.test(await fleetLog() || ''), 'Fleet totals with it: ' + await fleetLog());
+  await ev(`[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Where Is It?').click()`);
+  await waitFor(`!!document.querySelector('.where-is-it input')`, 'Where Is It? again');
+  await sleep(300);
 
   await type('100%');
   check(/Nothing held matches/.test(await statusText()), '% is taken literally: ' + await statusText());
@@ -79,11 +110,13 @@ module.exports = async (t) => {
 
 module.exports.before = async (db) => {
   await db.query(`INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES
-    (${CAL}, ${CAL}, 4000, 0, 1005003, 2), (${CAL}, ${CAL}, 2000, 50, 5003, 1000), (${DARA}, ${DARA}, 1, 7, 5003, 500)`);
+    (${CAL}, ${CAL}, 4000, 0, 1005003, 2), (${CAL}, ${CAL}, 2000, 50, 5003, 1000), (${DARA}, ${DARA}, 1, 7, 5003, 500),
+    (${DARA}, ${DARA}, 1, 90, 5004, 2), (${DARA}, ${DARA}, 1000, 90, 5004, 1), (${BEX}, 50000011, 11000, 90, 5004, 1)`);
   await db.query(`INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES (9000001, 20000, 40, 5003, 3)`);
 };
 
 module.exports.after = async (db) => {
   await db.query(`DELETE FROM companion_inventory_snapshot WHERE owner_cid IN (${CAL}, ${DARA}) AND item_id IN (1005003, 5003)`);
+  await db.query(`DELETE FROM companion_inventory_snapshot WHERE item_id = 5004`);
   await db.query(`DELETE FROM companion_fc_inventory_snapshot WHERE fc_id = 9000001 AND item_id = 5003`);
 };

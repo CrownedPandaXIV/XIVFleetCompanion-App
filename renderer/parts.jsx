@@ -200,7 +200,7 @@ function CharacterOverrideInput({ roster, cid, onChange }) {
     query.trim().length === 0
       ? []
       : roster
-          .filter((r) => `${r.name} (${r.world})`.toLowerCase().includes(query.toLowerCase()))
+          .filter((r) => matchesWords(`${r.name} (${r.world})`, query))
           .slice(0, 8);
 
   if (cid) {

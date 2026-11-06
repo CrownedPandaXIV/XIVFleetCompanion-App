@@ -3,7 +3,7 @@ const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
 const fcChestShare = require('../characters/fc-chest');
 const { loadFcDirectory } = require('../characters/fc-directory');
-const { MONEY_CONTAINERS, groupByItem, likePattern } = require('../characters/item-locations');
+const { MONEY_CONTAINERS, groupByItem, likePatterns, isEquipped } = require('../characters/item-locations');
 
 // Salvage piece vendor prices (fixed, not market price) and category
 // split - ported directly from the old n8n Parse Salvage node. Items
@@ -160,6 +160,7 @@ ipcMain.handle('get-character-inventory', async (event, cids) => {
         owner_name: row.owner_name,
         owner_world: row.owner_world,
         location,
+        equipped: isEquipped({ kind: isRetainer ? 'retainer' : 'character', container: row.sorted_container }),
         item_id: row.item_id,
         item_name: row.item_name || `Item ${row.item_id}`,
         quantity: row.quantity
@@ -267,8 +268,10 @@ ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
 ipcMain.handle('get-fleet-inventory-summary', async () => {
   return withClient(async (client) => {
 
+    // equipped: how many are being worn (gear on characters and retainers), for "Hide equipped gear".
     const personalResult = await client.query(`
-      SELECT item_id, SUM(quantity) AS total_quantity
+      SELECT item_id, SUM(quantity) AS total_quantity,
+             SUM(CASE WHEN sorted_container BETWEEN 1000 AND 1001 OR sorted_container = 11000 THEN quantity ELSE 0 END) AS equipped
       FROM companion_inventory_snapshot
       WHERE quantity > 0 AND sorted_container != 2000
       GROUP BY item_id
@@ -282,9 +285,11 @@ ipcMain.handle('get-fleet-inventory-summary', async () => {
     `);
 
     const totalsByItemId = new Map();
+    const equippedByItemId = new Map();
     for (const row of [...personalResult.rows, ...fcResult.rows]) {
       const itemId = row.item_id;
       totalsByItemId.set(itemId, (totalsByItemId.get(itemId) || 0) + Number(row.total_quantity));
+      equippedByItemId.set(itemId, (equippedByItemId.get(itemId) || 0) + (Number(row.equipped) || 0));
     }
 
     const itemIds = Array.from(totalsByItemId.keys());
@@ -298,7 +303,8 @@ ipcMain.handle('get-fleet-inventory-summary', async () => {
       .map((itemId) => ({
         item_id: itemId,
         item_name: nameById.get(itemId) || `Item ${itemId}`,
-        total_quantity: totalsByItemId.get(itemId)
+        total_quantity: totalsByItemId.get(itemId),
+        equipped_quantity: equippedByItemId.get(itemId)
       }))
       .sort((a, b) => b.total_quantity - a.total_quantity);
 
@@ -329,8 +335,8 @@ ipcMain.handle('find-items', async (event, term) => {
       SELECT DISTINCT ${baseId} FROM companion_fc_inventory_snapshot
       WHERE quantity > 0 AND NOT (sorted_container = ANY($1::int[]))`, [MONEY_CONTAINERS]);
     const matched = await client.query(
-      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE $2 ORDER BY name LIMIT $3`,
-      [heldIds.rows.map((r) => String(r.id)), likePattern(text), FIND_LIMIT + 1]);
+      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE ALL($2::text[]) ORDER BY name LIMIT $3`,
+      [heldIds.rows.map((r) => String(r.id)), likePatterns(text), FIND_LIMIT + 1]);
     const more = matched.rows.length > FIND_LIMIT;
     const nameById = new Map(matched.rows.slice(0, FIND_LIMIT).map((r) => [Number(r.id), r.name]));
     const ids = [...nameById.keys()];

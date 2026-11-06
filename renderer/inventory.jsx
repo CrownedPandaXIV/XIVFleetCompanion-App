@@ -12,7 +12,7 @@ function MultiCharacterPicker({ roster, selectedCids, onChange }) {
 
   const matches = roster
     .filter((r) => !selectedCids.includes(r.cid))
-    .filter((r) => `${r.name} (${r.world})`.toLowerCase().includes(query.toLowerCase()));
+    .filter((r) => matchesWords(`${r.name} (${r.world})`, query));
 
   function addCid(cid) {
     onChange([...selectedCids, cid]);
@@ -104,6 +104,28 @@ const FLEET_INV_COLUMN_DEFS = [
   { key: 'quantity', label: 'Total Quantity', cell: (r) => r.total_quantity.toLocaleString(), sort: (r) => r.total_quantity }
 ];
 
+// "Hide equipped gear" (Characters, Fleet totals and Where is it?): leaves out gear being worn by the characters and
+// their retainers. One choice for all three, remembered on this PC.
+function useHideEquipped() {
+  const [hide, setHide] = useState(() => {
+    try { return localStorage.getItem('hideEquippedGear') === 'true'; } catch { return false; }
+  });
+  const change = (value) => {
+    setHide(value);
+    try { localStorage.setItem('hideEquippedGear', String(value)); } catch { /* only a convenience */ }
+  };
+  return [hide, change];
+}
+
+function HideEquippedBox({ hide, onChange }) {
+  return (
+    <label title="Leave out gear being worn by the characters and their retainers">
+      <input type="checkbox" className="hide-equipped" checked={hide} onChange={(e) => onChange(e.target.checked)} />
+      {' '}Hide equipped gear
+    </label>
+  );
+}
+
 function CharacterInventoryTab() {
   const [roster, setRoster] = useState([]);
   const [selectedCids, setSelectedCids] = useState([]);
@@ -111,6 +133,7 @@ function CharacterInventoryTab() {
   const [error, setError] = useState(null);
   const [aggregate, setAggregate] = useState(false);
   const [search, setSearch] = useState('');
+  const [hideEquipped, setHideEquipped] = useHideEquipped();
 
   const sort = useColumnSort();
   const cols = useTableColumns({ tableKey: 'characterInventory', ownDefs: CHAR_INV_COLUMN_DEFS, rows: null, idOf: () => null });
@@ -142,7 +165,7 @@ function CharacterInventoryTab() {
   if (error) return <div className="error">Failed to load: {error}</div>;
 
   const filtered = (rows || []).filter((r) =>
-    search.trim() === '' || r.item_name.toLowerCase().includes(search.toLowerCase())
+    matchesWords(r.item_name, search) && !(hideEquipped && r.equipped)
   );
 
   const displayRows = sort.sortColumn
@@ -201,6 +224,7 @@ function CharacterInventoryTab() {
             <input type="checkbox" checked={aggregate} onChange={(e) => setAggregate(e.target.checked)} />
             {' '}Aggregate totals across selected characters
           </label>
+          <HideEquippedBox hide={hideEquipped} onChange={setHideEquipped} />
           {!aggregate && sort.sortColumn && (
             <button onClick={() => sort.resetSort()}>Reset Sorting</button>
           )}
@@ -225,7 +249,7 @@ function MultiFcPicker({ fcList, selectedFcIds, onChange }) {
 
   const matches = fcList
     .filter((fc) => !selectedFcIds.includes(fc.fc_id))
-    .filter((fc) => `${fc.fc_name} ${fc.member_names.join(' ')} ${fc.world}`.toLowerCase().includes(query.toLowerCase()));
+    .filter((fc) => matchesWords(`${fc.fc_name} ${fc.member_names.join(' ')} ${fc.world}`, query));
 
   function addFcId(id) {
     onChange([...selectedFcIds, id]);
@@ -335,7 +359,7 @@ function FcInventoryTab() {
   if (error) return <div className="error">Failed to load: {error}</div>;
 
   const filtered = (rows || []).filter((r) =>
-    search.trim() === '' || r.item_name.toLowerCase().includes(search.toLowerCase())
+    matchesWords(r.item_name, search)
   );
 
   const displayRows = sort.sortColumn
@@ -416,6 +440,7 @@ function FleetInventoryTab() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [hideEquipped, setHideEquipped] = useHideEquipped();
 
   const sort = useColumnSort();
   const cols = useTableColumns({ tableKey: 'fleetInventory', ownDefs: FLEET_INV_COLUMN_DEFS, rows: null, idOf: () => null });
@@ -433,8 +458,12 @@ function FleetInventoryTab() {
   if (error) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
-  const filtered = rows.filter((r) =>
-    search.trim() === '' || r.item_name.toLowerCase().includes(search.toLowerCase())
+  // Hiding equipped gear counts only what isn't being worn; an item that is only worn drops out.
+  const counted = hideEquipped
+    ? rows.map((r) => ({ ...r, total_quantity: r.total_quantity - (r.equipped_quantity || 0) })).filter((r) => r.total_quantity > 0)
+    : rows;
+  const filtered = counted.filter((r) =>
+    matchesWords(r.item_name, search)
   );
   const displayRows = sort.sortColumn
     ? applyColumnSort(filtered, sort.sortColumn, sort.sortDirection, cols.accessors)
@@ -444,6 +473,7 @@ function FleetInventoryTab() {
     <div>
       <div className="controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <input type="text" placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <HideEquippedBox hide={hideEquipped} onChange={setHideEquipped} />
         {sort.sortColumn && <button onClick={() => sort.resetSort()}>Reset Sorting</button>}
         <ColumnPicker cols={cols} />
       </div>
@@ -487,6 +517,7 @@ function WhereIsItTab() {
   const [error, setError] = useState(null);
   const [searching, setSearching] = useState(false);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
+  const [hideEquipped, setHideEquipped] = useHideEquipped();
   const latest = useRef(0);
 
   useEffect(() => {
@@ -512,6 +543,13 @@ function WhereIsItTab() {
   }, [term]);
 
   const places = (n) => `${n} place${n === 1 ? '' : 's'}`;
+  // Hiding equipped gear leaves out the places where it's being worn, and the items held only as worn gear.
+  const items = result ? (hideEquipped
+    ? result.items.map((item) => {
+      const kept = item.places.filter((p) => !p.equipped);
+      return { ...item, places: kept, total: kept.reduce((t, p) => t + p.qty, 0) };
+    }).filter((item) => item.places.length > 0)
+    : result.items) : [];
   return (
     <div className="where-is-it">
       <div className="controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -521,6 +559,7 @@ function WhereIsItTab() {
           <input type="checkbox" checked={groupByAccountEnabled} onChange={(e) => setGroupByAccountEnabled(e.target.checked)} />
           {' '}Group by account
         </label>
+        <HideEquippedBox hide={hideEquipped} onChange={setHideEquipped} />
         <ColumnPicker cols={whereCols} />
         {searching && <span className="status-inline">Searching...</span>}
       </div>
@@ -530,10 +569,10 @@ function WhereIsItTab() {
       </div>
       {error && <div className="error">Search failed: {error}</div>}
       {term.trim().length < 2 && <div className="status">Type at least 2 letters of an item name.</div>}
-      {result && term.trim().length >= 2 && result.items.length === 0 && !searching && (
-        <div className="status">Nothing held matches "{term.trim()}".</div>
+      {result && term.trim().length >= 2 && items.length === 0 && !searching && (
+        <div className="status">{result.items.length ? `Only equipped gear matches "${term.trim()}".` : `Nothing held matches "${term.trim()}".`}</div>
       )}
-      {result && term.trim().length >= 2 && result.items.map((item) => (
+      {result && term.trim().length >= 2 && items.map((item) => (
         <div key={item.itemId} className="where-item">
           <h3>{item.name} <span className="where-total">{item.total.toLocaleString()} in {places(item.places.length)}</span></h3>
           <table>

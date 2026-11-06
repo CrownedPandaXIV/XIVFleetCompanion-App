@@ -221,9 +221,11 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
     };
   });
 
-  const ventureList = universalis
+  // Characters no longer in the Roster are left out (as on Trends); their recorded rewards stay in the database, so
+  // adding one back brings its history back.
+  const ventureList = (universalis
     ? ventureSummary(ventureRows, { prices, windowDays }).map((v) => ({ ...v, top: topItems(v.items, prices) }))
-    : await ventureValues(client, since, windowDays);
+    : await ventureValues(client, since, windowDays)).filter((v) => byCid.has(v.ownerCid));
 
   // Live prices (Settings → Live Market Prices): the same loot and rewards at the cheapest listing on each
   // character's world, data center and region; items not on the market board at what a vendor pays.

@@ -9,6 +9,8 @@
 --   timestamptz / timestamp                    REAL, Unix seconds (fractions allowed), so times can be subtracted
 --   boolean                                    INTEGER, 0 or 1
 --   text[] (a setup's problems)                TEXT, one per line
+--   companion_metric_history.subject_id       no type: a character's id is kept as a whole number and a Free Company's
+--                                            as text, so each matches the column it's compared with
 --   numeric values and settings                REAL
 
 CREATE TABLE companion_character_current (
@@ -52,7 +54,7 @@ CREATE TABLE companion_submarine_snapshot (
 CREATE TABLE companion_metric_history (
     recorded_at  REAL    NOT NULL,
     subject_type TEXT    NOT NULL,
-    subject_id   INTEGER NOT NULL,
+    subject_id           NOT NULL,
     metric       TEXT    NOT NULL,
     value        REAL    NOT NULL,
     label        TEXT
@@ -162,6 +164,18 @@ CREATE TABLE companion_fc_inventory_snapshot (
     updated_at        REAL,
     PRIMARY KEY (fc_id, sorted_container, sorted_slot_index)
 );
+
+CREATE TABLE companion_venture_result (
+    owner_cid     INTEGER NOT NULL,
+    retainer_name TEXT    NOT NULL,
+    received_at   REAL    NOT NULL,
+    item_id       INTEGER NOT NULL,
+    hq            INTEGER NOT NULL,
+    quantity      INTEGER NOT NULL,
+    venture_id    INTEGER,
+    PRIMARY KEY (owner_cid, retainer_name, received_at, item_id, hq)
+);
+CREATE INDEX companion_venture_result_received_idx ON companion_venture_result (received_at);
 
 CREATE TABLE companion_inventory_type_lookup (
     sorted_container INTEGER PRIMARY KEY,

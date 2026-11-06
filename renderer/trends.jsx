@@ -214,7 +214,7 @@ function TrendSubjectPicker({ items, selection, onAdd, onRemove, noun, latest })
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const chosen = new Set(selection.map((s) => s.id));
-  const matches = items.filter((it) => !chosen.has(it.id) && it.label.toLowerCase().includes(query.toLowerCase())).slice(0, 60);
+  const matches = items.filter((it) => !chosen.has(it.id) && matchesWords(it.label, query)).slice(0, 60);
   const full = selection.length >= TREND_MAX_SERIES;
 
   return (

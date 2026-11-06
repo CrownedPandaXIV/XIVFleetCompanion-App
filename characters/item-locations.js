@@ -26,6 +26,12 @@ const RETAINER_PLACES = [
 
 const inRange = (container, [from, to]) => container >= from && container <= to;
 
+// Gear being worn: by a character (1000, 1001) or by a retainer (11000), for "Hide equipped gear".
+function isEquipped(stack) {
+  const c = Number(stack.container);
+  return stack.kind !== 'fc' && (inRange(c, [1000, 1001]) || c === 11000);
+}
+
 // Where one stack sits, in plain words.
 //   stack: { kind: 'character' | 'retainer' | 'fc', container, containerName, retainerName }
 function placeLabel(stack) {
@@ -92,7 +98,7 @@ function groupByItem(stacks) {
       item.places.push({
         who: s.who, world: s.world || null, account: s.account || null, kind: s.kind, where, qty: s.qty,
         owner: s.owner || s.who, ownerKey, sortIndex: s.sortIndex ?? null, hireOrder: s.hireOrder ?? null,
-        retainerName: s.retainerName || null,
+        retainerName: s.retainerName || null, equipped: isEquipped(s),
       });
     }
   }
@@ -106,4 +112,10 @@ function likePattern(term) {
   return `%${String(term).trim().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
-module.exports = { MONEY_CONTAINERS, placeLabel, groupByItem, likePattern };
+// Searching word by word: one ILIKE pattern per word typed, for `name ILIKE ALL(...)`, so a name matches when it has
+// every word, in any order ("diadochos healing" finds "Diadochos Bottoms of Healing").
+function likePatterns(text) {
+  return String(text).trim().split(/\s+/).filter(Boolean).map(likePattern);
+}
+
+module.exports = { MONEY_CONTAINERS, placeLabel, groupByItem, likePattern, likePatterns, isEquipped };
