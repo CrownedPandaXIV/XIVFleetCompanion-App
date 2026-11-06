@@ -285,7 +285,8 @@ ORDER BY level, kind, weight DESC, subject COLLATE "C";
 -- synced and on which setup it last logged in (only that one syncs it). behind_minutes: how far it is behind its
 -- account when the plugin no longer syncs it (fleet_not_synced_view), else NULL. low_ceruleum / low_repair_kits:
 -- below the low-supply warnings, for characters with a built sub that are still synced (as ipc/roster.js, through
--- characters/roster-warnings.js).
+-- characters/roster-warnings.js). num_sub_slots: the sub slots unlocked; ceruleum_warning / repair_kit_warning: the
+-- warnings themselves (0: off), so the game can colour how close a character is.
 CREATE OR REPLACE VIEW fleet_roster_view AS
 WITH thresholds AS (
   SELECT
@@ -303,7 +304,8 @@ SELECT c.cid, c.name, c.world, c.account_label, so.sort_index,
        CAST(coalesce(b.subs_built, 0) AS int) AS subs_built,
        CAST(floor(extract(epoch FROM ns.behind) / 60) AS int) AS behind_minutes,
        (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.ceruleum, 0) < t.ceruleum) AS low_ceruleum,
-       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.repair_kits, 0) < t.repair_kits) AS low_repair_kits
+       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.repair_kits, 0) < t.repair_kits) AS low_repair_kits,
+       c.num_sub_slots, t.ceruleum AS ceruleum_warning, t.repair_kits AS repair_kit_warning
 FROM companion_character_current c
 CROSS JOIN thresholds t
 LEFT JOIN character_sort_order so ON so.cid = c.cid

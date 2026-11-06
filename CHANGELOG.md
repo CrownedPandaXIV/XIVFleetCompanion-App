@@ -37,6 +37,8 @@ do by hand.
   Company chest's, on the same member as the Salvage tab), each character's real net income from its subs over the
   Income window (salvage that came in, less repair kits used, the same way as the Income tab), and the venture rewards
   over that window. Fight Club's expected figures come later in 2.x, with routes.
+- The Roster's view also gives each character's sub slots and the low-supply warnings themselves, so the game can show
+  subs as dots out of the slots and colour supplies by how close they are to the warnings.
 - **Retainer Ventures leaves out characters no longer in the Roster** (on the Income tab and the Summary's venture
   income), as Trends does. A removed character showed as a long number with its old rewards; its rewards stay recorded,
   so adding it back brings them back.

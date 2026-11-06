@@ -283,7 +283,8 @@ SELECT c.cid, c.name, c.world, c.account_label, so.sort_index,
        CAST(coalesce(b.subs_built, 0) AS INTEGER) AS subs_built,
        CAST(ns.behind / 60 AS INTEGER) AS behind_minutes,
        (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.ceruleum, 0) < t.ceruleum) AS low_ceruleum,
-       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.repair_kits, 0) < t.repair_kits) AS low_repair_kits
+       (coalesce(b.subs_built, 0) > 0 AND ns.cid IS NULL AND coalesce(c.repair_kits, 0) < t.repair_kits) AS low_repair_kits,
+       c.num_sub_slots, t.ceruleum AS ceruleum_warning, t.repair_kits AS repair_kit_warning
 FROM companion_character_current c
 CROSS JOIN thresholds t
 LEFT JOIN character_sort_order so ON so.cid = c.cid
