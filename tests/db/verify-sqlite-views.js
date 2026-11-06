@@ -82,6 +82,16 @@ const same = (a, b) => {
   return a === b;
 };
 
+// How much to buy is rounded up. When the amount before rounding is within a millionth of a whole number, the two
+// databases' arithmetic (PostgreSQL's numeric, SQLite's floating point) can round it either way: a difference of 1
+// there is not a difference in the working out. Anything else still has to match.
+function roundingTie(view, col, pgRow, liteRow) {
+  const m = /^(ceruleum|repair_kits)_restock$/.exec(col);
+  if (view !== 'fleet_supplies_view' || !m || Math.abs(pgRow[col] - liteRow[col]) !== 1) return false;
+  const exact = pgRow[`${m[1]}_per_day`] * pgRow.target_days - pgRow[m[1]];
+  return Math.abs(exact - Math.round(exact)) < 1e-6;
+}
+
 async function compare(pg, lite, view, key) {
   const pgRows = (await pg.query(`SELECT * FROM ${view}`)).rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plain(v)])));
   const stmt = lite.prepare(`SELECT * FROM ${view}`);
@@ -98,6 +108,7 @@ async function compare(pg, lite, view, key) {
   const [p, l] = [order(pgRows), order(liteRows)];
   for (let i = 0; i < p.length; i++) {
     for (const col of Object.keys(p[i])) {
+      if (roundingTie(view, col, p[i], l[i])) continue;
       assert.ok(same(p[i][col], l[i][col]),
         `${view} row ${i + 1} (${(Array.isArray(key) ? key : []).map((k) => `${k} ${p[i][k]}`).join(', ') || 'in order'}), ${col}: PostgreSQL ${JSON.stringify(p[i][col])}, SQLite ${JSON.stringify(l[i][col])}`);
     }
@@ -275,7 +286,9 @@ const SETTINGS = [
           await pg.query('BEGIN');
           try {
             const { rows: [{ at }] } = await pg.query('SELECT extract(epoch FROM now())::float8 AS at');
-            lite.exec(viewsSql.replaceAll("julianday('now')", `(${at} / 86400.0 + 2440587.5)`));
+            // As plain seconds: passing it through a Julian day (as julianday('now') is) would round it by up to 40
+            // microseconds, enough to tip a rounded-up amount over a whole number now and then.
+            lite.exec(viewsSql.replaceAll("((julianday('now') - 2440587.5) * 86400.0)", `(${at})`));
             const counts = [];
             for (const [view, key] of VIEWS) counts.push(`${view.replace(/^fleet_|_view$/g, '')} ${await compare(pg, lite, view, key)}`);
             console.log(`   rows: ${counts.join(', ')}`);
