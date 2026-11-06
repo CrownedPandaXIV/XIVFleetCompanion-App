@@ -97,6 +97,10 @@ do by hand.
 - **Loot per Voyage and the Next Rank forecasts for the plugin:** fleet_voyage_loot_view, fleet_rankup_forecast_view,
   fleet_rankup_history_view and fleet_voyage_returns_view (with SQLite twins). Loot per Voyage picks a sub's character in
   a fixed order. Its gil a voyage and Expected / day are now gold and its value a day green, as in the plugin.
+- **The Shopping List for the plugin:** fleet_shopping_held_view (what's held where, as the Shopping List counts it)
+  and fleet_shopping_progress_view (the ticks), with SQLite twins; the plugin works the list out itself from the game's
+  own recipes. Places holding as many of an item now always list in the same order. The Shopping List's gil is gold,
+  what's still to craft, make, gather or buy amber, and the cheaper of buying or making green, as in the plugin.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row

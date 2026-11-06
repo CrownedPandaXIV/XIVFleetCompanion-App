@@ -49,6 +49,8 @@ const VIEWS = [
   ['fleet_rankup_forecast_view', 'all'],
   ['fleet_rankup_history_view', 'all'],
   ['fleet_voyage_returns_view', 'all'],
+  ['fleet_shopping_held_view', ['item_id', 'who', 'place']],
+  ['fleet_shopping_progress_view', 'all'],
 ];
 
 let n = 0;
@@ -325,6 +327,7 @@ function fleet(seed, now) {
       gil_sub_day: chance(0.1) ? null : Math.floor(random() * 300000), rec_build_notes: pick(['90: SSUC', '95: WUSS++', '100: S+S+U+C+', '', null, 'none']),
       gil_hr: Math.floor(random() * 10000), unmod_min_rank: pick(['90: SSUC', '', null]), min_rank_build: pick(['80: S+S+U+C+', null]) });
   }
+  if (chance(0.7)) t.tier3_settings.push({ setting_key: 'shopping_progress', setting_value: pick(['{}', '{"24348":{"made":1,"outOf":2}}', 'not json']), updated_at: ago(1) });
   t.tier3_settings.push({ setting_key: 'universalis_enabled', setting_value: pick(['true', 'false', 'yes']), updated_at: ago(1) });
   for (const [pc, label] of [['DESKTOP-1', 'A'], ['DESKTOP-1', 'B'], ['LAPTOP', ''], ['DESKTOP-2', 'A'], ['OLD', 'C']]) {
     t.companion_pc_status.push({ pc_name: pc, account_label: label, plugin_version: pick(['2.0.0.11', '1.0.3.4', null]),

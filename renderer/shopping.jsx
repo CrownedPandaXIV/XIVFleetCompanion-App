@@ -27,6 +27,14 @@ function ShoppingPlaces({ places }) {
 }
 
 const shoppingGil = (n) => `${Number(n).toLocaleString()} gil`;
+// Gil in gold, as the plugin shows it.
+function ShoppingGil({ gil }) {
+  return <span className="gil">{shoppingGil(gil)}</span>;
+}
+// What's still to craft, make, gather or buy in amber (none left: dim), as the plugin.
+function ShoppingCount({ n }) {
+  return <strong className={n > 0 ? 'tone-warn' : 'dim'}>{n}</strong>;
+}
 
 // Columns for the Craft first, Gather or buy and Crystals sections: kind 'craft' has Make and Crafter,
 // 'gather' has Short. A vendor's price shows for items a vendor sells.
@@ -38,11 +46,11 @@ function shoppingItemDefs(kind) {
     { key: 'have', label: 'Have', cell: (r) => r.have, sort: (r) => r.have },
     {
       key: 'missing', label: kind === 'craft' ? 'Make' : 'Short',
-      cell: (r) => <><strong>{missing(r)}</strong>{kind === 'craft' && r.yield > 1 && r.crafts > 0 && <span className="shopping-note"> ({r.crafts} crafts of {r.yield})</span>}</>,
+      cell: (r) => <><ShoppingCount n={missing(r)} />{kind === 'craft' && r.yield > 1 && r.crafts > 0 && <span className="shopping-note"> ({r.crafts} crafts of {r.yield})</span>}</>,
       sort: (r) => missing(r),
     },
     ...(kind === 'craft' ? [{ key: 'crafter', label: 'Crafter', cell: (r) => r.job || '?', sort: (r) => r.job }] : []),
-    { key: 'vendor', label: 'Vendor', cell: (r) => (r.vendorPrice ? shoppingGil(r.vendorPrice) : ''), sort: (r) => r.vendorPrice },
+    { key: 'vendor', label: 'Vendor', cell: (r) => (r.vendorPrice ? <ShoppingGil gil={r.vendorPrice} /> : ''), sort: (r) => r.vendorPrice },
     { key: 'held', label: 'Held in', cell: (r) => <ShoppingPlaces places={r.places} />, sortable: false },
   ];
 }
@@ -61,8 +69,8 @@ function ShoppingMarketPrice({ listed, buying, kind }) {
     : undefined;
   return (
     <span title={title}>
-      {shoppingGil(listed.price)}{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}
-      {short && <span className="shopping-note shopping-too-few"> · only {buying.got} of {buying.wanted} listed</span>}
+      <ShoppingGil gil={listed.price} />{kind !== 'world' && listed.world ? <span className="shopping-note"> ({listed.world})</span> : null}
+      {short && <span className="shopping-note shopping-too-few tone-warn"> · only {buying.got} of {buying.wanted} listed</span>}
     </span>
   );
 }
@@ -134,9 +142,9 @@ const SHOPPING_BUY_DEFS = [
   { key: 'item', label: 'Item', locked: true, cell: (r) => r.name, sort: (r) => r.name },
   { key: 'need', label: 'Need', cell: (r) => r.need, sort: (r) => r.need },
   { key: 'have', label: 'Have', cell: (r) => r.have, sort: (r) => r.have },
-  { key: 'buy', label: 'Buy', cell: (r) => <strong>{r.short}</strong>, sort: (r) => r.short },
-  { key: 'price', label: 'Price', cell: (r) => shoppingGil(r.vendorPrice), sort: (r) => r.vendorPrice },
-  { key: 'cost', label: 'Cost', cell: (r) => shoppingGil(r.cost), sort: (r) => r.cost },
+  { key: 'buy', label: 'Buy', cell: (r) => <ShoppingCount n={r.short} />, sort: (r) => r.short },
+  { key: 'price', label: 'Price', cell: (r) => <ShoppingGil gil={r.vendorPrice} />, sort: (r) => r.vendorPrice },
+  { key: 'cost', label: 'Cost', cell: (r) => <ShoppingGil gil={r.cost} />, sort: (r) => r.cost },
   { key: 'held', label: 'Held in', cell: (r) => <ShoppingPlaces places={r.places} />, sortable: false },
 ];
 
@@ -148,7 +156,7 @@ function ShoppingBuyTable({ rows, total, showHeld }) {
   const hidden = rows.length - visible.length;
   return (
     <div className="shopping-section shopping-buy">
-      <h3>Buy from vendors <span className="shopping-total">{shoppingGil(total)}</span> <ColumnPicker cols={cols} /></h3>
+      <h3>Buy from vendors <span className="shopping-total gil">{shoppingGil(total)}</span> <ColumnPicker cols={cols} /></h3>
       <div className="shopping-note">Sold by NPC vendors for gil, so these are not crafted and their materials are not needed.</div>
       {visible.length === 0 ? (
         <div className="status">{rows.length ? 'Everything here is already held.' : 'Nothing on this list is sold by a vendor.'}</div>
@@ -206,7 +214,7 @@ function ShoppingMadeCell({ part, onSave }) {
 // The sub parts to craft; ctx.onSave saves how many are made.
 const SHOPPING_PART_DEFS = [
   { key: 'part', label: 'Part', locked: true, cell: (p) => p.name, sort: (p) => p.name },
-  { key: 'craft', label: 'Craft', cell: (p) => <strong>{p.crafts}</strong>, sort: (p) => p.crafts },
+  { key: 'craft', label: 'Craft', cell: (p) => <strong className={(p.made || 0) >= p.crafts ? 'dim' : 'tone-warn'}>{p.crafts}</strong>, sort: (p) => p.crafts },
   { key: 'crafter', label: 'Crafter', cell: (p) => p.job || '?', sort: (p) => p.job },
   { key: 'made', label: 'Made', td: (p, ctx) => <ShoppingMadeCell part={p} onSave={ctx.onSave} />, sort: (p) => p.made || 0 },
 ];
@@ -219,11 +227,11 @@ const SHOPPING_PART_MARKET_DEFS = [
   {
     key: 'makeCost', label: 'To make',
     cell: (p, ctx) => (p.makeCost !== null && p.makeCost !== undefined
-      ? <span className="shopping-make-cost" title={shoppingMakeTitle(p.makeBreakdown, ctx && ctx.marketKind)}>{shoppingGil(p.makeCost)}</span>
+      ? <span className="shopping-make-cost gil" title={shoppingMakeTitle(p.makeBreakdown, ctx && ctx.marketKind)}>{shoppingGil(p.makeCost)}</span>
       : <span className="shopping-note" title="Some of its materials have no price: not sold by a vendor or listed there.">—</span>),
     sort: (p) => (p.makeCost === null || p.makeCost === undefined ? Infinity : p.makeCost),
   },
-  { key: 'cheaper', label: 'Cheaper', cell: (p) => (p.cheaper === 'buy' ? 'Buy' : p.cheaper === 'make' ? 'Make' : ''), sort: (p) => p.cheaper || '' },
+  { key: 'cheaper', label: 'Cheaper', cell: (p) => (p.cheaper ? <span className="tone-good">{p.cheaper === 'buy' ? 'Buy' : 'Make'}</span> : ''), sort: (p) => p.cheaper || '' },
   SHOPPING_PART_DEFS[3],
 ];
 
@@ -260,8 +268,8 @@ function ShoppingMarketNote({ market, totals }) {
     <div className="shopping-note">
       Market board prices from {market.label}: the cheapest listing of each, leaving out your own retainers'. Totals go up
       the listings from the cheapest, as buying them would.
-      {totals && <> Buying the parts not made yet: <strong>{shoppingGil(totals.parts)}</strong>{missing(totals.partsUnlisted, totals.partsTooFew)}.
-        Buying every material still short: <strong>{shoppingGil(totals.materials)}</strong>{missing(totals.materialsUnlisted, totals.materialsTooFew)}.</>}
+      {totals && <> Buying the parts not made yet: <strong className="gil">{shoppingGil(totals.parts)}</strong>{missing(totals.partsUnlisted, totals.partsTooFew)}.
+        Buying every material still short: <strong className="gil">{shoppingGil(totals.materials)}</strong>{missing(totals.materialsUnlisted, totals.materialsTooFew)}.</>}
       {market.stale && <span> Universalis did not answer ({market.stale.problem}), so some prices are from {new Date(market.stale.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</span>}
     </div>
   );

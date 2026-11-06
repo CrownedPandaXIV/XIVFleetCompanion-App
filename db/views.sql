@@ -14,7 +14,7 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_rankup_forecast_view, fleet_rankup_history_view, fleet_voyage_returns_view, fleet_voyage_loot_view, fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
+DROP VIEW IF EXISTS fleet_shopping_held_view, fleet_shopping_progress_view, fleet_rankup_forecast_view, fleet_rankup_history_view, fleet_voyage_returns_view, fleet_voyage_loot_view, fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
   fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
   fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
   fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
@@ -901,3 +901,35 @@ CREATE OR REPLACE VIEW fleet_voyage_returns_view AS
 SELECT DISTINCT CAST(v.fc_id AS text) AS fc_id, v.sub_name, v.returned_at
 FROM companion_voyage_loot v
 WHERE v.returned_at >= now() - interval '31 days' AND v.sub_name IS NOT NULL;
+
+-- ---- Shopping List (plugin 2.0's Shopping List stage), as the Parts tab's (ipc/shopping.js). The plugin works the list
+-- out itself (ShoppingList.cs) from the Parts views, these two and the game's own recipes. ----
+
+-- What the fleet holds that counts for the Shopping List, as ipc/shopping.js loadHeld: every character's bags,
+-- crystals and saddlebags, its retainers' bags and crystals, and the Free Company chests and crystals (one chest
+-- however many tracked members the FC has). One row per item (high quality counted with normal), who holds it ("Name
+-- (World)", "Character 123" when not known, or the Free Company's name) and where ("Bags", "Crystals", "Saddlebag",
+-- "Retainer Amy", "FC chest").
+CREATE OR REPLACE VIEW fleet_shopping_held_view AS
+SELECT item_id, who, place, CAST(sum(quantity) AS bigint) AS qty
+FROM (
+  SELECT h.item_id, h.quantity,
+         CASE WHEN h.kind = 'fc' THEN h.who
+              WHEN nullif(h.owner_name, '') IS NULL THEN 'Character ' || h.owner_cid
+              ELSE h.owner_name || CASE WHEN nullif(h.world, '') IS NULL THEN '' ELSE ' (' || h.world || ')' END END AS who,
+         CASE WHEN h.kind = 'fc' THEN 'FC chest'
+              WHEN h.kind = 'retainer' THEN 'Retainer ' || coalesce(nullif(h.retainer_name, ''), 'unknown')
+              WHEN h.container BETWEEN 0 AND 3 THEN 'Bags'
+              WHEN h.container = 2001 THEN 'Crystals'
+              ELSE 'Saddlebag' END AS place
+  FROM fleet_holdings_view h
+  WHERE (h.kind = 'character' AND (h.container BETWEEN 0 AND 3 OR h.container IN (2001, 4000, 4001, 4100, 4101)))
+     OR (h.kind = 'retainer' AND (h.container BETWEEN 10000 AND 10006 OR h.container = 12001))
+     OR (h.kind = 'fc' AND (h.container BETWEEN 20000 AND 20010 OR h.container = 22001))
+) held
+GROUP BY item_id, who, place;
+
+-- The Shopping List's ticks (how many of each part on it have been crafted), saved by the app as JSON
+-- (subs/shopping-progress.js): one row, empty when nothing has been ticked.
+CREATE OR REPLACE VIEW fleet_shopping_progress_view AS
+SELECT setting_value AS progress FROM tier3_settings WHERE setting_key = 'shopping_progress';

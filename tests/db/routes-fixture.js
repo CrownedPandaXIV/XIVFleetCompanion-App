@@ -16,10 +16,23 @@ const { Client } = require('pg');
 const Module = require('module');
 
 // ipc/subs.js registers its calls with Electron when loaded: stood in for, as in parts-fixture.js.
+// Its calls are kept, so the Shopping List's (ipc/shopping.js get-shopping-list) can be asked as the window asks it.
+const handlers = new Map();
 const original = Module._load;
 Module._load = function load(request, ...rest) {
-  if (request === 'electron') return { ipcMain: { handle() {} }, app: { getPath: () => '.', getVersion: () => '0' }, safeStorage: {}, BrowserWindow: { getAllWindows: () => [] } };
+  if (request === 'electron') return { ipcMain: { handle(name, fn) { handlers.set(name, fn); } }, app: { getPath: () => '.', getVersion: () => '0' }, safeStorage: {}, BrowserWindow: { getAllWindows: () => [] } };
   return original.call(this, request, ...rest);
+};
+// Stood in for before the rest loads (they take these when loaded): the Shopping List works on this script's database
+// (not the app's saved one) and asks a made-up Universalis (fakeUniversalis below) when Live Market Prices is on.
+const db = require('../../db');
+const universalisSetting = require('../../ipc/universalis');
+let shoppingClient = null;
+let liveMarket = null;
+db.withClient = async (work, onError) => { try { return await work(shoppingClient); } catch (err) { return onError(err); } };
+universalisSetting.liveUniversalis = async (client) => {
+  const { rows } = await client.query("SELECT setting_value FROM tier3_settings WHERE setting_key = 'universalis_enabled'");
+  return rows.length && rows[0].setting_value === 'true' ? liveMarket : null;
 };
 const { loadSubmarinesWithRankUps, loadForecastAccuracy } = require('../../ipc/subs');
 const { computePartsNeeded } = require('../../ipc/parts');
@@ -48,7 +61,60 @@ const VIEWS = {
   forecasts: 'SELECT * FROM fleet_rankup_forecast_view ORDER BY cid, slot, rank, made_at',
   rankHistory: 'SELECT * FROM fleet_rankup_history_view ORDER BY cid, metric, recorded_at',
   returns: 'SELECT * FROM fleet_voyage_returns_view ORDER BY fc_id, sub_name, returned_at',
+  // The Shopping List: what's held where, the ticks and the retainers whose listings aren't the market.
+  shoppingHeld: 'SELECT * FROM fleet_shopping_held_view ORDER BY item_id, who COLLATE "C", place COLLATE "C"',
+  shoppingProgress: 'SELECT * FROM fleet_shopping_progress_view',
+  retainers: 'SELECT retainer_name AS name, world FROM fleet_retainers_view ORDER BY retainer_id',
 };
+
+// A made-up Universalis for the Shopping List's market prices: three data centers in two regions, and listings made
+// up from the place and item (some by the fleet's own retainers, some free or with no quantity, some items not listed
+// at all). Everything it answers is kept in `asked` (place -> item -> listings) for the plugin's tests to answer the same.
+const PLACES = [['Dynamis', 'North-America', ['Maduin', 'Golem', 'Halicarnassus']], ['Aether', 'North-America', ['Siren', 'Jenova']],
+  ['Chaos', 'Europe', ['Omega', 'Moogle']]];
+function fakeUniversalis(ownRetainers) {
+  const places = new Map();
+  for (const [dc, region, worlds] of PLACES) for (const w of worlds) places.set(w.toLowerCase(), { name: w, dc, region });
+  const asked = {};
+  const worldsIn = (scope) => [...places.values()].filter((p) => p.name === scope || p.dc === scope || p.region === scope).map((p) => p.name);
+  return {
+    asked,
+    placesOf: async () => places,
+    listingsIn: async (scope, ids) => {
+      const listings = new Map();
+      asked[scope] = asked[scope] || {};
+      for (const id of [...new Set(ids.map(Number).filter((x) => x > 0))]) {
+        let h = 17;
+        for (const ch of `${scope}|${id}`) h = (h * 31 + ch.charCodeAt(0)) % 1000003;
+        if (h % 7 === 0) continue;
+        const random = randomFrom(h);
+        const pick = (list) => list[Math.floor(random() * list.length)];
+        const isWorld = places.has(String(scope).toLowerCase());
+        const list = Array.from({ length: Math.floor(random() * 5) }, (_, k) => {
+          const world = isWorld ? undefined : pick(worldsIn(scope).length ? worldsIn(scope) : ['Golem']);
+          const own = ownRetainers.length && random() < 0.2 ? pick(ownRetainers) : null;
+          // Now and then exactly a vendor's price (the vendor wins a tie).
+          return { pricePerUnit: random() < 0.05 ? 0 : random() < 0.15 ? pick([15, 120, 999]) : 10 + Math.floor(random() * 5000), quantity: pick([0, 1, 1, 3, 10, 99]), hq: random() < 0.3,
+            retainerName: own ? own.name : `Seller${k}`, ...(world ? { worldName: world } : {}) };
+        });
+        listings.set(id, list);
+        asked[scope][id] = list;
+      }
+      return { listings, stale: null };
+    },
+  };
+}
+
+// How the Shopping List is asked for (Look ahead, Buy from vendors, Prices from), with Live Market Prices off or on.
+const SHOPPING_RUNS = [
+  { live: false, options: { aheadDays: 0 } },
+  { live: false, options: { aheadDays: 14, buyFromVendors: true } },
+  { live: true, options: { aheadDays: 7, priceScope: 'world:Golem' } },
+  { live: true, options: { aheadDays: 0, priceScope: 'region:North-America', buyFromVendors: true } },
+  { live: true, options: { aheadDays: 3 } },
+  { live: true, options: { aheadDays: 14, priceScope: 'dc:Chaos' } },
+  { live: true, options: { aheadDays: 0, priceScope: 'world:Nowhere' } },
+];
 
 // What a vendor pays for the made-up loot that isn't salvage (the app's item table; 99999 has no price).
 const ITEM_PRICES = { 5111: 120, 12500: 3400, 12501: 77 };
@@ -74,7 +140,7 @@ const row = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plai
 
 const TABLES = ['companion_character_current', 'character_sort_order', 'companion_submarine_snapshot', 'sub_craft_toggle', 'sub_build_rules',
   'fight_club_routes', 'fleet_economics_settings', 'companion_metric_history', 'companion_voyage_loot', 'companion_inventory_snapshot',
-  'companion_fc_inventory_snapshot', 'companion_rankup_forecast'];
+  'companion_fc_inventory_snapshot', 'companion_rankup_forecast', 'companion_retainer_lookup', 'companion_character_housing', 'tier3_settings'];
 
 async function insert(client, table, rows) {
   for (let start = 0; start < rows.length; start += 500) {
@@ -117,7 +183,71 @@ function gameData() {
   for (let r = 1; r <= 125; r++) ranks.push({ id: r, speed: 10 + Math.floor(r / 2), range: 5 + Math.floor(r / 3), expToNext: r < 125 ? 5000 + r * 4000 : 0 });
   const parts = [];
   for (let cl = 1; cl <= 10; cl++) for (let sl = 0; sl <= 3; sl++) parts.push({ class: cl, slot: sl, speed: Math.floor(random() * 30) - 5, range: Math.floor(random() * 20) });
-  return { sectors, maps, ranks, parts };
+  return { sectors, maps, ranks, parts, shop: shopData() };
+}
+
+// Made-up crafting data for the Shopping List, in the shape of the game's sheets: every sub part (but one) built at
+// the FC workshop in phases (sequences -> their parts -> their processes, each asking for supply items in sets), the
+// in-between items made from recipes (some with two, the lower id used; one with an empty one first), raw materials
+// and crystals, what gil shops sell and each item's name and vendor price (PriceMid).
+const SHOP_MADE = Array.from({ length: 16 }, (_, k) => 30001 + k);
+const SHOP_RAW = Array.from({ length: 20 }, (_, k) => 31001 + k);
+const SHOP_CRYSTALS = [2, 3, 4, 8, 9, 14, 19];
+function shopData() {
+  const random = randomFrom(4321);
+  const pick = (list) => list[Math.floor(random() * list.length)];
+  const partIds = Object.values(BASE).flatMap((b) => [0, 1, 2, 3].map((k) => b + k)).filter((id) => id !== BASE['Y+'] + 3);
+  const supplyItems = [];
+  const supplyFor = (item) => {
+    let found = supplyItems.find((x) => x.item === item);
+    if (!found) { found = { id: 100 + supplyItems.length, item }; supplyItems.push(found); }
+    return found.id;
+  };
+  const processes = [];
+  const craftParts = [];
+  const sequences = [];
+  for (const [k, id] of partIds.entries()) {
+    const partsOf = [];
+    for (let c = 0; c < 1 + Math.floor(random() * 2); c++) {
+      const procs = [];
+      for (let q = 0; q < 1 + Math.floor(random() * 3); q++) {
+        const n = 1 + Math.floor(random() * 3);
+        const items = Array.from({ length: n }, () => supplyFor(pick([...SHOP_MADE, ...SHOP_MADE, ...SHOP_RAW, 2, 8])));
+        processes.push({ id: 1000 + processes.length, supply: items, perSet: items.map(() => pick([1, 2, 3, 5])), sets: items.map(() => pick([1, 2, 3])) });
+        procs.push(processes[processes.length - 1].id);
+      }
+      craftParts.push({ id: 500 + craftParts.length, procs });
+      partsOf.push(craftParts[craftParts.length - 1].id);
+    }
+    // Now and then a part with a phase asking for nothing (left out), or a second sequence for the same part (the first counts).
+    if (random() < 0.05) craftParts.push({ id: 500 + craftParts.length, procs: [] });
+    sequences.push({ id: 10 + k * 2, result: id, parts: partsOf });
+    if (random() < 0.1) sequences.push({ id: 11 + k * 2, result: id, parts: [craftParts[0].id] });
+  }
+  // In-between items: each made from raw materials, crystals and in-between items made later in the list (so no loops).
+  const recipes = [];
+  for (const [k, id] of SHOP_MADE.entries()) {
+    const later = SHOP_MADE.slice(k + 1);
+    const ingredients = () => {
+      const list = [];
+      for (let n = 0; n < 1 + Math.floor(random() * 4); n++) {
+        const item = later.length && random() < 0.3 ? pick(later) : pick(SHOP_RAW);
+        if (!list.some(([i]) => i === item)) list.push([item, pick([1, 2, 3, 4])]);
+      }
+      list.push([pick(SHOP_CRYSTALS), pick([1, 2, 5])]);
+      return list;
+    };
+    if (random() < 0.15) recipes.push({ id: 20 + k * 3, result: id, yield: 1, craftType: 1, ingredients: [] });
+    recipes.push({ id: 21 + k * 3, result: id, yield: pick([1, 1, 2, 3]), craftType: pick([0, 1, 2, 3, 4, 5, 6, 7, 9]), ingredients: ingredients() });
+    if (random() < 0.3) recipes.push({ id: 22 + k * 3, result: id, yield: 1, craftType: pick([0, 5]), ingredients: ingredients() });
+  }
+  // A recipe for a crystal (so it's made, not gathered) and one for something nothing on the list uses.
+  recipes.push({ id: 9000, result: 2, yield: 3, craftType: 6, ingredients: [[SHOP_RAW[0], 1]] });
+  recipes.push({ id: 9001, result: 39999, yield: 1, craftType: 6, ingredients: [[SHOP_RAW[1], 1]] });
+  const items = [...partIds, ...SHOP_MADE, ...SHOP_RAW, ...SHOP_CRYSTALS]
+    .map((id) => ({ id, name: random() < 0.05 ? null : `Thing ${id}`, priceMid: pick([0, 3, 15, 120, 999, 2400]) }));
+  const gilShop = [...SHOP_RAW, ...SHOP_MADE, ...SHOP_CRYSTALS].filter(() => random() < 0.35);
+  return { sequences, craftParts, processes, supplyItems, recipes, items, gilShop };
 }
 
 async function writeGameData(client, game) {
@@ -128,8 +258,33 @@ async function writeGameData(client, game) {
   await client.query('CREATE TABLE ffxiv_submarinerank (id text, speed_bonus text, range_bonus text, exp_to_next text)');
   await client.query('CREATE TABLE ffxiv_submarinepart (id text, "class" text, slot text, speed text, range text)');
   await client.query('DROP TABLE IF EXISTS ffxiv_item');
-  await client.query('CREATE TABLE ffxiv_item (id text, name text, price_low text)');
-  await insert(client, 'ffxiv_item', Object.entries(ITEM_PRICES).map(([id, price]) => ({ id, name: `Item ${id}`, price_low: String(price) })));
+  await client.query('CREATE TABLE ffxiv_item (id text, name text, price_low text, price_mid text)');
+  await insert(client, 'ffxiv_item', Object.entries(ITEM_PRICES).map(([id, price]) => ({ id, name: `Item ${id}`, price_low: String(price), price_mid: '0' })));
+  // The Shopping List's: the FC workshop's phases, recipes, gil shops and the items' names and vendor prices.
+  const shop = game.shop;
+  await insert(client, 'ffxiv_item', shop.items.map((i) => ({ id: String(i.id), name: i.name, price_low: '0', price_mid: String(i.priceMid) })));
+  const numbered = (prefix, n) => Array.from({ length: n }, (_, i) => `${prefix}_${i}`);
+  await client.query('DROP TABLE IF EXISTS ffxiv_companycraftsequence, ffxiv_companycraftpart, ffxiv_companycraftprocess, ffxiv_companycraftsupplyitem, ffxiv_recipe, ffxiv_gilshopitem');
+  await client.query(`CREATE TABLE ffxiv_companycraftsequence (id text, result_item text, ${numbered('company_craft_part', 8).map((c) => `${c} text`).join(', ')})`);
+  await client.query(`CREATE TABLE ffxiv_companycraftpart (id text, ${numbered('company_craft_process', 3).map((c) => `${c} text`).join(', ')})`);
+  await client.query(`CREATE TABLE ffxiv_companycraftprocess (id text, ${[...numbered('supply_item', 12), ...numbered('set_quantity', 12), ...numbered('sets_required', 12)].map((c) => `${c} text`).join(', ')})`);
+  await client.query('CREATE TABLE ffxiv_companycraftsupplyitem (id text, item text)');
+  await client.query(`CREATE TABLE ffxiv_recipe (id text, craft_type text, item_result text, amount_result text, ${[...numbered('ingredient', 8), ...numbered('amount_ingredient', 8)].map((c) => `${c} text`).join(', ')})`);
+  await client.query('CREATE TABLE ffxiv_gilshopitem (id text, item text)');
+  const slots = (list, n) => Array.from({ length: n }, (_, i) => String(list[i] || 0));
+  await insert(client, 'ffxiv_companycraftsequence', shop.sequences.map((q) => ({ id: String(q.id), result_item: String(q.result),
+    ...Object.fromEntries(numbered('company_craft_part', 8).map((c, i) => [c, slots(q.parts, 8)[i]])) })));
+  await insert(client, 'ffxiv_companycraftpart', shop.craftParts.map((c) => ({ id: String(c.id),
+    ...Object.fromEntries(numbered('company_craft_process', 3).map((col, i) => [col, slots(c.procs, 3)[i]])) })));
+  await insert(client, 'ffxiv_companycraftprocess', shop.processes.map((p) => ({ id: String(p.id),
+    ...Object.fromEntries(numbered('supply_item', 12).map((c, i) => [c, slots(p.supply, 12)[i]])),
+    ...Object.fromEntries(numbered('set_quantity', 12).map((c, i) => [c, slots(p.perSet, 12)[i]])),
+    ...Object.fromEntries(numbered('sets_required', 12).map((c, i) => [c, slots(p.sets, 12)[i]])) })));
+  await insert(client, 'ffxiv_companycraftsupplyitem', shop.supplyItems.map((x) => ({ id: String(x.id), item: String(x.item) })));
+  await insert(client, 'ffxiv_recipe', shop.recipes.map((r) => ({ id: String(r.id), craft_type: String(r.craftType), item_result: String(r.result), amount_result: String(r.yield),
+    ...Object.fromEntries(numbered('ingredient', 8).map((c, i) => [c, String(r.ingredients[i] ? r.ingredients[i][0] : 0)])),
+    ...Object.fromEntries(numbered('amount_ingredient', 8).map((c, i) => [c, String(r.ingredients[i] ? r.ingredients[i][1] : 0)])) })));
+  await insert(client, 'ffxiv_gilshopitem', shop.gilShop.map((id, k) => ({ id: String(262144 + k), item: String(id) })));
   await insert(client, 'ffxiv_submarineexploration', game.sectors.map((s) => ({ id: String(s.id), location: s.location, exp_reward: String(s.expReward),
     survey_durationmin: String(s.surveyMinutes), x: String(s.x), y: String(s.y), z: String(s.z), starting_point: s.starting ? 'True' : 'False', map: String(s.map) })));
   await insert(client, 'ffxiv_submarinemap', game.maps.map((m) => ({ id: String(m.id), name: m.name })));
@@ -162,7 +317,7 @@ function randomFleet(seed, now, game) {
   for (let i = 0; i < 12; i++) {
     const cid = 18014498578000000n + BigInt(i);
     const fc = chance(0.85) ? 9232379236109516800n + BigInt(i % 5) : null;
-    t.companion_character_current.push({ cid, name: `Char${i}`, world: pick(['Maduin', 'Golem']), account_label: pick(['A', 'B', null]), gil: 0, ceruleum: 0,
+    t.companion_character_current.push({ cid, name: `Char${i}`, world: seed === 77 ? (i % 2 ? 'Siren' : 'Maduin') : chance(0.08) ? 'Nowhere' : pick(['Maduin', 'Golem']), account_label: pick(['A', 'B', null]), gil: 0, ceruleum: 0,
       repair_kits: 0, retainer_count: 0, submarine_count: 0, num_sub_slots: 4, fc_id: fc, first_seen_at: new Date(now - 90 * DAY), last_synced_at: new Date(now - 60000) });
     if (chance(0.7)) t.character_sort_order.push({ cid, sort_index: Math.floor(random() * 100) });
     // A few spare parts in its bags, for Look ahead's spares (needed now first, then soonest first).
@@ -170,6 +325,23 @@ function randomFleet(seed, now, game) {
       if (chance(0.5)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: cid, sorted_container: pick([0, 1, 2, 3]), sorted_slot_index: k,
         item_id: BASE[pick(LETTERS)] + pick([0, 1, 2, 3]), quantity: pick([1, 1, 2]), updated_at: new Date(now - 60000) });
     }
+    // For the Shopping List: materials and crystals here and there (normal and high quality), only some of the places
+    // counting (bags, crystals, saddlebags; not what's worn, mail or the armoire), its retainers' (bags and crystals
+    // count; what they wear or sell doesn't) and its FC's name.
+    const material = () => pick([...SHOP_MADE, ...SHOP_RAW, ...SHOP_RAW, ...SHOP_CRYSTALS]) + (chance(0.15) ? 1000000 : 0);
+    for (let k = 0; k < 8; k++) {
+      if (chance(0.6)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: cid, sorted_container: pick([0, 1, 2, 3, 2001, 4000, 4001, 4100, 4101, 1000, 2003, 2500]),
+        sorted_slot_index: 100 + k, item_id: material(), quantity: pick([1, 2, 5, 20, 99]), updated_at: new Date(now - 60000) });
+    }
+    for (let r = 0; r < Math.floor(random() * 3); r++) {
+      const retainerId = 7000000n + BigInt(i * 10 + r);
+      t.companion_retainer_lookup.push({ retainer_id: retainerId, owner_cid: cid, name: chance(0.1) ? '' : pick([`Amy${i}`, `Bo${r}`, 'Cid']) });
+      for (let k = 0; k < 4; k++) {
+        if (chance(0.6)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: retainerId, sorted_container: pick([10000, 10003, 10006, 12001, 11000, 12002]),
+          sorted_slot_index: k, item_id: material(), quantity: pick([1, 3, 10, 50]), updated_at: new Date(now - 60000) });
+      }
+    }
+    if (fc && chance(0.8)) t.companion_character_housing.push({ cid, fc_id: fc, fc_name: chance(0.2) ? null : `Company ${fc % 100n}`, updated_at: new Date(now - (i + 1) * 60000) });
     const subs = 1 + Math.floor(random() * 4);
     for (let s = 1; s <= subs; s++) {
       const name = chance(0.3) ? `Sub ${s}` : `Submersible-${s}`;
@@ -252,6 +424,22 @@ function randomFleet(seed, now, game) {
         item_id: BASE[pick(LETTERS)] + pick([0, 1, 2, 3]), quantity: pick([1, 2]), updated_at: new Date(now - 60000) });
     }
   }
+  for (let f = 0; f < 5; f++) {
+    for (let k = 0; k < 5; k++) {
+      if (chance(0.5)) t.companion_fc_inventory_snapshot.push({ fc_id: 9232379236109516800n + BigInt(f), sorted_container: pick([20000, 20005, 20010, 22001, 21000]),
+        sorted_slot_index: 100 + k, item_id: pick([...SHOP_MADE, ...SHOP_RAW, ...SHOP_CRYSTALS]) + (chance(0.1) ? 1000000 : 0), quantity: pick([1, 4, 30, 999]),
+        updated_at: new Date(now - 60000) });
+    }
+  }
+  // Parts already ticked off on the Shopping List, some with a Look ahead (and one the Parts page doesn't offer).
+  const ticks = {};
+  for (let k = 0; k < 12; k++) {
+    const id = BASE[pick(LETTERS)] + pick([0, 1, 2, 3]);
+    const ahead = pick([0, 0, 3, 7, 14, 5]);
+    const outOf = 1 + Math.floor(random() * 4);
+    ticks[id] = ahead ? { made: 1 + Math.floor(random() * outOf), outOf, ahead } : { made: 1 + Math.floor(random() * outOf), outOf };
+  }
+  if (chance(0.85)) t.tier3_settings.push({ setting_key: 'shopping_progress', setting_value: JSON.stringify(ticks) });
   if (chance(0.8)) t.fleet_economics_settings.push({ setting_key: 'repair_kit_cost', setting_value: pick([0, 1730, 2500.5]) });
   if (chance(0.8)) t.fleet_economics_settings.push({ setting_key: 'income_window_days', setting_value: pick([3, 7, 14, 30, 5]) });
   return t;
@@ -325,6 +513,23 @@ function randomFleet(seed, now, game) {
       for (const r of [...inputs.characters, ...inputs.subs, ...inputs.history, ...inputs.partsSubs, ...inputs.forecasts, ...inputs.rankHistory]) r.cid = String(r.cid);
       for (const r of inputs.spares) { if (r.cid !== null) r.cid = String(r.cid); if (r.retainer_id !== null) r.retainer_id = String(r.retainer_id); }
       for (const r of inputs.rules) if (r.cid_override !== null) r.cid_override = String(r.cid_override);
+      // The Shopping List, asked for each way in turn, each from the same saved ticks (asking saves them reconciled).
+      liveMarket = fakeUniversalis(inputs.retainers.filter((r) => r.name).map((r) => ({ name: r.name, world: r.world })));
+      shoppingClient = client;
+      const shopping = [];
+      const storedTicks = inputs.shoppingProgress.length ? inputs.shoppingProgress[0].progress : null;
+      for (const run of SHOPPING_RUNS) {
+        await client.query(`DELETE FROM tier3_settings WHERE setting_key IN ('universalis_enabled', 'shopping_progress')`);
+        await client.query(`INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('universalis_enabled', $1)`, [String(run.live)]);
+        if (storedTicks !== null) await client.query(`INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('shopping_progress', $1)`, [storedTicks]);
+        Date.now = () => now;
+        try {
+          shopping.push({ ...run, result: await handlers.get('get-shopping-list')(null, run.options) });
+        } finally { Date.now = realNow; }
+      }
+      const listed = shopping.filter((x) => x.result.success && !x.result.empty);
+      console.log(`   Shopping List: ${listed.length} of ${shopping.length} ways with parts to craft (${listed.map((x) => x.result.parts.length).join(', ')} parts), `
+        + `${shopping.filter((x) => x.result.market && x.result.market.scope).length} priced`);
       const methods = {};
       for (const s of subs) methods[s.rank_up.method] = (methods[s.rank_up.method] || 0) + 1;
       console.log(`random fleet ${seed}: ${subs.length} subs, ${subs.filter((s) => s.target_route).length} with a Target Route, `
@@ -333,10 +538,10 @@ function randomFleet(seed, now, game) {
       console.log(`   Look ahead 14 days: ${expectedParts.length} parts, ${expectedParts.filter((p) => p.due_at !== null).length} for builds coming up`);
       console.log(`   Loot per Voyage over ${loot.windowDays} days: ${loot.totals.voyages} voyages, ${loot.subs.length} subs, ${loot.routes.length} routes, ${Math.round(loot.totals.gil)} gil`);
       console.log(`   Next Rank dates checked: ${accuracy.count} (${accuracy.checks.length} listed), off by ${accuracy.averageOff === null ? '-' : (accuracy.averageOff / 3600000).toFixed(1)}h on average`);
-      cases.push({ name: `random fleet ${seed}`, now, inputs, expected, expectedParts, expectedLoot, expectedAccuracy: accuracy });
+      cases.push({ name: `random fleet ${seed}`, now, inputs, expected, expectedParts, expectedLoot, expectedAccuracy: accuracy, shopping, listings: liveMarket.asked });
     }
     if (out) {
-      fs.writeFileSync(out, `${JSON.stringify({ about: 'Written by XIVFleetCompanion-App tests/db/routes-fixture.js: the fleet_route_* views, made-up game data and the app\'s Subs answers for made-up fleets.', game, itemPrices: ITEM_PRICES, cases })}\n`);
+      fs.writeFileSync(out, `${JSON.stringify({ about: 'Written by XIVFleetCompanion-App tests/db/routes-fixture.js: the fleet_route_* views, made-up game data and the app\'s Subs answers for made-up fleets.', game, itemPrices: ITEM_PRICES, places: PLACES, cases })}\n`);
       console.log(`written to ${out}`);
     }
   } finally {

@@ -18,6 +18,8 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_shopping_held_view;
+DROP VIEW IF EXISTS fleet_shopping_progress_view;
 DROP VIEW IF EXISTS fleet_voyage_returns_view;
 DROP VIEW IF EXISTS fleet_rankup_history_view;
 DROP VIEW IF EXISTS fleet_rankup_forecast_view;
@@ -832,3 +834,26 @@ CREATE VIEW fleet_voyage_returns_view AS
 SELECT DISTINCT CAST(v.fc_id AS TEXT) AS fc_id, v.sub_name, v.returned_at
 FROM companion_voyage_loot v
 WHERE v.returned_at >= ((julianday('now') - 2440587.5) * 86400.0) - 31 * 86400.0 AND v.sub_name IS NOT NULL;
+
+-- Shopping List (fleet_shopping_held_view and fleet_shopping_progress_view in db/views.sql).
+CREATE VIEW fleet_shopping_held_view AS
+SELECT item_id, who, place, sum(quantity) AS qty
+FROM (
+  SELECT h.item_id, h.quantity,
+         CASE WHEN h.kind = 'fc' THEN h.who
+              WHEN nullif(h.owner_name, '') IS NULL THEN 'Character ' || h.owner_cid
+              ELSE h.owner_name || CASE WHEN nullif(h.world, '') IS NULL THEN '' ELSE ' (' || h.world || ')' END END AS who,
+         CASE WHEN h.kind = 'fc' THEN 'FC chest'
+              WHEN h.kind = 'retainer' THEN 'Retainer ' || coalesce(nullif(h.retainer_name, ''), 'unknown')
+              WHEN h.container BETWEEN 0 AND 3 THEN 'Bags'
+              WHEN h.container = 2001 THEN 'Crystals'
+              ELSE 'Saddlebag' END AS place
+  FROM fleet_holdings_view h
+  WHERE (h.kind = 'character' AND (h.container BETWEEN 0 AND 3 OR h.container IN (2001, 4000, 4001, 4100, 4101)))
+     OR (h.kind = 'retainer' AND (h.container BETWEEN 10000 AND 10006 OR h.container = 12001))
+     OR (h.kind = 'fc' AND (h.container BETWEEN 20000 AND 20010 OR h.container = 22001))
+) held
+GROUP BY item_id, who, place;
+
+CREATE VIEW fleet_shopping_progress_view AS
+SELECT setting_value AS progress FROM tier3_settings WHERE setting_key = 'shopping_progress';
