@@ -38,6 +38,9 @@ const VIEWS = [
   ['fleet_parts_rules_view', ['id']],
   ['fleet_parts_fight_club_view', ['id']],
   ['fleet_parts_spares_view', 'all'],
+  ['fleet_market_settings_view', []],
+  ['fleet_market_accounts_view', ['account_label']],
+  ['fleet_market_listings_view', ['retainer_id', 'slot']],
 ];
 
 let n = 0;
@@ -49,9 +52,9 @@ async function scenario(name, fn) {
 // 0/1) and lists (text[], one per line).
 const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorded_at', 'items_seen_at', 'house_last_visited',
   'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
-  'logged_in_at', 'last_sync_at', 'check_at', 'received_at']);
+  'logged_in_at', 'last_sync_at', 'check_at', 'received_at', 'first_seen_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
-  'submarinetracker_found', 'venture_stats_found', 'hq', 'craft_enabled', 'is_retainer']);
+  'submarinetracker_found', 'venture_stats_found', 'hq', 'craft_enabled', 'is_retainer', 'stale', 'live_prices']);
 const LISTS = new Set(['problems']);
 
 // Puts the same rows in both: rows are plain objects, times in Unix seconds.
@@ -140,7 +143,7 @@ function fleet(seed, now) {
   const t = { companion_character_current: [], character_sort_order: [], companion_submarine_snapshot: [], companion_metric_history: [],
     companion_retainer_lookup: [], companion_character_housing: [], companion_character_login: [], companion_pc_status: [],
     companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [], companion_venture_result: [],
-    sub_craft_toggle: [], sub_build_rules: [], fight_club_routes: [] };
+    sub_craft_toggle: [], sub_build_rules: [], fight_club_routes: [], companion_market_listing: [], tier3_settings: [] };
   const SALVAGE = [22500, 22501, 22502, 22503, 22504, 22505, 22506, 22507];
   const chests = new Map();
   // Now and then a spare sub part (21792 to 24367, and a number just outside those), for the Parts views.
@@ -254,6 +257,12 @@ function fleet(seed, now) {
             sorted_slot_index: slot, item_id: chance(0.05) ? null : 40000 + Math.floor(random() * 2000), quantity: 1, updated_at: ago(1) });
         }
       }
+      // What it has up for sale, some for months, one seen a moment in the future (a PC's clock ahead).
+      for (let slot = 0; slot < 20; slot++) {
+        if (chance(0.15)) t.companion_market_listing.push({ retainer_id: id, owner_cid: chance(0.05) ? 999n : cid, slot, item_id: chance(0.3) ? pick([22500, 5111, 27800]) : 40000 + Math.floor(random() * 300),
+          quantity: pick([1, 5, 99, 999]), hq: chance(0.3), unit_price: pick([1, 450, 9999, 125000, 4999999]),
+          first_seen_at: chance(0.02) ? now + 300 : ago(random() * 120 * 24 + 0.37), updated_at: ago(1) });
+      }
       if (chance(0.3)) t.retainer_gear_targets.push({ retainer_id: id, target_mode: pick(['level', 'ilvl', null]), target_value: chance(0.2) ? null : Math.floor(random() * 700) + 1,
         only_crafted: chance(0.5), updated_at: ago(3) });
     }
@@ -270,6 +279,7 @@ function fleet(seed, now) {
       gil_sub_day: chance(0.1) ? null : Math.floor(random() * 300000), rec_build_notes: pick(['90: SSUC', '95: WUSS++', '100: S+S+U+C+', '', null, 'none']),
       gil_hr: Math.floor(random() * 10000) });
   }
+  t.tier3_settings.push({ setting_key: 'universalis_enabled', setting_value: pick(['true', 'false', 'yes']), updated_at: ago(1) });
   for (const [pc, label] of [['DESKTOP-1', 'A'], ['DESKTOP-1', 'B'], ['LAPTOP', ''], ['DESKTOP-2', 'A'], ['OLD', 'C']]) {
     t.companion_pc_status.push({ pc_name: pc, account_label: label, plugin_version: pick(['2.0.0.11', '1.0.3.4', null]),
       last_sync_at: pick([ago(0.05), ago(30), ago(90), null]), autoretainer_ready: pick([true, false, null]), allagantools_ready: pick([true, false, null]),
@@ -283,15 +293,15 @@ function fleet(seed, now) {
 
 const SETTINGS = [
   { low_ceruleum_threshold: 100, low_repair_kit_threshold: 10, supply_window_days: 14, restock_target_days: 14, not_synced_after_minutes: 30, house_warn_days: 7,
-    income_window_days: 7, repair_kit_cost: 1730 },
+    income_window_days: 7, repair_kit_cost: 1730, market_stale_days: 7 },
   { low_ceruleum_threshold: 0, low_repair_kit_threshold: 0, supply_window_days: 3, restock_target_days: 30, not_synced_after_minutes: 10, house_warn_days: 1,
-    income_window_days: 3, repair_kit_cost: 0 },
+    income_window_days: 3, repair_kit_cost: 0, market_stale_days: 1 },
   // Odd values: a threshold with a fraction (the warning text rounds it), a window that isn't a choice (14 instead),
   // a restock with a fraction, a not-synced setting that isn't whole (30 instead), a house warning out of range (7).
   { low_ceruleum_threshold: 2500.5, low_repair_kit_threshold: 150.5, supply_window_days: 5, restock_target_days: 45.5, not_synced_after_minutes: 30.5, house_warn_days: 50,
-    income_window_days: 5, repair_kit_cost: 1999.5 },
+    income_window_days: 5, repair_kit_cost: 1999.5, market_stale_days: 2.5 },
   { low_ceruleum_threshold: 900, low_repair_kit_threshold: 90, supply_window_days: 30, restock_target_days: 1, not_synced_after_minutes: 1440, house_warn_days: 44,
-    income_window_days: 30, repair_kit_cost: 2500 },
+    income_window_days: 30, repair_kit_cost: 2500, market_stale_days: 90 },
   { low_ceruleum_threshold: 400, supply_window_days: 7, restock_target_days: 90, income_window_days: 14 }, // some unset: their defaults
 ];
 

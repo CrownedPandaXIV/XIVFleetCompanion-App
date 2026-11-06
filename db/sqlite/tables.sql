@@ -309,3 +309,24 @@ CREATE TABLE fight_club_routes (
     gil_month       REAL,
     repair_times    TEXT
 );
+
+-- What each retainer has up for sale, and since when (the Gil & Market page), and the app's on/off settings (Live
+-- Market Prices: 'universalis_enabled', 'true' or 'false').
+CREATE TABLE companion_market_listing (
+    retainer_id   INTEGER NOT NULL,
+    owner_cid     INTEGER NOT NULL,
+    slot          INTEGER NOT NULL,
+    item_id       INTEGER NOT NULL,
+    quantity      INTEGER NOT NULL,
+    hq            INTEGER NOT NULL,
+    unit_price    INTEGER NOT NULL,
+    first_seen_at REAL    NOT NULL,
+    updated_at    REAL,
+    PRIMARY KEY (retainer_id, slot)
+);
+
+CREATE TABLE tier3_settings (
+    setting_key   TEXT PRIMARY KEY,
+    setting_value TEXT,
+    updated_at    REAL
+);

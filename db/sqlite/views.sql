@@ -18,6 +18,9 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_market_listings_view;
+DROP VIEW IF EXISTS fleet_market_accounts_view;
+DROP VIEW IF EXISTS fleet_market_settings_view;
 DROP VIEW IF EXISTS fleet_parts_spares_view;
 DROP VIEW IF EXISTS fleet_parts_fight_club_view;
 DROP VIEW IF EXISTS fleet_parts_rules_view;
@@ -638,9 +641,9 @@ SELECT o.owner_cid, c.name, c.world, c.account_label, so.sort_index,
        i.item_id, i.quantity,
        CASE i.item_id WHEN 22500 THEN 8000 WHEN 22501 THEN 9000 WHEN 22502 THEN 10000 WHEN 22503 THEN 13000
                       WHEN 22504 THEN 27000 WHEN 22505 THEN 28500 WHEN 22506 THEN 30000 WHEN 22507 THEN 34500 END AS salvage_price,
-       o.rewards, o.retainers, st.window_days
+       o.rewards, o.retainers, st.window_days, i.hq_quantity
 FROM owners o
-JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
+JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity, sum(CASE WHEN hq THEN quantity ELSE 0 END) AS hq_quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
 JOIN companion_character_current c ON c.cid = o.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
 CROSS JOIN settings st;
@@ -687,3 +690,37 @@ FROM companion_fc_inventory_snapshot fc
 WHERE fc.quantity > 0
   AND (fc.item_id BETWEEN 21792 AND 21799 OR fc.item_id BETWEEN 22526 AND 22529 OR fc.item_id BETWEEN 23903 AND 23906
        OR fc.item_id BETWEEN 24344 AND 24367);
+
+-- ---- Gil and the market (db/views.sql has the details) ----
+
+CREATE VIEW fleet_market_settings_view AS
+SELECT coalesce((SELECT CAST(setting_value AS INTEGER) FROM fleet_economics_settings
+                 WHERE setting_key = 'market_stale_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 90), 7) AS stale_days,
+       coalesce((SELECT setting_value = 'true' FROM tier3_settings WHERE setting_key = 'universalis_enabled'), 0) AS live_prices;
+
+CREATE VIEW fleet_market_accounts_view AS
+WITH chars AS (
+  SELECT cid, coalesce(nullif(account_label, ''), 'Ungrouped') AS label, coalesce(gil, 0) AS gil FROM companion_character_current
+),
+rets AS (
+  SELECT c.label, coalesce(r.gil, 0) AS gil FROM companion_retainer_lookup r JOIN chars c ON c.cid = r.owner_cid
+)
+SELECT a.label AS account_label, a.characters, coalesce(b.retainers, 0) AS retainers, a.character_gil, coalesce(b.retainer_gil, 0) AS retainer_gil,
+       a.character_gil + coalesce(b.retainer_gil, 0) AS total
+FROM (SELECT label, count(*) AS characters, sum(gil) AS character_gil FROM chars GROUP BY label) a
+LEFT JOIN (SELECT label, count(*) AS retainers, sum(gil) AS retainer_gil FROM rets GROUP BY label) b ON b.label = a.label;
+
+CREATE VIEW fleet_market_listings_view AS
+WITH ages AS (
+  SELECT l.*, CASE WHEN l.first_seen_at > ((julianday('now') - 2440587.5) * 86400.0) THEN 0
+                   ELSE (((julianday('now') - 2440587.5) * 86400.0) - l.first_seen_at) / 86400.0 END AS age_days
+  FROM companion_market_listing l
+)
+SELECT l.retainer_id, l.owner_cid, l.slot, l.item_id, l.quantity, l.hq, l.unit_price, l.first_seen_at,
+       r.name AS retainer_name, c.name AS owner_name, c.world, c.account_label, so.sort_index,
+       l.unit_price * l.quantity AS value, l.age_days, l.age_days >= st.stale_days AS stale
+FROM ages l
+LEFT JOIN companion_retainer_lookup r ON r.retainer_id = l.retainer_id
+LEFT JOIN companion_character_current c ON c.cid = l.owner_cid
+LEFT JOIN character_sort_order so ON so.cid = l.owner_cid
+CROSS JOIN fleet_market_settings_view st;

@@ -76,6 +76,12 @@ do by hand.
 - The Parts tab reads everything in a fixed order (a character's own spares before its retainers', Sub Rules and Fight
   Club routes as they were made), so the same fleet always gets the same answers: before, which of two identical spares
   it named could depend on the database.
+- **Gil and the market for the game** (plugin 2.0's Gil & Market page): gil per account, every listing with how long
+  it has been up and whether that's unsold for a while (the Gil & Market tab's days), and the Gil & Market settings
+  (those days, and whether Live Market Prices is on). Venture rewards now say how many were high quality, so the game
+  can price them apart as the Income tab does. The plugin asks Universalis itself when Live Market Prices is on, the
+  same way as the app; tests/market-fixture.js runs the app's own Universalis code on canned listings and writes its
+  answers for the plugin's tests to check against.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row

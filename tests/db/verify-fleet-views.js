@@ -37,6 +37,7 @@ const appDb = require('../../db');
 appDb.withClient = async (fn, onError) => { try { return await fn(appClient); } catch (e) { if (onError) return onError(e); throw e; } };
 const { SALVAGE_PRICES } = require('../../ipc/inventory');
 const { loadIncome } = require('../../ipc/income');
+const { loadMarket } = require('../../ipc/details');
 Module._load = original;
 
 let n = 0;
@@ -160,7 +161,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   await admin.query(`CREATE DATABASE ${NAME}`);
   const client = new Client({ host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: NAME });
   await client.connect();
-  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets, companion_fc_inventory_snapshot, companion_venture_result');
+  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets, companion_fc_inventory_snapshot, companion_venture_result, companion_market_listing, tier3_settings');
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
@@ -705,6 +706,54 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.deepStrictEqual([Number(aki[0].rewards), Number(aki[0].retainers), aki[0].window_days, aki[0].name], [3, 2, 7, 'Aki'], 'Aki: 3 rewards in the window from 2 retainers');
       assert.strictEqual(rows.find((r) => r.item_id === 22500).salvage_price, 8000, 'salvage at its fixed price');
       assert.ok(!rows.some((r) => String(r.owner_cid) === '180144985774840040'), 'a removed character is left out');
+      assert.deepStrictEqual(aki.filter((r) => r.item_id === 5111).map((r) => [Number(r.quantity), Number(r.hq_quantity)]), [[5, 2]], 'high quality counted apart');
+    });
+
+    await scenario('gil and market: gil per account and every listing\'s age as the Gil & Market tab (Live Market Prices off)', async () => {
+      await clear();
+      await character(client, 1, { name: 'Aki', label: 'A' });
+      await character(client, 2, { name: 'Bex', label: '' });
+      await character(client, 3, { name: 'Cal', label: null });
+      await client.query('UPDATE companion_character_current SET gil = CASE cid WHEN 1 THEN 1000 WHEN 2 THEN 25 ELSE NULL END');
+      await client.query(`INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name, gil, updated_at) VALUES
+        (501, 1, 'Ret A', 500, now()), (502, 1, 'Ret B', NULL, now()), (503, 2, 'Ret C', 7, now()), (504, 99, 'Orphan', 99999, now())`);
+      let seed = 99;
+      const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const pick = (list) => list[Math.floor(random() * list.length)];
+      const listings = [];
+      for (let i = 0; i < 60; i++) {
+        listings.push(`(${pick([501, 502, 503, 504])}, ${pick([1, 2, 99])}, ${i}, ${pick([5111, 22500, 40001])}, ${pick([1, 7, 99])}, ${pick([true, false])}, ${pick([1, 450, 125000])},
+          now() - make_interval(secs => ${Math.floor(random() * 40 * 86400) + 37}))`);
+      }
+      listings.push(`(501, 1, 99, 5111, 1, false, 10, now() + interval '5 minutes')`); // a PC's clock ahead
+      await client.query(`INSERT INTO companion_market_listing (retainer_id, owner_cid, slot, item_id, quantity, hq, unit_price, first_seen_at) VALUES ${listings.join(', ')}`);
+      for (const days of [null, 3, 2.5, 120, 1]) {
+        await client.query(`DELETE FROM fleet_economics_settings WHERE setting_key = 'market_stale_days'`);
+        if (days !== null) await setting(client, 'market_stale_days', days);
+        await client.query('BEGIN');
+        try {
+          const app = await loadMarket(client);
+          const [st] = (await client.query('SELECT * FROM fleet_market_settings_view')).rows;
+          assert.deepStrictEqual([st.stale_days, st.live_prices], [app.minDays, false], `the days setting ${days}`);
+          const accounts = (await client.query('SELECT * FROM fleet_market_accounts_view ORDER BY account_label')).rows;
+          assert.deepStrictEqual(accounts.map((a) => [a.account_label, Number(a.characters), Number(a.retainers), Number(a.character_gil), Number(a.retainer_gil), Number(a.total)]),
+            app.accounts.map((a) => [a.label, a.characters, a.retainers, a.characterGil, a.retainerGil, a.total]), 'gil per account');
+          const rows = (await client.query('SELECT * FROM fleet_market_listings_view')).rows;
+          assert.strictEqual(rows.length, app.market.totals.listings, 'every listing');
+          assert.strictEqual(rows.reduce((t, r) => t + Number(r.value), 0), app.market.totals.value, 'their value');
+          const stale = rows.filter((r) => r.stale).sort((a, b) => Number(b.age_days) - Number(a.age_days));
+          assert.deepStrictEqual(stale.map((r) => `${r.retainer_id}|${r.slot}`), app.market.stale.map((l) => `${l.retainer_id}|${l.slot}`), 'unsold for a while, oldest first');
+          for (const l of app.market.stale) {
+            const r = rows.find((x) => String(x.retainer_id) === l.retainer_id && x.slot === l.slot);
+            assert.ok(Math.abs(Number(r.age_days) - l.ageDays) < 0.01, `${l.retainer_id}|${l.slot}: age`);
+            assert.deepStrictEqual([r.retainer_name, r.owner_name, r.world, r.account_label], [l.retainer_name, l.owner_name, l.world, l.account_label], `${l.retainer_id}|${l.slot}`);
+          }
+        } finally {
+          await client.query('COMMIT');
+        }
+      }
+      await client.query(`INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('universalis_enabled', 'true')`);
+      assert.strictEqual((await client.query('SELECT live_prices FROM fleet_market_settings_view')).rows[0].live_prices, true, 'Live Market Prices on');
     });
   } finally {
     await client.end();

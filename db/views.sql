@@ -14,7 +14,8 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
+DROP VIEW IF EXISTS fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
+  fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
   fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
   fleet_alerts_view, fleet_summary_view, fleet_retainer_counts_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
 
@@ -665,7 +666,8 @@ CROSS JOIN settings st;
 -- character and item (normal and high quality together), with that character's number of rewards and retainers.
 -- Characters no longer in the Roster are left out (their rewards stay recorded).
 -- The game's vendor price comes from the game's own files in the plugin; salvage_price is the fixed salvage price
--- (as the app's), NULL for anything else.
+-- (as the app's), NULL for anything else. hq_quantity: how many of quantity are high quality (priced apart with live
+-- market prices).
 CREATE OR REPLACE VIEW fleet_venture_income_view AS
 WITH settings AS (
   SELECT window_days, now() - make_interval(days => window_days) AS window_start
@@ -682,9 +684,9 @@ SELECT o.owner_cid, c.name, c.world, c.account_label, so.sort_index,
        i.item_id, i.quantity,
        CASE i.item_id WHEN 22500 THEN 8000 WHEN 22501 THEN 9000 WHEN 22502 THEN 10000 WHEN 22503 THEN 13000
                       WHEN 22504 THEN 27000 WHEN 22505 THEN 28500 WHEN 22506 THEN 30000 WHEN 22507 THEN 34500 END AS salvage_price,
-       o.rewards, o.retainers, st.window_days
+       o.rewards, o.retainers, st.window_days, i.hq_quantity
 FROM owners o
-JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
+JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity, sum(CASE WHEN hq THEN quantity ELSE 0 END) AS hq_quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
 JOIN companion_character_current c ON c.cid = o.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
 CROSS JOIN settings st;
@@ -746,3 +748,43 @@ FROM companion_fc_inventory_snapshot fc
 WHERE fc.quantity > 0
   AND (fc.item_id BETWEEN 21792 AND 21799 OR fc.item_id BETWEEN 22526 AND 22529 OR fc.item_id BETWEEN 23903 AND 23906
        OR fc.item_id BETWEEN 24344 AND 24367);
+
+-- ---- Gil and the market (plugin 2.0's Gil & Market page), as the app's Gil & Market tab (ipc/details.js loadMarket,
+-- characters/market.js). Live prices from Universalis are asked for by the plugin itself, as the app does, and only
+-- when they're on (fleet_market_settings_view). ----
+
+-- The Gil & Market tab's settings: how many days up for sale counts as unsold for a while (1 to 90, 7 by default),
+-- and whether Live Market Prices is on (Settings → General; off by default).
+CREATE OR REPLACE VIEW fleet_market_settings_view AS
+SELECT coalesce((SELECT CAST(setting_value AS int) FROM fleet_economics_settings
+                 WHERE setting_key = 'market_stale_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 90), 7) AS stale_days,
+       coalesce((SELECT setting_value = 'true' FROM tier3_settings WHERE setting_key = 'universalis_enabled'), false) AS live_prices;
+
+-- Gil per account (no account label: "Ungrouped"): its characters' gil and their retainers' (retainers of characters
+-- no longer tracked are left out), as characters/market.js gilByAccount.
+CREATE OR REPLACE VIEW fleet_market_accounts_view AS
+WITH chars AS (
+  SELECT cid, coalesce(nullif(account_label, ''), 'Ungrouped') AS label, coalesce(gil, 0) AS gil FROM companion_character_current
+),
+rets AS (
+  SELECT c.label, coalesce(r.gil, 0) AS gil FROM companion_retainer_lookup r JOIN chars c ON c.cid = r.owner_cid
+)
+SELECT a.label AS account_label, a.characters, coalesce(b.retainers, 0) AS retainers, a.character_gil, coalesce(b.retainer_gil, 0) AS retainer_gil,
+       a.character_gil + coalesce(b.retainer_gil, 0) AS total
+FROM (SELECT label, count(*) AS characters, sum(gil) AS character_gil FROM chars GROUP BY label) a
+LEFT JOIN (SELECT label, count(*) AS retainers, sum(gil) AS retainer_gil FROM rets GROUP BY label) b ON b.label = a.label;
+
+-- Every listing the retainers have up for sale: its retainer and character, value (price each × quantity), how many
+-- days since the plugin first saw it (a repriced listing keeps its time) and whether that's at least the setting's
+-- days (unsold for a while), as characters/market.js listingAges.
+CREATE OR REPLACE VIEW fleet_market_listings_view AS
+SELECT l.retainer_id, l.owner_cid, l.slot, l.item_id, l.quantity, l.hq, l.unit_price, l.first_seen_at,
+       r.name AS retainer_name, c.name AS owner_name, c.world, c.account_label, so.sort_index,
+       l.unit_price * l.quantity AS value,
+       CASE WHEN l.first_seen_at > now() THEN 0 ELSE extract(epoch FROM now() - l.first_seen_at) / 86400 END AS age_days,
+       (CASE WHEN l.first_seen_at > now() THEN 0 ELSE extract(epoch FROM now() - l.first_seen_at) / 86400 END) >= st.stale_days AS stale
+FROM companion_market_listing l
+LEFT JOIN companion_retainer_lookup r ON r.retainer_id = l.retainer_id
+LEFT JOIN companion_character_current c ON c.cid = l.owner_cid
+LEFT JOIN character_sort_order so ON so.cid = l.owner_cid
+CROSS JOIN fleet_market_settings_view st;
