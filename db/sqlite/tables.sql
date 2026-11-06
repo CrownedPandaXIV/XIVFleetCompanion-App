@@ -269,3 +269,43 @@ INSERT INTO companion_inventory_type_lookup (sorted_container, display_name) VAL
     (27010, 'HousingInteriorStoreroom10'),
     (27011, 'HousingInteriorStoreroom11'),
     (27200, 'HousingExteriorStoreroom2');
+
+-- The Parts tab's own settings, made in the app (Parts → Show Rules, and the Subs tab's Craft? box), and Fight
+-- Club's routes (the app's Fight Club import; the plugin-only version will import them itself).
+CREATE TABLE sub_craft_toggle (
+    cid           INTEGER NOT NULL,
+    sub_name      TEXT    NOT NULL,
+    craft_enabled INTEGER NOT NULL DEFAULT 0,
+    updated_at    REAL,
+    PRIMARY KEY (cid, sub_name)
+);
+
+CREATE TABLE sub_build_rules (
+    id           INTEGER PRIMARY KEY,
+    rank         INTEGER NOT NULL,
+    cid_override INTEGER,
+    sub_filter   TEXT,
+    hull         TEXT,
+    stern        TEXT,
+    bow          TEXT,
+    bridge       TEXT,
+    updated_at   REAL
+);
+
+CREATE TABLE fight_club_routes (
+    id              INTEGER PRIMARY KEY,
+    oj_24h_pct      REAL,
+    gil_sub_day     REAL,
+    route           TEXT NOT NULL,
+    hours           REAL,
+    rec_build_notes TEXT,
+    unmod_min_rank  TEXT,
+    min_rank_build  TEXT,
+    gil_sub         REAL,
+    gil_fc          REAL,
+    gil_hr          REAL,
+    gil_day         REAL,
+    gil_week        REAL,
+    gil_month       REAL,
+    repair_times    TEXT
+);

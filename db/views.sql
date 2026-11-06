@@ -14,7 +14,8 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
+DROP VIEW IF EXISTS fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
+  fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
   fleet_alerts_view, fleet_summary_view, fleet_retainer_counts_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
 
 -- A sub part's class letter, from its item number (as subs/submarine-builds.js SUB_PART_CLASS; the test checks
@@ -687,3 +688,61 @@ JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY
 JOIN companion_character_current c ON c.cid = o.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
 CROSS JOIN settings st;
+
+-- ---- The Parts tab's inputs (plugin 2.0 batch 4) ----
+-- Parts are worked out in the plugin (PartsPlanner.cs) the same way as the app's (ipc/parts.js computePartsNeeded),
+-- not in a view: handing out spares one at a time, with a shared FC chest never promising one part twice, is a
+-- step-by-step job a view does badly. These views give the plugin exactly what the app's working out reads, with
+-- item numbers rather than names, in a fixed order. tests/db/verify-fleet-views.js writes a made-up fleet's views
+-- and the app's answers to a file the plugin's tests check its own answers against.
+
+-- Every character: its place in the Roster, its Free Company (as text: the SQLite version keeps it as text) and
+-- how many sub slots its workshop has, and whether its FC has a house (a character with a house but no workshop
+-- yet needs its first sub's parts).
+CREATE OR REPLACE VIEW fleet_parts_characters_view AS
+SELECT c.cid, c.name, c.world, c.account_label, so.sort_index, CAST(c.fc_id AS text) AS fc_id,
+       coalesce(c.num_sub_slots, 0) AS num_sub_slots, coalesce(h.has_house, false) AS has_house
+FROM companion_character_current c
+LEFT JOIN character_sort_order so ON so.cid = c.cid
+LEFT JOIN companion_character_housing h ON h.cid = c.cid;
+
+-- Every built sub with its workshop slot (the slot column, else the number in a default name), rank, the four
+-- parts' item numbers (hull, stern, bow, bridge) and whether it's ticked Craft? (follows Fight Club's builds).
+CREATE OR REPLACE VIEW fleet_parts_subs_view AS
+SELECT s.cid, s.sub_name, coalesce(s.slot, substring(s.sub_name FROM '^Submersible-([1-4])$')::int) AS slot,
+       s.level AS rank, s.part1, s.part2, s.part3, s.part4,
+       coalesce(t.craft_enabled, false) AS craft_enabled
+FROM companion_submarine_snapshot s
+LEFT JOIN sub_craft_toggle t ON t.cid = s.cid AND t.sub_name = s.sub_name
+WHERE s.level > 0;
+
+-- The Sub Rules (the build each sub should have from a rank), in the order they were made.
+CREATE OR REPLACE VIEW fleet_parts_rules_view AS
+SELECT id, rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules;
+
+-- Fight Club's routes with a recommended build, for subs ticked Craft? from rank 85, with the repair kit price from
+-- Settings (0 when not set) for its gil a day after repair kits.
+CREATE OR REPLACE VIEW fleet_parts_fight_club_view AS
+SELECT f.id, f.route, f.hours, f.repair_times, f.gil_sub_day, f.rec_build_notes,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'), 0) AS repair_kit_cost
+FROM fight_club_routes f
+WHERE f.rec_build_notes IS NOT NULL AND f.rec_build_notes <> '';
+
+-- Spare sub parts: in each character's bags (containers 0 to 3) and its retainers' (10000 to 10004), with the
+-- retainer's number and name; and in each Free Company's chest (cid NULL, fc_id set; its tracked members share it). A
+-- character's own stacks come before its retainers', then by container and slot.
+CREATE OR REPLACE VIEW fleet_parts_spares_view AS
+SELECT inv.owner_cid AS cid, CAST(NULL AS text) AS fc_id, (inv.retainer_id <> inv.owner_cid) AS is_retainer, inv.retainer_id,
+       rl.name AS retainer_name, inv.sorted_container, inv.sorted_slot_index, inv.item_id, inv.quantity
+FROM companion_inventory_snapshot inv
+LEFT JOIN companion_retainer_lookup rl ON rl.retainer_id = inv.retainer_id
+WHERE (inv.sorted_container BETWEEN 0 AND 3 OR inv.sorted_container BETWEEN 10000 AND 10004)
+  AND inv.quantity > 0
+  AND (inv.item_id BETWEEN 21792 AND 21799 OR inv.item_id BETWEEN 22526 AND 22529 OR inv.item_id BETWEEN 23903 AND 23906
+       OR inv.item_id BETWEEN 24344 AND 24367)
+UNION ALL
+SELECT NULL, CAST(fc.fc_id AS text), false, NULL, NULL, fc.sorted_container, fc.sorted_slot_index, fc.item_id, fc.quantity
+FROM companion_fc_inventory_snapshot fc
+WHERE fc.quantity > 0
+  AND (fc.item_id BETWEEN 21792 AND 21799 OR fc.item_id BETWEEN 22526 AND 22529 OR fc.item_id BETWEEN 23903 AND 23906
+       OR fc.item_id BETWEEN 24344 AND 24367);

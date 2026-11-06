@@ -18,6 +18,11 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_parts_spares_view;
+DROP VIEW IF EXISTS fleet_parts_fight_club_view;
+DROP VIEW IF EXISTS fleet_parts_rules_view;
+DROP VIEW IF EXISTS fleet_parts_subs_view;
+DROP VIEW IF EXISTS fleet_parts_characters_view;
 DROP VIEW IF EXISTS fleet_venture_income_view;
 DROP VIEW IF EXISTS fleet_income_view;
 DROP VIEW IF EXISTS fleet_salvage_view;
@@ -639,3 +644,46 @@ JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY
 JOIN companion_character_current c ON c.cid = o.owner_cid
 LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
 CROSS JOIN settings st;
+
+-- ---- The Parts tab's inputs (db/views.sql has why: parts are worked out in the plugin) ----
+
+CREATE VIEW fleet_parts_characters_view AS
+SELECT c.cid, c.name, c.world, c.account_label, so.sort_index, c.fc_id,
+       coalesce(c.num_sub_slots, 0) AS num_sub_slots, coalesce(h.has_house, 0) AS has_house
+FROM companion_character_current c
+LEFT JOIN character_sort_order so ON so.cid = c.cid
+LEFT JOIN companion_character_housing h ON h.cid = c.cid;
+
+CREATE VIEW fleet_parts_subs_view AS
+SELECT s.cid, s.sub_name,
+       coalesce(s.slot, CASE WHEN s.sub_name GLOB 'Submersible-[1-4]' THEN CAST(substr(s.sub_name, 13, 1) AS INTEGER) END) AS slot,
+       s.level AS rank, s.part1, s.part2, s.part3, s.part4,
+       coalesce(t.craft_enabled, 0) AS craft_enabled
+FROM companion_submarine_snapshot s
+LEFT JOIN sub_craft_toggle t ON t.cid = s.cid AND t.sub_name = s.sub_name
+WHERE s.level > 0;
+
+CREATE VIEW fleet_parts_rules_view AS
+SELECT id, rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules;
+
+CREATE VIEW fleet_parts_fight_club_view AS
+SELECT f.id, f.route, f.hours, f.repair_times, f.gil_sub_day, f.rec_build_notes,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'), 0) AS repair_kit_cost
+FROM fight_club_routes f
+WHERE f.rec_build_notes IS NOT NULL AND f.rec_build_notes <> '';
+
+CREATE VIEW fleet_parts_spares_view AS
+SELECT inv.owner_cid AS cid, CAST(NULL AS TEXT) AS fc_id, (inv.retainer_id <> inv.owner_cid) AS is_retainer, inv.retainer_id,
+       rl.name AS retainer_name, inv.sorted_container, inv.sorted_slot_index, inv.item_id, inv.quantity
+FROM companion_inventory_snapshot inv
+LEFT JOIN companion_retainer_lookup rl ON rl.retainer_id = inv.retainer_id
+WHERE (inv.sorted_container BETWEEN 0 AND 3 OR inv.sorted_container BETWEEN 10000 AND 10004)
+  AND inv.quantity > 0
+  AND (inv.item_id BETWEEN 21792 AND 21799 OR inv.item_id BETWEEN 22526 AND 22529 OR inv.item_id BETWEEN 23903 AND 23906
+       OR inv.item_id BETWEEN 24344 AND 24367)
+UNION ALL
+SELECT NULL, fc.fc_id, 0, NULL, NULL, fc.sorted_container, fc.sorted_slot_index, fc.item_id, fc.quantity
+FROM companion_fc_inventory_snapshot fc
+WHERE fc.quantity > 0
+  AND (fc.item_id BETWEEN 21792 AND 21799 OR fc.item_id BETWEEN 22526 AND 22529 OR fc.item_id BETWEEN 23903 AND 23906
+       OR fc.item_id BETWEEN 24344 AND 24367);

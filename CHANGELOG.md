@@ -67,6 +67,15 @@ do by hand.
   after its countdown.
 - FC points in aqua, and ceruleum and repair kits that don't count toward the warnings (no sub built, or not synced)
   dim rather than plain.
+- **The Parts tab's inputs for the game** (plugin 2.0's Parts page): every character's sub slots and FC, every built
+  sub's parts and Craft? tick, the Sub Rules, Fight Club's recommended builds with the repair kit price, and every spare
+  sub part in bags, retainers and FC chests. The plugin works the parts out itself, the same way as the Parts tab (a
+  shared FC chest can't give one part twice, which a view does badly); tests/db/parts-fixture.js writes made-up fleets
+  and the Parts tab's answers for the plugin's tests to check against. The one-file (SQLite) version gets the Sub
+  Rules, Craft? and Fight Club tables too.
+- The Parts tab reads everything in a fixed order (a character's own spares before its retainers', Sub Rules and Fight
+  Club routes as they were made), so the same fleet always gets the same answers: before, which of two identical spares
+  it named could depend on the database.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row

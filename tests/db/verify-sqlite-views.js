@@ -33,6 +33,11 @@ const VIEWS = [
   ['fleet_salvage_view', ['cid']],
   ['fleet_income_view', ['cid']],
   ['fleet_venture_income_view', ['owner_cid', 'item_id']],
+  ['fleet_parts_characters_view', ['cid']],
+  ['fleet_parts_subs_view', ['cid', 'sub_name']],
+  ['fleet_parts_rules_view', ['id']],
+  ['fleet_parts_fight_club_view', ['id']],
+  ['fleet_parts_spares_view', 'all'],
 ];
 
 let n = 0;
@@ -46,7 +51,7 @@ const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorde
   'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
   'logged_in_at', 'last_sync_at', 'check_at', 'received_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
-  'submarinetracker_found', 'venture_stats_found', 'hq']);
+  'submarinetracker_found', 'venture_stats_found', 'hq', 'craft_enabled', 'is_retainer']);
 const LISTS = new Set(['problems']);
 
 // Puts the same rows in both: rows are plain objects, times in Unix seconds.
@@ -134,10 +139,13 @@ function fleet(seed, now) {
   const PARTS = [21792, 21795, 21797, 22527, 23904, 24346, 24349, 24353, 24358, 24361, 24366];
   const t = { companion_character_current: [], character_sort_order: [], companion_submarine_snapshot: [], companion_metric_history: [],
     companion_retainer_lookup: [], companion_character_housing: [], companion_character_login: [], companion_pc_status: [],
-    companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [], companion_venture_result: [] };
+    companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [], companion_venture_result: [],
+    sub_craft_toggle: [], sub_build_rules: [], fight_club_routes: [] };
   const SALVAGE = [22500, 22501, 22502, 22503, 22504, 22505, 22506, 22507];
   const chests = new Map();
-  const item = () => (chance(0.1) ? 1000000 : 0) + pick([1, 2, 5, 10155, 10373, 22500, 22503, 22504, 22507, 40000 + Math.floor(random() * 300)]);
+  // Now and then a spare sub part (21792 to 24367, and a number just outside those), for the Parts views.
+  const item = () => (chance(0.15) ? pick([21792, 21799, 21800, 22526, 22530, 23906, 24344, 24367, 24368, 24350])
+    : (chance(0.1) ? 1000000 : 0) + pick([1, 2, 5, 10155, 10373, 22500, 22503, 22504, 22507, 40000 + Math.floor(random() * 300)]));
   let retainerId = 33777097243660300n;
   for (let i = 0; i < 160; i++) {
     const cid = 18014498578000000n + BigInt(i);
@@ -161,6 +169,7 @@ function fleet(seed, now) {
         part1: parts[0], part2: parts[1], part3: parts[2], part4: parts[3],
         return_time: pick([0, null, Math.floor(now - random() * 90000), Math.floor(now + random() * 90000) + 60]),
         updated_at: ago(1), current_exp: Math.floor(random() * 1e6), next_level_exp: chance(0.1) ? null : 1e6, slot: chance(0.3) ? null : s });
+      if (chance(0.4)) t.sub_craft_toggle.push({ cid, sub_name: named ? `Sub ${s}` : `Submersible-${s}`, craft_enabled: chance(0.6), updated_at: ago(2) });
     }
     // Supply history: drops, restocks, unchanged hourly values; sometimes the bags-and-retainers totals too.
     const span = Math.floor(random() * 40 * 24);
@@ -248,6 +257,18 @@ function fleet(seed, now) {
       if (chance(0.3)) t.retainer_gear_targets.push({ retainer_id: id, target_mode: pick(['level', 'ilvl', null]), target_value: chance(0.2) ? null : Math.floor(random() * 700) + 1,
         only_crafted: chance(0.5), updated_at: ago(3) });
     }
+  }
+  // Sub Rules (some for one character or some slots, a filter the app doesn't know) and Fight Club routes (some
+  // without a recommended build).
+  for (let r = 1; r <= 12; r++) {
+    t.sub_build_rules.push({ id: r, rank: pick([1, 20, 45, 70, 85, 90, 100]), cid_override: chance(0.2) ? 18014498578000000n + BigInt(Math.floor(random() * 160)) : null,
+      sub_filter: pick(['', 'All', null, 'Sub1Only', 'Sub2,Sub4', 'Sub3', 'nonsense']), hull: pick(['S', 'U+', 'W', '', null]), stern: pick(['S', 'C', 'Y+', '']),
+      bow: pick(['U', 'W+', 'S', '']), bridge: pick(['C', 'S', 'U', null]), updated_at: ago(5) });
+  }
+  for (let r = 1; r <= 15; r++) {
+    t.fight_club_routes.push({ id: r, route: pick(['MROJZ', 'OJ', 'JORZ', 'MOVZ']), hours: pick([24, 36.5, null]), repair_times: pick(['4', '6 (3)', null, 'x']),
+      gil_sub_day: chance(0.1) ? null : Math.floor(random() * 300000), rec_build_notes: pick(['90: SSUC', '95: WUSS++', '100: S+S+U+C+', '', null, 'none']),
+      gil_hr: Math.floor(random() * 10000) });
   }
   for (const [pc, label] of [['DESKTOP-1', 'A'], ['DESKTOP-1', 'B'], ['LAPTOP', ''], ['DESKTOP-2', 'A'], ['OLD', 'C']]) {
     t.companion_pc_status.push({ pc_name: pc, account_label: label, plugin_version: pick(['2.0.0.11', '1.0.3.4', null]),
