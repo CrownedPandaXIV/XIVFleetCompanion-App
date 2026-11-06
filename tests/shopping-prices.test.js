@@ -62,7 +62,7 @@ test('buying several goes up the listings, cheapest first, and says when too few
 test('each part: buy or make, and the totals for buying instead', () => {
   const list = {
     parts: [{ itemId: 22528, crafts: 3, made: 0 }, { itemId: 22526, crafts: 2, made: 0 }],
-    craft: [{ itemId: 1, make: 6 }],
+    craft: [{ itemId: 99, make: 6 }],
     gather: [{ itemId: 10, short: 18 }, { itemId: 11, short: 4 }, { itemId: 12, short: 0 }],
     crystals: [{ itemId: 3, short: 10 }],
   };
@@ -73,8 +73,10 @@ test('each part: buy or make, and the totals for buying instead', () => {
     [10, { price: 100, world: 'Maduin', listings: [{ price: 100, quantity: 10 }, { price: 120, quantity: 99 }] }],
     [3, { price: 5, world: 'Maduin', listings: [{ price: 5, quantity: 999 }] }],
     [20, { price: 50, world: 'Maduin', listings: [{ price: 50, quantity: 99 }] }],
+    [99, { price: 300, world: 'Maduin', listings: [{ price: 300, quantity: 4 }, { price: 310, quantity: 1 }] }],
   ]);
   const priced = priceList(list, { market, vendor: new Map(), recipes });
+  assert.deepStrictEqual(priced.craft[0].buying, { gil: 4 * 300 + 310, got: 5, wanted: 6 }, 'an in-between item: what buying the 6 to make costs (only 5 for sale)');
   const bow = priced.parts[0];
   assert.deepStrictEqual([bow.market.price, bow.makeCost, bow.cheaper], [600, 670, 'buy'], 'listed at 600, 2 x 305 + 50 + 10 = 670 to make');
   assert.deepStrictEqual(bow.buying, { gil: 1400, got: 2, wanted: 3 }, 'only two listed: 600 + 800');

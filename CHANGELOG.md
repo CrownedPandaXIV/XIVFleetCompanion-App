@@ -104,6 +104,9 @@ do by hand.
 - **The Shopping List's market prices look at the 100 cheapest listings of each item** (was 20), so buying a material
   needed in the thousands isn't shown as short when plenty more is for sale. "Only 1,639 of 2,277 for sale" now means
   just that, and its hover says what those cost and that the rest can't be bought there right now.
+- **Craft first's market board prices have the same hover** as the other sections: what buying the ones still to make
+  costs, from the cheapest listing up (with "only X of Y for sale" when there aren't enough). The totals stay for
+  parts and raw materials.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
