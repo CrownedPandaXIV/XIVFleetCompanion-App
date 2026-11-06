@@ -3,7 +3,8 @@
 -- and returns only the rows a window shows, with the same numbers as the app's tabs (tests/db/verify-fleet-views.js).
 --
 -- Written with plugin-only use in mind (a one-file SQLite version later in 2.x): views added from 2.x's "rest of the
--- tabs" stage keep to plain SQL where it gives the same answer, so they translate easily. And no view here reads the
+-- tabs" stage keep to plain SQL where it gives the same answer, so they translate easily. Each has a SQLite twin in
+-- db/sqlite/views.sql: change both together (tests/db/verify-sqlite-views.js checks they match row for row). And no view here reads the
 -- game data tables (ffxiv_*): a new database has none until the app fills them, and a view that needed them couldn't
 -- be made. Names of jobs, ventures and items come from the game's own files in the plugin instead.
 --

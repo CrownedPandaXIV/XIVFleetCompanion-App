@@ -37,5 +37,6 @@ Two rules for the views:
 - **No game data tables (`ffxiv_*`).** A new database gets its game data only after the views are made, and a view
   that reads a game data column couldn't be made there, which would stop the app's database check. Give the game's
   numbers (a class, a venture, an item) and let the plugin name them from the game's own files.
-- **Plain SQL where it gives the same answer**, so each view translates easily to the plugin-only one-file (SQLite)
-  version planned for later in 2.x.
+- **Change `db/sqlite/views.sql` too.** Every view has a SQLite twin there for the plugin-only one-file version
+  planned for later in 2.x; `tests/db/verify-sqlite-views.js` fills both with the same made-up fleet and fails unless
+  every row matches. Keep to plain SQL where it gives the same answer, so the twin stays a close translation.

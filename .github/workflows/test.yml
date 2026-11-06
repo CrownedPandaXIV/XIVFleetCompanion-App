@@ -82,6 +82,8 @@ jobs:
       run: node tests/db/verify-metric-window.js
     - name: Verify the views plugin 2.0 reads against the app's own working out
       run: node tests/db/verify-fleet-views.js
+    - name: Verify the views give the same answers on SQLite (the plugin-only one-file version)
+      run: node tests/db/verify-sqlite-views.js
     - name: Verify the venture reward totals
       run: node tests/db/verify-venture-totals.js
     - name: Verify moving the database to another PC (two servers, the runner's pg_dump and pg_restore)

@@ -161,7 +161,13 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
     await scenario('supplies: 300 random histories (drops, restocks, hourly reminders, late syncs) match the Supplies tab', async () => {
       await clear();
       let seed = 42;
-      const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+      // mulberry32: 32-bit integer steps, so JavaScript's numbers never lose digits (which would make it repeat).
+      const random = () => {
+        seed = (seed + 0x6D2B79F5) | 0;
+        let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+      };
       const rows = [];
       for (let cid = 100; cid < 400; cid++) {
         const synced = random() < 0.2 ? random() * 300 : random() * 2; // some stopped syncing days ago
