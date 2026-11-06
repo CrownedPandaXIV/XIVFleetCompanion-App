@@ -14,7 +14,7 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
+DROP VIEW IF EXISTS fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
   fleet_alerts_view, fleet_summary_view, fleet_retainer_counts_view, fleet_not_synced_view, fleet_subs_view, fleet_supplies_view CASCADE;
 
 -- A sub part's class letter, from its item number (as subs/submarine-builds.js SUB_PART_CLASS; the test checks
@@ -454,6 +454,8 @@ SELECT kind, owner_cid, retainer_id, fc_id, container,
        (item_id >= 1000000 AND item_id < 2000000) AS hq,
        quantity, who, world, owner_name, account_label, sort_index, retainer_name, hire_order_index, container_name,
        container IN (2000, 2502, 12000, 22000) AS money,
+       -- Gear being worn: by the character (1000, 1001) or by a retainer (11000), for "Hide equipped gear".
+       (kind <> 'fc' AND (container BETWEEN 1000 AND 1001 OR container = 11000)) AS equipped,
        CASE kind
          WHEN 'fc' THEN
            CASE WHEN container BETWEEN 20000 AND 20010 THEN 'FC chest tab ' || (container - 20000 + 1)
@@ -484,9 +486,188 @@ FROM stacks;
 
 -- How many of each item the whole fleet holds, as the Inventory tab's Fleet totals: every character's and retainer's
 -- stacks except the character's gil, plus everything in the Free Company chests. A high-quality item counts apart
--- from the normal one (hq), as there.
+-- from the normal one (hq), as there. equipped: how many of them are being worn (total - equipped with "Hide equipped
+-- gear" on).
 CREATE OR REPLACE VIEW fleet_item_totals_view AS
-SELECT item_id, hq, sum(quantity) AS total
+SELECT item_id, hq, sum(quantity) AS total, sum(CASE WHEN equipped THEN quantity ELSE 0 END) AS equipped
 FROM fleet_holdings_view
 WHERE NOT (kind <> 'fc' AND container = 2000)
 GROUP BY item_id, hq;
+
+-- Salvage held by each character, as the Salvage tab (ipc/inventory.js get-salvage): every piece in its bags,
+-- retainers and so on, plus its Free Company chest's when the chest is counted on it (the leader when tracked, else
+-- the first in the Roster, as fleet_holdings_view), at the fixed vendor prices. Standard: items 22500 to 22503;
+-- extravagant: 22504 to 22507. One row per character holding any, with how many of each piece (q22500 and so on).
+CREATE OR REPLACE VIEW fleet_salvage_view AS
+WITH prices (item_id, gil) AS (
+  VALUES (22500, 8000), (22501, 9000), (22502, 10000), (22503, 13000),
+         (22504, 27000), (22505, 28500), (22506, 30000), (22507, 34500)
+),
+held AS (
+  SELECT h.owner_cid AS cid, h.item_id, sum(h.quantity) AS quantity
+  FROM fleet_holdings_view h
+  WHERE h.item_id BETWEEN 22500 AND 22507 AND NOT h.hq
+  GROUP BY h.owner_cid, h.item_id
+)
+SELECT c.cid, c.name, c.world, c.account_label, so.sort_index,
+       CAST(sum(CASE WHEN h.item_id <= 22503 THEN h.quantity ELSE 0 END) AS bigint) AS standard,
+       CAST(sum(CASE WHEN h.item_id > 22503 THEN h.quantity ELSE 0 END) AS bigint) AS extravagant,
+       CAST(sum(h.quantity * p.gil) AS bigint) AS gil,
+       CAST(sum(CASE WHEN h.item_id = 22500 THEN h.quantity ELSE 0 END) AS bigint) AS q22500,
+       CAST(sum(CASE WHEN h.item_id = 22501 THEN h.quantity ELSE 0 END) AS bigint) AS q22501,
+       CAST(sum(CASE WHEN h.item_id = 22502 THEN h.quantity ELSE 0 END) AS bigint) AS q22502,
+       CAST(sum(CASE WHEN h.item_id = 22503 THEN h.quantity ELSE 0 END) AS bigint) AS q22503,
+       CAST(sum(CASE WHEN h.item_id = 22504 THEN h.quantity ELSE 0 END) AS bigint) AS q22504,
+       CAST(sum(CASE WHEN h.item_id = 22505 THEN h.quantity ELSE 0 END) AS bigint) AS q22505,
+       CAST(sum(CASE WHEN h.item_id = 22506 THEN h.quantity ELSE 0 END) AS bigint) AS q22506,
+       CAST(sum(CASE WHEN h.item_id = 22507 THEN h.quantity ELSE 0 END) AS bigint) AS q22507
+FROM held h
+JOIN prices p ON p.item_id = h.item_id
+JOIN companion_character_current c ON c.cid = h.cid
+LEFT JOIN character_sort_order so ON so.cid = c.cid
+GROUP BY c.cid, c.name, c.world, c.account_label, so.sort_index;
+
+-- Each character's real net income from its subs, as the Income tab (ipc/income.js and subs/income.js
+-- characterIncome; the Fight Club "expected" columns come later in 2.x): salvage that came in over the window (from
+-- Settings, 7 days by default), at its vendor price, less the repair kits used at the repair kit cost, per day.
+--
+-- From the values recorded over time (companion_metric_history): the last one at or before the window start and
+-- everything after it. Salvage that came in: every rise in the count of a piece, except a rise at the same moment
+-- as items were stored for a new source (inventory_sources rose: first_stored) and the part matched by a drop of the
+-- same piece in the character's FC chest at that moment (taken out of the chest: from_chest). Repair kits used:
+-- every drop in those held in bags and retainers (item_qty:10373) when that history reaches back to the start, else
+-- in the bags. The window runs from its start (or the first salvage value, when later) to the character's last
+-- sync (or its newest value, when later); less than a day of it is not enough (enough false, the numbers NULL).
+CREATE OR REPLACE VIEW fleet_income_view AS
+WITH settings AS (
+  SELECT window_days, kit_cost, now() - make_interval(days => window_days) AS window_start
+  FROM (SELECT
+    coalesce((SELECT CAST(setting_value AS int) FROM fleet_economics_settings
+              WHERE setting_key = 'income_window_days' AND setting_value IN (3, 7, 14, 30)), 7) AS window_days,
+    coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'), 0) AS kit_cost) chosen
+),
+prices (item_id, gil) AS (
+  VALUES (22500, 8000), (22501, 9000), (22502, 10000), (22503, 13000),
+         (22504, 27000), (22505, 28500), (22506, 30000), (22507, 34500)
+),
+characters AS (
+  SELECT c.cid, c.name, c.world, c.account_label, c.fc_id, so.sort_index, c.last_synced_at,
+         (SELECT count(*) FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0) AS subs
+  FROM companion_character_current c
+  LEFT JOIN character_sort_order so ON so.cid = c.cid
+  WHERE EXISTS (SELECT 1 FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0)
+),
+metrics (metric) AS (
+  VALUES ('item_qty:22500'), ('item_qty:22501'), ('item_qty:22502'), ('item_qty:22503'),
+         ('item_qty:22504'), ('item_qty:22505'), ('item_qty:22506'), ('item_qty:22507'),
+         ('repair_kits'), ('item_qty:10373'), ('inventory_sources')
+),
+-- Each series from the last value at or before the window start, with the value before each one.
+series AS (
+  SELECT subject_type, subject_id, metric, recorded_at AS at, value,
+         lag(value) OVER (PARTITION BY subject_type, subject_id, metric ORDER BY recorded_at) AS prev
+  FROM (
+    SELECT h.subject_type, h.subject_id, h.metric, h.recorded_at, h.value
+    FROM companion_metric_history h CROSS JOIN settings st
+    WHERE h.recorded_at > st.window_start AND h.metric IN (SELECT metric FROM metrics)
+      AND ((h.subject_type = 'character' AND h.subject_id IN (SELECT cid FROM characters))
+        OR (h.subject_type = 'fc' AND h.subject_id IN (SELECT fc_id FROM characters)))
+    UNION ALL
+    SELECT b.subject_type, b.subject_id, b.metric, b.recorded_at, b.value
+    FROM (SELECT 'character' AS subject_type, cid AS subject_id FROM characters
+          UNION SELECT 'fc', fc_id FROM characters WHERE fc_id IS NOT NULL) s
+    CROSS JOIN metrics m CROSS JOIN settings st
+    CROSS JOIN LATERAL (
+      SELECT h.subject_type, h.subject_id, h.metric, h.recorded_at, h.value FROM companion_metric_history h
+      WHERE h.subject_type = s.subject_type AND h.subject_id = s.subject_id AND h.metric = m.metric
+        AND h.recorded_at <= st.window_start
+      ORDER BY h.recorded_at DESC LIMIT 1) b
+  ) points
+),
+spans AS (
+  SELECT ch.cid,
+         coalesce(greatest(ch.last_synced_at, (SELECT max(se.at) FROM series se WHERE se.subject_type = 'character' AND se.subject_id = ch.cid)),
+                  now()) AS end_at,
+         greatest(st.window_start, (SELECT min(se.at) FROM series se
+                                    WHERE se.subject_type = 'character' AND se.subject_id = ch.cid AND se.metric LIKE 'item_qty:225%')) AS salvage_from
+  FROM characters ch CROSS JOIN settings st
+),
+windows AS (
+  SELECT cid, end_at, coalesce(salvage_from, end_at) AS from_at,
+         extract(epoch FROM (end_at - coalesce(salvage_from, end_at))) / 86400 AS span_days
+  FROM spans
+),
+rises AS (
+  SELECT ch.cid, CAST(substring(se.metric FROM 10) AS int) AS item_id, se.at, se.value - se.prev AS amount,
+         EXISTS (SELECT 1 FROM series so WHERE so.subject_type = 'character' AND so.subject_id = ch.cid
+                   AND so.metric = 'inventory_sources' AND so.at = se.at AND so.value > so.prev) AS first_stored,
+         coalesce((SELECT max(fc.prev - fc.value) FROM series fc WHERE fc.subject_type = 'fc' AND fc.subject_id = ch.fc_id
+                     AND fc.metric = se.metric AND fc.at = se.at AND fc.prev > fc.value), 0) AS chest_drop
+  FROM characters ch
+  JOIN windows w ON w.cid = ch.cid
+  JOIN series se ON se.subject_type = 'character' AND se.subject_id = ch.cid AND se.metric LIKE 'item_qty:225%'
+  WHERE se.at > w.from_at AND se.value > se.prev
+),
+salvage AS (
+  SELECT r.cid,
+         sum(CASE WHEN r.first_stored THEN 0 ELSE r.amount - least(r.amount, r.chest_drop) END) AS pieces,
+         sum(CASE WHEN r.first_stored THEN 0 ELSE least(r.amount, r.chest_drop) END) AS from_chest,
+         sum(CASE WHEN r.first_stored THEN r.amount ELSE 0 END) AS first_stored,
+         sum(CASE WHEN r.first_stored THEN 0 ELSE (r.amount - least(r.amount, r.chest_drop)) * p.gil END) AS gil
+  FROM rises r JOIN prices p ON p.item_id = r.item_id
+  GROUP BY r.cid
+),
+kits AS (
+  SELECT w.cid,
+         coalesce((SELECT sum(se.prev - se.value) FROM series se
+                   WHERE se.subject_type = 'character' AND se.subject_id = w.cid AND se.at > w.from_at AND se.prev > se.value
+                     AND se.metric = CASE WHEN EXISTS (SELECT 1 FROM series t WHERE t.subject_type = 'character' AND t.subject_id = w.cid
+                                                         AND t.metric = 'item_qty:10373' AND t.at <= w.from_at)
+                                          THEN 'item_qty:10373' ELSE 'repair_kits' END), 0) AS used
+  FROM windows w
+)
+SELECT ch.cid, ch.name, ch.world, ch.account_label, ch.sort_index, ch.last_synced_at, ch.subs,
+       w.span_days >= 1 AS enough, w.span_days,
+       CASE WHEN w.span_days >= 1 THEN coalesce(sv.pieces, 0) END AS pieces,
+       CASE WHEN w.span_days >= 1 THEN coalesce(sv.from_chest, 0) END AS from_chest,
+       CASE WHEN w.span_days >= 1 THEN coalesce(sv.first_stored, 0) END AS first_stored,
+       CASE WHEN w.span_days >= 1 THEN coalesce(sv.gil, 0) END AS salvage_gil,
+       CASE WHEN w.span_days >= 1 THEN k.used END AS kits_used,
+       CASE WHEN w.span_days >= 1 THEN k.used * st.kit_cost END AS kit_gil,
+       CASE WHEN w.span_days >= 1 THEN coalesce(sv.gil, 0) - k.used * st.kit_cost END AS net,
+       CAST(CASE WHEN w.span_days >= 1 THEN (coalesce(sv.gil, 0) - k.used * st.kit_cost) / w.span_days END AS double precision) AS per_day,
+       CAST(CASE WHEN w.span_days >= 1 THEN coalesce(sv.gil, 0) / w.span_days END AS double precision) AS salvage_per_day,
+       CAST(CASE WHEN w.span_days >= 1 THEN k.used * st.kit_cost / w.span_days END AS double precision) AS kit_per_day,
+       st.window_days, st.kit_cost
+FROM characters ch
+JOIN windows w ON w.cid = ch.cid
+JOIN kits k ON k.cid = ch.cid
+LEFT JOIN salvage sv ON sv.cid = ch.cid
+CROSS JOIN settings st;
+
+-- Venture rewards AutoRetainer recorded over the Income window, as the Income tab's Retainer Ventures: one row per
+-- character and item (normal and high quality together), with that character's number of rewards and retainers.
+-- The game's vendor price comes from the game's own files in the plugin; salvage_price is the fixed salvage price
+-- (as the app's), NULL for anything else.
+CREATE OR REPLACE VIEW fleet_venture_income_view AS
+WITH settings AS (
+  SELECT window_days, now() - make_interval(days => window_days) AS window_start
+  FROM (SELECT coalesce((SELECT CAST(setting_value AS int) FROM fleet_economics_settings
+                         WHERE setting_key = 'income_window_days' AND setting_value IN (3, 7, 14, 30)), 7) AS window_days) chosen
+),
+rewards AS (
+  SELECT v.* FROM companion_venture_result v CROSS JOIN settings st WHERE v.received_at > st.window_start
+),
+owners AS (
+  SELECT owner_cid, count(*) AS rewards, count(DISTINCT retainer_name) AS retainers FROM rewards GROUP BY owner_cid
+)
+SELECT o.owner_cid, coalesce(c.name, 'Character ' || o.owner_cid) AS name, c.world, c.account_label, so.sort_index,
+       i.item_id, i.quantity,
+       CASE i.item_id WHEN 22500 THEN 8000 WHEN 22501 THEN 9000 WHEN 22502 THEN 10000 WHEN 22503 THEN 13000
+                      WHEN 22504 THEN 27000 WHEN 22505 THEN 28500 WHEN 22506 THEN 30000 WHEN 22507 THEN 34500 END AS salvage_price,
+       o.rewards, o.retainers, st.window_days
+FROM owners o
+JOIN (SELECT owner_cid, item_id, sum(quantity) AS quantity FROM rewards GROUP BY owner_cid, item_id) i ON i.owner_cid = o.owner_cid
+LEFT JOIN companion_character_current c ON c.cid = o.owner_cid
+LEFT JOIN character_sort_order so ON so.cid = o.owner_cid
+CROSS JOIN settings st;
