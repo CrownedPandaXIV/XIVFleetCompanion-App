@@ -6,13 +6,13 @@
 // "needs attention" categories already built elsewhere in the app.
 // No LLM involved - everything here is real Postgres data, same as
 // every other view.
-// The Parts tab's rows grouped per built sub: subs whose rank now calls for different parts.
+// The Parts tab's rows grouped per sub: built subs whose rank now calls for different parts, and new subs to build in
+// an open slot (rank 0, isNew), as the plugin's Summary.
 function subsReadyForParts(partRows) {
   const subs = new Map();
   for (const r of partRows) {
-    if (!(Number(r.rank) > 0)) continue;
     const key = `${r.cid}|${r.sub_name}`;
-    if (!subs.has(key)) subs.set(key, { cid: r.cid, sub_name: r.sub_name, rank: r.rank, character_name: r.character_name, world: r.world, sort_index: r.sort_index, parts: [] });
+    if (!subs.has(key)) subs.set(key, { cid: r.cid, sub_name: r.sub_name, rank: r.rank, isNew: !(Number(r.rank) > 0), character_name: r.character_name, world: r.world, sort_index: r.sort_index, parts: [] });
     subs.get(key).parts.push({ slot: r.slot, part: `${r.needed_modified ? 'Modified ' : ''}${r.needed_class}`, spare: r.spare_location || null });
   }
   return [...subs.values()].sort((a, b) => (a.sort_index ?? 1e9) - (b.sort_index ?? 1e9) || String(a.sub_name).localeCompare(String(b.sub_name)));
@@ -35,12 +35,20 @@ const HOUSE_WARNING_COLUMN_DEFS = [
     sort: (h) => h.demolition_in_days,
   },
 ];
+// "7 subs are ready for new parts, 1 new sub to build" (as the plugin's PartsPlanner.ReadyText).
+function readyCountText(subs) {
+  const built = subs.filter((s) => !s.isNew).length;
+  const fresh = subs.length - built;
+  return [built > 0 ? `${built} sub${built === 1 ? ' is' : 's are'} ready for new parts` : null, fresh > 0 ? `${fresh} new sub${fresh === 1 ? '' : 's'} to build` : null]
+    .filter(Boolean).join(', ');
+}
+
 const HOUSE_WARNING_DUPLICATE_EXTRAS = ['x_account'];
 
 const READY_SUB_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
-  { key: 'rank', label: 'Rank', cell: (r) => r.rank, sort: (r) => Number(r.rank) },
+  { key: 'rank', label: 'Rank', cell: (r) => (r.isNew ? <span className="dim" title="A sub not built yet: its first build">new</span> : r.rank), sort: (r) => Number(r.rank) },
   { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p) => `${p.slot} ${p.part} (${p.spare ? `spare in ${p.spare}` : 'to craft'})`).join(', '), sortable: false },
 ];
 
@@ -260,9 +268,10 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
         <button onClick={() => onNavigate('parts')} style={{ fontSize: '13px', fontWeight: 400 }}>View Parts</button>
       </h2>
       {readySubs === null && <div className="status">Loading...</div>}
-      {readyShown !== null && readyShown.length === 0 && <div className="status">No sub has reached the rank of its next build.</div>}
+      {readyShown !== null && readyShown.length === 0 && <div className="status">No sub has reached the rank of its next build, and no new sub to build.</div>}
       {readyShown !== null && readyShown.length > 0 && (
         <React.Fragment>
+          <div className="status ready-subs-count">{readyCountText(readyShown)}</div>
           <div className="controls"><ColumnPicker cols={readyCols} /></div>
           <ColumnTable cols={readyCols} sort={readySort} rows={readyShown} rowKey={(sub) => `${sub.cid}|${sub.sub_name}`} className="ready-subs" />
         </React.Fragment>

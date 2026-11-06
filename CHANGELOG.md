@@ -76,6 +76,9 @@ do by hand.
 - The Parts tab reads everything in a fixed order (a character's own spares before its retainers', Sub Rules and Fight
   Club routes as they were made), so the same fleet always gets the same answers: before, which of two identical spares
   it named could depend on the database.
+- **Subs Ready for New Parts lists new subs to build too** (on the Summary): a sub not built yet in an open slot gets
+  its own row with its first build's parts, its rank shown as "new", and a line above says how many of each ("7 subs
+  are ready for new parts, 1 new sub to build"), as the plugin's Summary.
 - **Gil and the market for the game** (plugin 2.0's Gil & Market page): gil per account, every listing with how long
   it has been up and whether that's unsold for a while (the Gil & Market tab's days), and the Gil & Market settings
   (those days, and whether Live Market Prices is on). Venture rewards now say how many were high quality, so the game

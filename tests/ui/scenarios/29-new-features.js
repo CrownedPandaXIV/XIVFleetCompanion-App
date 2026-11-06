@@ -17,10 +17,11 @@ module.exports = async (t) => {
   await sleep(500);
   const expectedReady = await ev(`Promise.all([window.api.getPartsNeeded(), window.api.getFleetWarnings()]).then(([p, w]) => {
     const skip = new Set((w.notSynced || []).map(c => String(c.cid)));
-    return new Set(p.rows.filter(x => x.rank > 0 && !skip.has(String(x.cid))).map(x => x.cid + '|' + x.sub_name)).size;
+    return new Set(p.rows.filter(x => !skip.has(String(x.cid))).map(x => x.cid + '|' + x.sub_name)).size;
   })`);
   const shownReady = await ev(`document.querySelectorAll('.ready-subs tbody tr').length`);
-  check(expectedReady > 0 && shownReady === expectedReady, `Summary lists each sub ready for new parts once (${shownReady} of ${expectedReady})`);
+  check(expectedReady > 0 && shownReady === expectedReady, `Summary lists each sub ready for new parts, and each new sub to build, once (${shownReady} of ${expectedReady})`);
+  check(/sub(s are| is) ready for new parts|new subs? to build/.test(await ev(`document.querySelector('.ready-subs-count').innerText`)), 'with how many of each: ' + await ev(`document.querySelector('.ready-subs-count').innerText`));
   check(/\((spare in .+|to craft)\)/.test(await ev(`(document.querySelector('.ready-subs tbody tr') || {}).innerText || ''`)), 'each part says where a spare is or that it is to craft');
 
   // ---- Supplies: ceruleum from FC credits, per FC, per account and for the fleet ----
