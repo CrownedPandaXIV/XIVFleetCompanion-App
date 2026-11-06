@@ -200,7 +200,7 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
   const { latestCharacter } = await snapshotFragments(client);
   const characters = (await client.query(`
     SELECT c.cid::text AS cid, c.name, c.world, c.account_label, c.fc_id::text AS fc_id, so.sort_index
-    FROM ${latestCharacter} c LEFT JOIN character_sort_order so ON so.cid = c.cid`)).rows;
+    FROM ${latestCharacter} c LEFT JOIN character_sort_order so ON so.cid = c.cid ORDER BY c.cid`)).rows;
   const byCid = new Map(characters.map((c) => [c.cid, c]));
   const subs = await loadSubmarines(client);
   const subFor = new Map();

@@ -51,15 +51,16 @@ const LOOT_SUB_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', cell: (s) => s.subName || '—', sort: (s) => s.subName },
   { key: 'route', label: 'Route', cell: (s) => s.route, sort: (s) => s.route },
   { key: 'voyages', label: 'Voyages', cell: (s) => s.voyages, sort: (s) => s.voyages },
-  { key: 'per_voyage', label: 'Vendor gil / voyage', cell: (s) => incomeGil(s.perVoyage), sort: (s) => s.perVoyage },
-  { key: 'real', label: 'Vendor value / day', td: (s) => <td className="income-real">{incomeGil(s.perDay)}</td>, sort: (s) => s.perDay },
-  { key: 'expected', label: 'Expected / day', cell: (s) => incomeGil(s.expectedPerDay), sort: (s) => s.expectedPerDay },
+  // As the plugin: gil a voyage and expected in gold, value a day in green.
+  { key: 'per_voyage', label: 'Vendor gil / voyage', td: (s) => <td className="num"><GilText gil={Math.round(s.perVoyage)} /></td>, sort: (s) => s.perVoyage },
+  { key: 'real', label: 'Vendor value / day', td: (s) => <td className="income-real num tone-good">{incomeGil(s.perDay)}</td>, sort: (s) => s.perDay },
+  { key: 'expected', label: 'Expected / day', td: (s) => <td className="num">{s.expectedPerDay === null || s.expectedPerDay === undefined ? <span className="dim">—</span> : <GilText gil={Math.round(s.expectedPerDay)} />}</td>, sort: (s) => s.expectedPerDay },
 ];
 const LOOT_ROUTE_COLUMN_DEFS = [
   { key: 'route', label: 'Route', locked: true, cell: (r) => r.route, sort: (r) => r.route },
   { key: 'subs', label: 'Subs', cell: (r) => r.subs, sort: (r) => r.subs },
   { key: 'voyages', label: 'Voyages', cell: (r) => r.voyages, sort: (r) => r.voyages },
-  { key: 'per_voyage', label: 'Vendor gil / voyage', cell: (r) => incomeGil(r.perVoyage), sort: (r) => r.perVoyage },
+  { key: 'per_voyage', label: 'Vendor gil / voyage', td: (r) => <td className="num"><GilText gil={Math.round(r.perVoyage)} /></td>, sort: (r) => r.perVoyage },
 ];
 const VENTURE_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
@@ -78,7 +79,9 @@ function marketColumnDefs(field, unit) {
     label: `${MARKET_SCOPE_LABELS[scope]} market ${unit}`,
     td: (r) => {
       const m = r.market && r.market[scope];
-      return <td className={`income-market market-${scope}`} title={`At the cheapest listing on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis); items not on the market board at what a vendor pays.`}>{m ? incomeGil(m[field]) : '—'}</td>;
+      // As the plugin: a day's value in green, a voyage's gil in gold.
+      const value = !m ? <span className="dim">—</span> : field === 'perDay' ? <span className="tone-good">{incomeGil(m[field])}</span> : <GilText gil={Math.round(m[field])} />;
+      return <td className={`income-market market-${scope} num`} title={`At the cheapest listing on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis); items not on the market board at what a vendor pays.`}>{value}</td>;
     },
     sort: (r) => (r.market && r.market[scope] ? r.market[scope][field] : null),
   }));

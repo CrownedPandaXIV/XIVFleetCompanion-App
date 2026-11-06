@@ -18,6 +18,10 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_voyage_returns_view;
+DROP VIEW IF EXISTS fleet_rankup_history_view;
+DROP VIEW IF EXISTS fleet_rankup_forecast_view;
+DROP VIEW IF EXISTS fleet_voyage_loot_view;
 DROP VIEW IF EXISTS fleet_voyage_sectors_view;
 DROP VIEW IF EXISTS fleet_sub_history_view;
 DROP VIEW IF EXISTS fleet_route_fight_club_view;
@@ -779,3 +783,52 @@ CREATE VIEW fleet_voyage_sectors_view AS
 SELECT CAST(v.fc_id AS TEXT) AS fc_id, v.sub_register, v.sub_name, v.returned_at, v.sector, v.leg
 FROM companion_voyage_loot v
 WHERE v.returned_at >= ((julianday('now') - 2440587.5) * 86400.0) - 14 * 86400.0;
+
+CREATE VIEW fleet_voyage_loot_view AS
+WITH settings AS (
+  SELECT coalesce((SELECT CAST(setting_value AS INTEGER) FROM fleet_economics_settings
+                   WHERE setting_key = 'income_window_days' AND setting_value IN (3, 7, 14, 30)), 7) AS window_days
+)
+SELECT CAST(l.fc_id AS TEXT) AS fc_id, l.sub_register, l.returned_at, l.sector, l.sub_name, l.primary_item, l.primary_count,
+       l.additional_item, l.additional_count, l.leg, st.window_days
+FROM companion_voyage_loot l
+CROSS JOIN settings st
+WHERE l.returned_at > ((julianday('now') - 2440587.5) * 86400.0) - st.window_days * 86400.0;
+
+CREATE VIEW fleet_rankup_forecast_view AS
+SELECT f.cid, f.slot, f.rank, f.made_at, f.predicted_at, f.sub_name, CAST(c.fc_id AS TEXT) AS fc_id, c.name AS character_name
+FROM companion_rankup_forecast f
+LEFT JOIN companion_character_current c ON c.cid = f.cid
+WHERE f.made_at >= ((julianday('now') - 2440587.5) * 86400.0) - 30 * 86400.0;
+
+CREATE VIEW fleet_rankup_history_view AS
+WITH series AS (
+  SELECT DISTINCT f.cid, 'sub_rank:' || f.slot AS metric
+  FROM companion_rankup_forecast f
+  WHERE f.made_at >= ((julianday('now') - 2440587.5) * 86400.0) - 30 * 86400.0
+),
+inside AS (
+  SELECT se.cid, se.metric, h.recorded_at, h.value,
+         lead(h.value) OVER (PARTITION BY se.cid, se.metric ORDER BY h.recorded_at DESC) AS earlier,
+         row_number() OVER (PARTITION BY se.cid, se.metric ORDER BY h.recorded_at DESC) AS n
+  FROM series se
+  JOIN companion_metric_history h ON h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+   AND h.recorded_at > ((julianday('now') - 2440587.5) * 86400.0) - 31 * 86400.0
+)
+SELECT cid, metric, recorded_at, value FROM inside WHERE n = 1 OR earlier IS NULL OR earlier <> value
+UNION ALL
+SELECT cid, metric, recorded_at, value FROM (
+  SELECT se.cid, se.metric,
+         (SELECT h.recorded_at FROM companion_metric_history h
+          WHERE h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+            AND h.recorded_at <= ((julianday('now') - 2440587.5) * 86400.0) - 31 * 86400.0 ORDER BY h.recorded_at DESC LIMIT 1) AS recorded_at,
+         (SELECT h.value FROM companion_metric_history h
+          WHERE h.subject_type = 'character' AND h.subject_id = +se.cid AND h.metric = se.metric
+            AND h.recorded_at <= ((julianday('now') - 2440587.5) * 86400.0) - 31 * 86400.0 ORDER BY h.recorded_at DESC LIMIT 1) AS value
+  FROM series se) b
+WHERE b.recorded_at IS NOT NULL;
+
+CREATE VIEW fleet_voyage_returns_view AS
+SELECT DISTINCT CAST(v.fc_id AS TEXT) AS fc_id, v.sub_name, v.returned_at
+FROM companion_voyage_loot v
+WHERE v.returned_at >= ((julianday('now') - 2440587.5) * 86400.0) - 31 * 86400.0 AND v.sub_name IS NOT NULL;

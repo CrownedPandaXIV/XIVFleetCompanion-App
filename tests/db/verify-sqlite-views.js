@@ -45,6 +45,10 @@ const VIEWS = [
   ['fleet_route_fight_club_view', ['id']],
   ['fleet_sub_history_view', 'all'],
   ['fleet_voyage_sectors_view', 'all'],
+  ['fleet_voyage_loot_view', 'all'],
+  ['fleet_rankup_forecast_view', 'all'],
+  ['fleet_rankup_history_view', 'all'],
+  ['fleet_voyage_returns_view', 'all'],
 ];
 
 let n = 0;
@@ -56,7 +60,7 @@ async function scenario(name, fn) {
 // 0/1) and lists (text[], one per line).
 const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorded_at', 'items_seen_at', 'house_last_visited',
   'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
-  'logged_in_at', 'last_sync_at', 'check_at', 'received_at', 'first_seen_at', 'returned_at']);
+  'logged_in_at', 'last_sync_at', 'check_at', 'received_at', 'first_seen_at', 'returned_at', 'made_at', 'predicted_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
   'submarinetracker_found', 'venture_stats_found', 'hq', 'craft_enabled', 'is_retainer', 'stale', 'live_prices',
   'primary_hq', 'additional_hq', 'valid']);
@@ -149,7 +153,7 @@ function fleet(seed, now) {
   const t = { companion_character_current: [], character_sort_order: [], companion_submarine_snapshot: [], companion_metric_history: [],
     companion_retainer_lookup: [], companion_character_housing: [], companion_character_login: [], companion_pc_status: [],
     companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [], companion_venture_result: [],
-    sub_craft_toggle: [], sub_build_rules: [], fight_club_routes: [], companion_market_listing: [], tier3_settings: [], companion_voyage_loot: [] };
+    sub_craft_toggle: [], sub_build_rules: [], fight_club_routes: [], companion_market_listing: [], tier3_settings: [], companion_voyage_loot: [], companion_rankup_forecast: [] };
   const SALVAGE = [22500, 22501, 22502, 22503, 22504, 22505, 22506, 22507];
   const chests = new Map();
   // Now and then a spare sub part (21792 to 24367, and a number just outside those), for the Parts views.
@@ -191,6 +195,13 @@ function fleet(seed, now) {
         const at = ago(h) - i * 0.41 - s * 0.07;
         if (chance(0.8)) t.companion_metric_history.push({ recorded_at: at, subject_type: 'character', subject_id: cid, metric: `sub_rank:${s}`, value: rank });
         if (chance(0.8)) t.companion_metric_history.push({ recorded_at: at, subject_type: 'character', subject_id: cid, metric: `sub_exp:${s}`, value: exp });
+      }
+      // Next Rank dates the app saved for it over the last 35 days.
+      if (chance(0.5)) {
+        for (let k = 0; k < 6; k++) {
+          t.companion_rankup_forecast.push({ cid, slot: s, rank: rank + Math.floor(random() * 3), made_at: ago(random() * 35 * 24 + 0.37) - k * 0.01,
+            predicted_at: ago(-random() * 100), sub_name: named ? `Sub ${s}` : `Submersible-${s}` });
+        }
       }
       // The voyages SubmarineTracker recorded for it over the last 20 days, sector by sector (the order run known for most).
       if (fc && chance(0.7)) {

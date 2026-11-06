@@ -21,8 +21,10 @@ Module._load = function load(request, ...rest) {
   if (request === 'electron') return { ipcMain: { handle() {} }, app: { getPath: () => '.', getVersion: () => '0' }, safeStorage: {}, BrowserWindow: { getAllWindows: () => [] } };
   return original.call(this, request, ...rest);
 };
-const { loadSubmarinesWithRankUps } = require('../../ipc/subs');
+const { loadSubmarinesWithRankUps, loadForecastAccuracy } = require('../../ipc/subs');
 const { computePartsNeeded } = require('../../ipc/parts');
+const { loadLoot } = require('../../ipc/details');
+const { voyagesFrom, marketLoot } = require('../../subs/loot');
 Module._load = original;
 
 const NAME = 'fleet_routes_check';
@@ -40,7 +42,23 @@ const VIEWS = {
   partsSubs: 'SELECT * FROM fleet_parts_subs_view ORDER BY cid, sub_name COLLATE "C"',
   partsFightClub: 'SELECT * FROM fleet_parts_fight_club_view ORDER BY id',
   spares: 'SELECT * FROM fleet_parts_spares_view ORDER BY cid, is_retainer, retainer_id, fc_id, sorted_container, sorted_slot_index',
+  // Loot per Voyage on the Income page.
+  loot: 'SELECT * FROM fleet_voyage_loot_view ORDER BY fc_id, sub_register, returned_at, sector',
+  // How close the Next Rank dates came (the Subs page's forecast line).
+  forecasts: 'SELECT * FROM fleet_rankup_forecast_view ORDER BY cid, slot, rank, made_at',
+  rankHistory: 'SELECT * FROM fleet_rankup_history_view ORDER BY cid, metric, recorded_at',
+  returns: 'SELECT * FROM fleet_voyage_returns_view ORDER BY fc_id, sub_name, returned_at',
 };
+
+// What a vendor pays for the made-up loot that isn't salvage (the app's item table; 99999 has no price).
+const ITEM_PRICES = { 5111: 120, 12500: 3400, 12501: 77 };
+
+// Made-up market prices for Loot per Voyage at market prices: the same on both sides, by world, scope and item.
+function fakePrice(world, scope, id) {
+  let h = 7;
+  for (const ch of `${world}|${scope}|${id}`) h = (h * 31 + ch.charCodeAt(0)) % 100003;
+  return h % 5 === 0 ? null : 100 + (h % 9000);
+}
 
 // Whole numbers as text when JavaScript's numbers can't hold them exactly (character ids), numbers otherwise; times
 // in milliseconds; a sub's route stops as a list of numbers.
@@ -56,7 +74,7 @@ const row = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plai
 
 const TABLES = ['companion_character_current', 'character_sort_order', 'companion_submarine_snapshot', 'sub_craft_toggle', 'sub_build_rules',
   'fight_club_routes', 'fleet_economics_settings', 'companion_metric_history', 'companion_voyage_loot', 'companion_inventory_snapshot',
-  'companion_fc_inventory_snapshot'];
+  'companion_fc_inventory_snapshot', 'companion_rankup_forecast'];
 
 async function insert(client, table, rows) {
   for (let start = 0; start < rows.length; start += 500) {
@@ -109,6 +127,9 @@ async function writeGameData(client, game) {
   await client.query('CREATE TABLE ffxiv_submarinemap (id text, name text)');
   await client.query('CREATE TABLE ffxiv_submarinerank (id text, speed_bonus text, range_bonus text, exp_to_next text)');
   await client.query('CREATE TABLE ffxiv_submarinepart (id text, "class" text, slot text, speed text, range text)');
+  await client.query('DROP TABLE IF EXISTS ffxiv_item');
+  await client.query('CREATE TABLE ffxiv_item (id text, name text, price_low text)');
+  await insert(client, 'ffxiv_item', Object.entries(ITEM_PRICES).map(([id, price]) => ({ id, name: `Item ${id}`, price_low: String(price) })));
   await insert(client, 'ffxiv_submarineexploration', game.sectors.map((s) => ({ id: String(s.id), location: s.location, exp_reward: String(s.expReward),
     survey_durationmin: String(s.surveyMinutes), x: String(s.x), y: String(s.y), z: String(s.z), starting_point: s.starting ? 'True' : 'False', map: String(s.map) })));
   await insert(client, 'ffxiv_submarinemap', game.maps.map((m) => ({ id: String(m.id), name: m.name })));
@@ -130,7 +151,7 @@ function randomFleet(seed, now, game) {
   // Never within an hour of the views' 14-day edge (their now() and the app's clock are a moment apart).
   const ago = (hours) => {
     let h = hours;
-    if (Math.abs(h - 14 * 24) < 1) h += 2;
+    for (const days of [3, 7, 14, 30]) if (Math.abs(h - days * 24) < 1) h += 2;
     return new Date(now - h * HOUR - 1234);
   };
   const byMap = new Map();
@@ -173,6 +194,8 @@ function randomFleet(seed, now, game) {
         let e = 0;
         const perVoyage = 5000 + Math.floor(random() * 60000);
         const register = 500000 + i * 10 + s;
+        // Now and then renamed since: its voyages carry an old name, so its character is any member of its FC.
+        const lootName = chance(0.15) ? `${name} (old)` : name;
         const history = [];
         for (let h = 20 * 24; h >= 0; h -= 12 + Math.floor(random() * 30)) {
           if (chance(0.7)) {
@@ -181,14 +204,25 @@ function randomFleet(seed, now, game) {
             if (fc && route.length && chance(0.85)) {
               const at = ago(h);
               for (const [k, sector] of (chance(0.9) ? route : [pick(byMap.get(map)).id]).entries()) {
-                t.companion_voyage_loot.push({ fc_id: fc, sub_register: register, returned_at: at, sector, sub_name: chance(0.05) ? null : name,
-                  primary_item: 22500, primary_count: 1, leg: chance(0.9) ? k + 1 : null });
+                // What it brought back: salvage, now and then something else (priced from the item table, or not at all).
+                const loot = () => (chance(0.7) ? 22500 + Math.floor(random() * 8) : pick([5111, 12500, 12501, 99999]));
+                t.companion_voyage_loot.push({ fc_id: fc, sub_register: register, returned_at: at, sector, sub_name: chance(0.05) ? null : lootName,
+                  primary_item: loot(), primary_count: 1 + Math.floor(random() * 3), additional_item: chance(0.5) ? loot() : null,
+                  additional_count: chance(0.9) ? 1 + Math.floor(random() * 2) : 0, leg: chance(0.9) ? k + 1 : null });
               }
             }
           }
           history.push({ at: ago(h), rank: r, exp: e });
         }
         if (chance(0.05)) history.splice(Math.floor(history.length / 2), 0, { at: ago(10 * 24 + 0.5), rank: 1, exp: 0 }); // another sub took the slot once
+        // Next Rank dates the app saved now and then over the last 30 days, some for ranks it has since reached.
+        for (let k = 0; k < 8; k++) {
+          const p = pick(history);
+          const made = new Date(p.at.getTime() - random() * 3 * 24 * HOUR);
+          if (made.getTime() < now - 29 * 24 * HOUR) continue;
+          t.companion_rankup_forecast.push({ cid, slot: s, rank: p.rank + pick([0, 1, 1, 2]), made_at: made,
+            predicted_at: new Date(made.getTime() + random() * 4 * 24 * HOUR), sub_name: name });
+        }
         for (const p of history) {
           t.companion_metric_history.push({ recorded_at: p.at, subject_type: 'character', subject_id: cid, metric: `sub_rank:${s}`, value: p.rank });
           t.companion_metric_history.push({ recorded_at: p.at, subject_type: 'character', subject_id: cid, metric: `sub_exp:${s}`, value: p.exp });
@@ -219,6 +253,7 @@ function randomFleet(seed, now, game) {
     }
   }
   if (chance(0.8)) t.fleet_economics_settings.push({ setting_key: 'repair_kit_cost', setting_value: pick([0, 1730, 2500.5]) });
+  if (chance(0.8)) t.fleet_economics_settings.push({ setting_key: 'income_window_days', setting_value: pick([3, 7, 14, 30, 5]) });
   return t;
 }
 
@@ -248,11 +283,33 @@ function randomFleet(seed, now, game) {
       Date.now = () => now;
       let subs;
       let partsAhead;
+      let loot;
+      let accuracy;
       try {
         subs = await loadSubmarinesWithRankUps(client);
         // The Parts page with Look ahead at 14 days: what's needed now, then the next builds due by then.
         partsAhead = await computePartsNeeded(client, { aheadDays: 14 });
+        loot = await loadLoot(client, {});
+        accuracy = await loadForecastAccuracy(client);
       } finally { Date.now = realNow; }
+      // Loot per Voyage at (made-up) market prices, by the app's own working out.
+      const worldOf = new Map(loot.subs.filter((r) => r.world).map((r) => [`${r.fcId}|${r.register}`, r.world]));
+      const letterFor = new Map(game.sectors.filter((x) => x.location).map((x) => [x.id, x.location]));
+      const priceFor = (world, scope) => new Map([...new Set(inputs.loot.flatMap((r) => [r.primary_item, r.additional_item]).filter(Boolean))]
+        .map((id) => [Number(id), fakePrice(world, scope, id)]).filter(([, p]) => p !== null));
+      const market = marketLoot(voyagesFrom(inputs.loot.map((r) => ({ ...r, returned_at: new Date(r.returned_at) }))), { worldOf, priceFor, letterFor, windowDays: loot.windowDays });
+      const expectedLoot = {
+        windowDays: loot.windowDays,
+        totals: loot.totals,
+        subs: loot.subs.map((r) => ({ fcId: r.fcId, register: String(r.register), subName: r.subName, voyages: r.voyages, gil: r.gil, perVoyage: r.perVoyage,
+          perDay: r.perDay, route: r.route, lastAt: r.lastAt, character: r.character_name, world: r.world, expectedPerDay: r.expectedPerDay })),
+        routes: loot.routes.map((r) => ({ route: r.route, voyages: r.voyages, subs: r.subs, gil: r.gil, perVoyage: r.perVoyage })),
+        market: Object.fromEntries(['world', 'dc', 'region'].map((sc) => [sc, {
+          totals: market[sc].totals,
+          subs: [...market[sc].subs.entries()].map(([key, v]) => ({ key, ...v })),
+          routes: [...market[sc].routes.entries()].map(([route, v]) => ({ route, ...v })),
+        }])),
+      };
       const expected = subs.map((s) => row({
         cid: String(s.cid), sub_name: s.sub_name, current_setup: s.current_setup, current_route: s.current_route,
         current_map: s.current_map ? s.current_map.id : null, target_route: s.target_route, target_gil_day: s.target_gil_day === '' ? null : s.target_gil_day,
@@ -265,7 +322,7 @@ function randomFleet(seed, now, game) {
         spare_location: r.spare_location, recycled_from: r.recycled_from, due_at: r.due_at,
       }));
       for (const r of expectedParts) r.cid = String(r.cid);
-      for (const r of [...inputs.characters, ...inputs.subs, ...inputs.history, ...inputs.partsSubs]) r.cid = String(r.cid);
+      for (const r of [...inputs.characters, ...inputs.subs, ...inputs.history, ...inputs.partsSubs, ...inputs.forecasts, ...inputs.rankHistory]) r.cid = String(r.cid);
       for (const r of inputs.spares) { if (r.cid !== null) r.cid = String(r.cid); if (r.retainer_id !== null) r.retainer_id = String(r.retainer_id); }
       for (const r of inputs.rules) if (r.cid_override !== null) r.cid_override = String(r.cid_override);
       const methods = {};
@@ -274,10 +331,12 @@ function randomFleet(seed, now, game) {
         + `${subs.filter((s) => typeof s.current_gil_day === 'number').length} with a Current Gil/Day, ${subs.filter((s) => s.rank_up.nextBuild).length} with a Next Build; `
         + `dates: ${Object.entries(methods).map(([m, n]) => `${m} ${n}`).join(', ')}`);
       console.log(`   Look ahead 14 days: ${expectedParts.length} parts, ${expectedParts.filter((p) => p.due_at !== null).length} for builds coming up`);
-      cases.push({ name: `random fleet ${seed}`, now, inputs, expected, expectedParts });
+      console.log(`   Loot per Voyage over ${loot.windowDays} days: ${loot.totals.voyages} voyages, ${loot.subs.length} subs, ${loot.routes.length} routes, ${Math.round(loot.totals.gil)} gil`);
+      console.log(`   Next Rank dates checked: ${accuracy.count} (${accuracy.checks.length} listed), off by ${accuracy.averageOff === null ? '-' : (accuracy.averageOff / 3600000).toFixed(1)}h on average`);
+      cases.push({ name: `random fleet ${seed}`, now, inputs, expected, expectedParts, expectedLoot, expectedAccuracy: accuracy });
     }
     if (out) {
-      fs.writeFileSync(out, `${JSON.stringify({ about: 'Written by XIVFleetCompanion-App tests/db/routes-fixture.js: the fleet_route_* views, made-up game data and the app\'s Subs answers for made-up fleets.', game, cases })}\n`);
+      fs.writeFileSync(out, `${JSON.stringify({ about: 'Written by XIVFleetCompanion-App tests/db/routes-fixture.js: the fleet_route_* views, made-up game data and the app\'s Subs answers for made-up fleets.', game, itemPrices: ITEM_PRICES, cases })}\n`);
       console.log(`written to ${out}`);
     }
   } finally {

@@ -14,7 +14,7 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
+DROP VIEW IF EXISTS fleet_rankup_forecast_view, fleet_rankup_history_view, fleet_voyage_returns_view, fleet_voyage_loot_view, fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
   fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
   fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
   fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
@@ -849,3 +849,55 @@ CREATE OR REPLACE VIEW fleet_voyage_sectors_view AS
 SELECT CAST(v.fc_id AS text) AS fc_id, v.sub_register, v.sub_name, v.returned_at, v.sector, v.leg
 FROM companion_voyage_loot v
 WHERE v.returned_at >= now() - interval '14 days';
+
+-- Every sector of every voyage SubmarineTracker recorded over the Income window (Loot per Voyage, as the app's Income
+-- tab: ipc/details.js loadLoot), with what it brought back and the window's days.
+CREATE OR REPLACE VIEW fleet_voyage_loot_view AS
+WITH settings AS (
+  SELECT coalesce((SELECT CAST(setting_value AS int) FROM fleet_economics_settings
+                   WHERE setting_key = 'income_window_days' AND setting_value IN (3, 7, 14, 30)), 7) AS window_days
+)
+SELECT CAST(l.fc_id AS text) AS fc_id, l.sub_register, l.returned_at, l.sector, l.sub_name, l.primary_item, l.primary_count,
+       l.additional_item, l.additional_count, l.leg, st.window_days
+FROM companion_voyage_loot l
+CROSS JOIN settings st
+WHERE l.returned_at > now() - make_interval(days => st.window_days);
+
+-- How close the Next Rank dates came (the Subs tab's forecast line, ipc/subs.js loadForecastAccuracy): the dates the app
+-- saved over the last 30 days, each sub slot's recorded rank over the last 31 (a value recorded again unchanged left out,
+-- plus the last before), and when each recorded voyage came back over the last 31 days.
+CREATE OR REPLACE VIEW fleet_rankup_forecast_view AS
+SELECT f.cid, f.slot, f.rank, f.made_at, f.predicted_at, f.sub_name, CAST(c.fc_id AS text) AS fc_id, c.name AS character_name
+FROM companion_rankup_forecast f
+LEFT JOIN companion_character_current c ON c.cid = f.cid
+WHERE f.made_at >= now() - interval '30 days';
+
+CREATE OR REPLACE VIEW fleet_rankup_history_view AS
+WITH series AS (
+  SELECT DISTINCT f.cid, 'sub_rank:' || f.slot AS metric
+  FROM companion_rankup_forecast f
+  WHERE f.made_at >= now() - interval '30 days'
+)
+SELECT se.cid, se.metric, w.recorded_at, w.value
+FROM series se
+CROSS JOIN LATERAL (
+  SELECT recorded_at, value FROM (
+    SELECT h.recorded_at, h.value, lead(h.value) OVER newest_first AS earlier, row_number() OVER newest_first AS n
+    FROM companion_metric_history h
+    WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+      AND h.recorded_at > now() - interval '31 days'
+    WINDOW newest_first AS (ORDER BY h.recorded_at DESC)) inside
+  WHERE n = 1 OR earlier IS DISTINCT FROM value) w
+UNION ALL
+SELECT se.cid, se.metric, b.recorded_at, b.value
+FROM series se
+CROSS JOIN LATERAL (
+  SELECT h.recorded_at, h.value FROM companion_metric_history h
+  WHERE h.subject_type = 'character' AND h.subject_id = se.cid AND h.metric = se.metric
+    AND h.recorded_at <= now() - interval '31 days'
+  ORDER BY h.recorded_at DESC LIMIT 1) b;
+
+CREATE OR REPLACE VIEW fleet_voyage_returns_view AS
+SELECT DISTINCT CAST(v.fc_id AS text) AS fc_id, v.sub_name, v.returned_at
+FROM companion_voyage_loot v
+WHERE v.returned_at >= now() - interval '31 days' AND v.sub_name IS NOT NULL;

@@ -186,6 +186,18 @@ CREATE TABLE companion_voyage_loot (
 );
 CREATE INDEX companion_voyage_loot_returned_idx ON companion_voyage_loot (returned_at);
 
+-- Each sub's Next Rank date as the app saved it, once an hour (the Subs tab's forecast line compares them with the real
+-- rank-ups).
+CREATE TABLE companion_rankup_forecast (
+    cid          INTEGER NOT NULL,
+    slot         INTEGER NOT NULL,
+    rank         INTEGER NOT NULL,
+    made_at      REAL    NOT NULL,
+    predicted_at REAL    NOT NULL,
+    sub_name     TEXT,
+    PRIMARY KEY (cid, slot, rank, made_at)
+);
+
 CREATE TABLE companion_venture_result (
     owner_cid     INTEGER NOT NULL,
     retainer_name TEXT    NOT NULL,
