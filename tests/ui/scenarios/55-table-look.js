@@ -34,4 +34,24 @@ module.exports = async (t) => {
   check(Math.abs(after[last] - before[last] - 120) <= 2, `the last column grew by 120px (${before[last]} → ${after[last]})`);
   check(after.slice(0, last).every((w, i) => Math.abs(w - before[i]) <= 1), 'the other columns kept their widths');
   await shot('table-look-roster');
+
+  // Character and world together, FC points in aqua, supplies that don't count dim.
+  check(await ev(`!!document.querySelector('tr[data-cid="${BEX}"] .world-after')`), 'the world follows the name, softer');
+  check(!(await ev(`[...document.querySelectorAll('thead th')].some((th) => th.innerText.trim().toUpperCase().startsWith('WORLD'))`)), 'no separate World column');
+
+  // Retainers: each owner once, the class in its role's colour with the level softer.
+  await nav('Retainers');
+  await waitFor(`document.querySelectorAll('tbody tr').length > 1`, 'the retainers', 20000);
+  const owners = await ev(`[...document.querySelector('table').querySelectorAll('tbody tr')].map((tr) => tr.children[0].innerText.trim())`);
+  check(owners[0] !== '' && owners[1] === '' && owners[2] !== '' && owners[3] === '', 'an owner with several retainers is named once: ' + JSON.stringify(owners.slice(0, 4)));
+  // The test data's retainers are crafters (no role, so plain); the roles themselves:
+  check(await ev(`[roleClass('PLD'), roleClass('GLA'), roleClass('WHM'), roleClass('CNJ'), roleClass('SMN'), roleClass('ACN'), roleClass('BTN') || 'none'].join(' ')`)
+    === 'role-tank role-tank-base role-healer role-healer-base role-dps role-dps-base none', 'classes are coloured by role, base classes lighter, gatherers plain');
+  await shot('table-look-retainers');
+
+  // Subs: a bar for the rank's progress, builds with softer dashes.
+  await nav('Subs');
+  await waitFor(`document.querySelectorAll('tbody tr').length > 0`, 'the subs', 20000);
+  check(await ev(`document.querySelectorAll('.rank-bar').length > 0`), 'a bar for how far to the next rank');
+  await shot('table-look-subs');
 };

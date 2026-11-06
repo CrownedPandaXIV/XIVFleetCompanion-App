@@ -39,16 +39,14 @@ const HOUSE_WARNING_COLUMN_DEFS = [
 const HOUSE_WARNING_DUPLICATE_EXTRAS = ['x_account'];
 
 const READY_SUB_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.character_name, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
   { key: 'rank', label: 'Rank', cell: (r) => r.rank, sort: (r) => Number(r.rank) },
   { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p) => `${p.slot} ${p.part} (${p.spare ? `spare in ${p.spare}` : 'to craft'})`).join(', '), sortable: false },
 ];
 
 const LOW_SUPPLY_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (w) => w.character_name, sort: (w) => w.character_name },
-  { key: 'world', label: 'World', cell: (w) => w.world, sort: (w) => w.world },
+  { key: 'character', label: 'Character', locked: true, cell: (w) => <CharacterName name={w.character_name} world={w.world} />, sort: (w) => w.character_name },
   { key: 'account', label: 'Account', cell: (w) => w.account_label, sort: (w) => w.account_label },
   { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? 'var(--danger)' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
   { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? 'var(--danger)' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
@@ -56,8 +54,7 @@ const LOW_SUPPLY_COLUMN_DEFS = [
 const SUMMARY_CHARACTER_DUPLICATE_EXTRAS = ['x_world', 'x_account', 'x_ceruleum', 'x_repair_kits'];
 
 const RETAINER_IDLE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.owner_name, sort: (r) => r.owner_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.owner_name} world={r.world} />, sort: (r) => r.owner_name },
   { key: 'account', label: 'Account', cell: (r) => r.account_label || '—', sort: (r) => r.account_label },
   { key: 'retainer', label: 'Retainer', cell: (r) => r.retainer_name, sort: (r) => r.retainer_name },
   { key: 'class', label: 'Class', cell: (r) => r.job_abbreviation || '—', sort: (r) => r.job_abbreviation },

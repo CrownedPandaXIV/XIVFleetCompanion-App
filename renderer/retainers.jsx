@@ -18,7 +18,8 @@ function RetainerStatusCell({ hasVenture, ventureEndsAt, hasJob = true }) {
 
   if (!hasVenture || !endEpoch) return <span className={hasJob ? 'tone-warn' : 'dim'}>Idle</span>;
   if (!onVenture) return <span className="tone-good">Venture Complete</span>;
-  return formatCountdown(endEpoch - nowEpoch);
+  // The countdown, then when it's done, softer.
+  return <>{formatCountdown(endEpoch - nowEpoch)}<span className="dim" style={{ marginLeft: 8 }}>{finishClock(endEpoch)}</span></>;
 }
 
 // One equipped-slot row inside the Avg ilvl hover breakdown. Mismatch/Empty
@@ -101,6 +102,12 @@ function GearSlotRow({ slot, jobAbbreviation, targetMode, targetValue, onlyCraft
   );
 }
 
+// Green when the gear meets the retainer's target (every slot OK), amber when any slot falls short, none without one.
+function gearTone(targetMode, slots) {
+  if (!targetMode || slots.length === 0) return undefined;
+  return slots.some((s) => s.status === 'Mismatch' || s.status === 'Wrong Job' || s.status === 'Empty') ? 'tone-warn' : 'tone-good';
+}
+
 function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetValue, onlyCrafted }) {
   const [hovering, setHovering] = useState(false);
   const slots = gearSlots || [];
@@ -111,7 +118,7 @@ function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetVa
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      <span style={slots.length > 0 ? { textDecoration: 'underline dotted', textUnderlineOffset: '3px' } : undefined}>
+      <span className={gearTone(targetMode, slots)} style={slots.length > 0 ? { textDecoration: 'underline dotted', textUnderlineOffset: '3px' } : undefined}>
         {typeof avgIlvl === 'number' ? avgIlvl.toFixed(1) : '—'}
       </span>
       {hovering && slots.length > 0 && (
@@ -159,10 +166,13 @@ function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetVa
 // The Retainers tab's own columns. Target Mode / Value / Only Crafted / Actions edit the row's target, so they read
 // and change the row's working state, passed in as `ctx`.
 const RETAINER_COLUMN_DEFS = [
-  { key: 'owner', label: 'Owner', cell: (r) => r.owner_name || '—', sort: (r) => r.owner_name },
-  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world || '—'}</span>, sort: (r) => r.world },
+  // The owner once, on their first retainer (while the table isn't sorted by a column).
+  { key: 'owner', label: 'Owner', cell: (r) => (r.sameOwnerAbove ? '' : <CharacterName name={r.owner_name} world={r.world} />), sort: (r) => r.owner_name },
   { key: 'retainer', label: 'Retainer', locked: true, cell: (r) => r.retainer_name, sort: (r) => r.retainer_name },
-  { key: 'job', label: 'Class/Level', cell: (r) => (r.job_abbreviation ? `${r.job_abbreviation}/${r.level ?? '?'}` : '—'), sort: (r) => r.job_abbreviation },
+  // The class in its role's colour, the level softer.
+  { key: 'job', label: 'Class/Level', cell: (r) => (r.job_abbreviation
+    ? <><span className={roleClass(r.job_abbreviation)}>{r.job_abbreviation}</span> <span className="dim">{r.level ?? '?'}</span></>
+    : <span className="dim">—</span>), sort: (r) => r.job_abbreviation },
   { key: 'gil', label: 'Gil', td: (r) => <td className="num"><GilText gil={typeof r.gil === 'number' ? r.gil : null} /></td>, sort: (r) => (typeof r.gil === 'number' ? r.gil : null) },
   { key: 'avgIlvl', label: 'Avg ilvl', sort: (r) => (typeof r.avg_ilvl === 'number' ? r.avg_ilvl : null),
     td: (r) => <AvgIlvlCell avgIlvl={r.avg_ilvl} gearSlots={r.gear_slots} jobAbbreviation={r.job_abbreviation} targetMode={r.target_mode} targetValue={r.target_value} onlyCrafted={r.only_crafted} /> },
@@ -288,8 +298,9 @@ function RetainersView({ refreshKey }) {
         <tr><ColumnHeadCells cols={retainersCols} sortColumn={retainersSort.sortColumn} sortDirection={retainersSort.sortDirection} onSortClick={retainersSortOnClick} /></tr>
       </thead>
       <tbody>
-        {rowsToShow.map((r) => (
-          <RetainerTargetRow key={r.retainer_id} retainer={r} cols={retainersCols} onSaveTarget={handleSaveTarget} onClearTarget={handleClearTarget} />
+        {rowsToShow.map((r, i) => (
+          <RetainerTargetRow key={r.retainer_id}
+            retainer={{ ...r, sameOwnerAbove: !retainersSort.sortColumn && i > 0 && String(rowsToShow[i - 1].owner_cid) === String(r.owner_cid) }} cols={retainersCols} onSaveTarget={handleSaveTarget} onClearTarget={handleClearTarget} />
         ))}
       </tbody>
     </table>

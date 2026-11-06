@@ -18,7 +18,7 @@ module.exports = async (t) => {
   check(await ev(`document.querySelectorAll('tbody tr[data-cid]').length`) === 80, 'Character Roster lists all 80 characters');
   await clickText('label', 'Group by account');
   await sleep(300);
-  const names = await ev(`[...document.querySelectorAll('tbody tr[data-cid]')].map(tr=>tr.children[1].innerText.trim())`);
+  const names = await ev(`[...document.querySelectorAll('tbody tr[data-cid]')].map(tr=>tr.children[1].innerText.trim().replace(/ \\([^()]*\\)$/, ''))`);
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
   check(JSON.stringify(names) === JSON.stringify(sorted), 'with no saved order, the roster is in name order: ' + names.slice(0, 3).join(', '));
 

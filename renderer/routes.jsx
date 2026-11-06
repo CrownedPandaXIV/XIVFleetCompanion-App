@@ -27,8 +27,7 @@ function computeSuboptimalSubs(rows) {
 
 // The Route Optimization tab's own columns (rows are subs that are not on their Target Route).
 const ROUTE_OPT_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.character_name, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
   { key: 'currentRoute', label: 'Current Route', cell: (r) => r.current_route || '—', sort: (r) => r.current_route || null },
   { key: 'currentGilDay', label: 'Current Gil/Day', cell: (r) => formatGilDay(r.current_gil_day), sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },

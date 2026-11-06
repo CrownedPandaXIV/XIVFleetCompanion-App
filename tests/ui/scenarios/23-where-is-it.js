@@ -27,7 +27,15 @@ module.exports = async (t) => {
   };
   const results = () => ev(`[...document.querySelectorAll('.where-item')].map(div => ({
     title: div.querySelector('h3').innerText.trim(),
-    rows: [...div.querySelectorAll('tbody tr')].map(tr => [...tr.children].map(td => td.innerText.trim())),
+    // The name and its world are one cell; split back into two so each row reads name, world, where, quantity.
+    rows: [...div.querySelectorAll('tbody tr')].map(tr => [...tr.children].flatMap((td, i) => {
+      if (i > 0 || tr.children.length === 1) return [td.innerText.trim()];
+      const w = td.querySelector('.world-after');
+      const c = td.cloneNode(true);
+      const cw = c.querySelector('.world-after');
+      if (cw) cw.remove();
+      return [c.textContent.trim(), w ? w.textContent.replace(/[()]/g, '').trim() : ''];
+    })),
   }))`);
   const statusText = () => ev(`[...document.querySelectorAll('.where-is-it > .status')].map(s => s.innerText).join(' ')`);
 

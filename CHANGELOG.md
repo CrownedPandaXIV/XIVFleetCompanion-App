@@ -55,6 +55,18 @@ do by hand.
 - **Every column can be resized, the last one too**: a table keeps each column at the width it's given instead of
   stretching them all to fill the page, so dragging the last column's edge works, the room left over sits after it,
   and a wider table scrolls sideways.
+- **Character and world together**: every table with characters (Roster, Retainers, Subs, Supplies, Salvage, Income,
+  Route Optimization, Parts, Where is it?, the Summary's lists) names each with its world after it, softer, instead of
+  a separate World column, as the plugin does. A copied or exported table gives it as "Wa'kana Gojo (Cuchulainn)".
+- **Livelier Subs and Retainers**: a thin bar beside each sub's rank for how far to the next, softer dashes in builds,
+  subs back in green and in port softer; each retainer's owner named once, its class in its role's colour (tanks
+  blue, healers green, damage red, a base class such as Gladiator or Conjurer a lighter shade) with the level softer,
+  Avg ilvl green when the gear meets the gear target and amber when it falls short, and the time a venture is done
+  after its countdown.
+- FC points in aqua, and ceruleum and repair kits that don't count toward the warnings (no sub built, or not synced)
+  dim rather than plain.
+- **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
+  Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.

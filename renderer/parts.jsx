@@ -32,8 +32,7 @@ function groupNeedsByCharacter(rows) {
 // automatically when the tab is sorted into one flat table, and available to add in the per-character view.
 const PARTS_DETAIL_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', locked: true, cell: (n) => n.sub_name, sort: (r) => r.sub_name },
-  { key: 'character', label: 'Character', default: false, cell: (n) => n.character_name, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', default: false, cell: (n) => n.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', default: false, cell: (n) => <CharacterName name={n.character_name} world={n.world} />, sort: (r) => r.character_name },
   { key: 'rank', label: 'Rank', cell: (n) => n.rank, sort: (r) => r.rank },
   { key: 'slot', label: 'Slot', cell: (n) => n.slot, sort: (r) => r.slot },
   { key: 'needed', label: 'Needed', cell: (n) => needsLabel(n), sort: (r) => needsLabel(r) },
@@ -480,7 +479,7 @@ function PartsView({ refreshKey }) {
     rows,
     idOf: (r) => r.cid,
     refreshKey,
-    contextKeys: ['character', 'world'],
+    contextKeys: ['character'],
     contextActive: !!partsDetailSort.sortColumn
   });
   const partsDetailRows = partsDetailCols.rows;

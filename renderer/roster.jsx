@@ -10,15 +10,14 @@ const ROSTER_SUB_COLUMNS = ['ceruleum', 'repairKits', 'submarines'];
 const ROSTER_RETAINER_COLUMNS = ['retainers'];
 
 const ROSTER_COLUMN_DEFS = [
-  { key: 'name', label: 'Name', locked: true, cell: (row) => <>{row.name}<NotSyncedTag behindMs={row.not_synced_ms} /><TrendDetailLink kind="character" id={row.cid} name={row.name} /></>, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (row) => <span className="dim">{row.world}</span>, sort: (r) => r.world },
+  { key: 'name', label: 'Name', locked: true, cell: (row) => <>{row.name}<WorldAfter world={row.world} /><NotSyncedTag behindMs={row.not_synced_ms} /><TrendDetailLink kind="character" id={row.cid} name={row.name} /></>, sort: (r) => r.name },
   { key: 'fc', label: 'FC', cell: (row) => (row.fc_name ? <span className="fc-name">{row.fc_name}</span> : <span className="dim">—</span>), sort: (r) => r.fc_name || '' },
-  { key: 'fcPoints', label: 'FC Points', td: (row) => <td className="num">{row.fc_points === null || row.fc_points === undefined ? '—' : Number(row.fc_points).toLocaleString()}</td>, sort: (r) => (r.fc_points === null || r.fc_points === undefined ? null : Number(r.fc_points)) },
+  { key: 'fcPoints', label: 'FC Points', td: (row) => <td className="num fc-points">{row.fc_points === null || row.fc_points === undefined ? '—' : Number(row.fc_points).toLocaleString()}</td>, sort: (r) => (r.fc_points === null || r.fc_points === undefined ? null : Number(r.fc_points)) },
   { key: 'house', label: 'House', cell: (row) => (row.has_house ? <span className="address">{formatHouse(row)}</span> : <span className="dim">—</span>), sort: (r) => formatHouse(r) },
   { key: 'gil', label: 'Gil', td: (row) => <td className="num"><GilText gil={row.gil} /></td>, sort: (r) => Number(r.gil) },
   // Green at or above the warning, amber under it, red under half of it (characters/roster-warnings.js).
-  { key: 'ceruleum', label: 'Ceruleum', td: (row) => <td className={`num ${toneClass(row.ceruleum_tone) || ''}`} title={row.low_ceruleum ? 'Below the low-ceruleum warning (Settings → General → Warnings)' : undefined}>{row.ceruleum}</td>, sort: (r) => Number(r.ceruleum) },
-  { key: 'repairKits', label: 'Repair Kits', td: (row) => <td className={`num ${toneClass(row.repair_tone) || ''}`} title={row.low_repair ? 'Below the low-repair-kit warning (Settings → General → Warnings)' : undefined}>{row.repair_kits}</td>, sort: (r) => Number(r.repair_kits) },
+  { key: 'ceruleum', label: 'Ceruleum', td: (row) => <td className={`num ${toneClass(row.ceruleum_tone) || 'dim'}`} title={row.low_ceruleum ? 'Below the low-ceruleum warning (Settings → General → Warnings)' : undefined}>{row.ceruleum}</td>, sort: (r) => Number(r.ceruleum) },
+  { key: 'repairKits', label: 'Repair Kits', td: (row) => <td className={`num ${toneClass(row.repair_tone) || 'dim'}`} title={row.low_repair ? 'Below the low-repair-kit warning (Settings → General → Warnings)' : undefined}>{row.repair_kits}</td>, sort: (r) => Number(r.repair_kits) },
   { key: 'retainers', label: 'Retainers', td: (row) => <td className="num">{row.retainer_count}</td>, sort: (r) => r.retainer_count },
   // Subs as dots out of the slots unlocked: green when every slot has one, amber with a slot free.
   { key: 'submarines', label: 'Submarines', sort: (r) => r.submarine_count, cell: (row) => row.submarine_count,

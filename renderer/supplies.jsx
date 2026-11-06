@@ -37,8 +37,7 @@ function supplyColumnDefs(metric, label) {
 
 // The Supplies table's own columns (rows are characters with subs).
 const SUPPLY_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world}</span>, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
   ...supplyColumnDefs('ceruleum', 'Ceruleum'),
   ...supplyColumnDefs('repair_kits', 'Repair kits'),
 ];

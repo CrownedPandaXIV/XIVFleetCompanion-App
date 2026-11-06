@@ -60,8 +60,7 @@ function SalvageBreakdownCell({ total, breakdown }) {
 
 // The Salvage tab's own columns (rows are characters).
 const SALVAGE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => <>{r.character_name}<TrendDetailLink kind="character" id={r.cid} name={r.character_name} /></>, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world}</span>, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <>{r.character_name}<WorldAfter world={r.world} /><TrendDetailLink kind="character" id={r.cid} name={r.character_name} /></>, sort: (r) => r.character_name },
   { key: 'standard', label: 'Standard Salvage', td: (r) => <SalvageBreakdownCell total={r.standard_total} breakdown={r.standard_breakdown} />, sort: (r) => r.standard_total },
   { key: 'extravagant', label: 'Extravagant Salvage', td: (r) => <SalvageBreakdownCell total={r.extravagant_total} breakdown={r.extravagant_breakdown} />, sort: (r) => r.extravagant_total },
   { key: 'value', label: 'Value', td: (r) => <td className="num"><GilText gil={r.calculated_gil} /></td>, sort: (r) => Number(r.calculated_gil) }

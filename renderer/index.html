@@ -33,6 +33,7 @@
       --gil: #f2d06b;
       --address: #8cc4f2;
       --fc: #b8a6f0;
+      --fc-points: #5fd3c8;
     }
     table {
       width: 100%;
@@ -50,6 +51,17 @@
     .address { color: var(--address); }
     .fc-name { color: var(--fc); }
     .dim { color: var(--dim); }
+    .world-after { color: var(--dim); margin-left: 6px; }
+    .fc-points { color: var(--fc-points); }
+    .rank-bar { display: inline-block; width: 36px; height: 4px; margin-right: 8px; vertical-align: middle; border-radius: 2px; background: #2a2e38; overflow: hidden; }
+    .rank-bar > span { display: block; height: 100%; background: #5b8def; }
+    /* A class by its role (tables.jsx roleClass), the same as the plugin's. */
+    .role-tank { color: #5b8def; }
+    .role-tank-base { color: #a3bff5; }
+    .role-healer { color: #5fb870; }
+    .role-healer-base { color: #a6d9af; }
+    .role-dps { color: #e06464; }
+    .role-dps-base { color: #efa6a6; }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .pips { display: inline-flex; gap: 5px; vertical-align: middle; cursor: help; }
     .pip { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; }
@@ -57,7 +69,7 @@
     .pip.on.warn { background: var(--warn); }
     .pip.off { border: 1.5px solid var(--dim); }
     /* The count behind the dots: not shown, but copied and exported with the table. */
-    .pips-count { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .pips-count, .copy-only { font-size: 0; }
     th, td {
       text-align: left;
       padding: 8px 24px;

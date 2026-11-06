@@ -87,5 +87,5 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster');
   await sleep(400);
   const roster = await headers();
-  check(!roster.includes('tracked members') && roster.includes('house') && roster.indexOf('name') < roster.indexOf('world'), 'each tab keeps its own layout');
+  check(!roster.includes('tracked members') && roster.includes('house') && roster.indexOf('name') < roster.indexOf('fc'), 'each tab keeps its own layout');
 };

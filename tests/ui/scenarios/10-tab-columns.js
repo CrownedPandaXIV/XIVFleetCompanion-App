@@ -26,19 +26,19 @@ module.exports = async (t) => {
   const TABS = [
     {
       name: 'Salvage', nav: 'Salvage',
-      default: ['character', 'world', 'standard salvage', 'extravagant salvage', 'value'],
-      move: ['value', 'world'], remove: 'World', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
+      default: ['character', 'standard salvage', 'extravagant salvage', 'value'],
+      move: ['value', 'standard salvage'], remove: 'Extravagant Salvage', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
     },
     {
       name: 'Subs', nav: 'Subs',
       default: ['sub', 'status', 'rank', 'next rank', 'next build', 'current setup', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'craft?'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
-      afterSort: { header: 'rank', expectFirst: ['character', 'world', 'sub'] },
+      afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
     {
       name: 'Retainers', nav: 'Retainers',
-      default: ['owner', 'world', 'retainer', 'class/level', 'gil', 'avg ilvl', 'venture type', 'status', 'target mode', 'target value', 'only crafted?', 'actions'],
-      move: ['gil', 'world'], remove: 'Venture Type', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
+      default: ['owner', 'retainer', 'class/level', 'gil', 'avg ilvl', 'venture type', 'status', 'target mode', 'target value', 'only crafted?', 'actions'],
+      move: ['gil', 'retainer'], remove: 'Venture Type', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       editTarget: true,
     },
     {
@@ -50,12 +50,12 @@ module.exports = async (t) => {
       name: 'Parts detail', nav: 'Parts', prepare: async () => { await pressWhenThere('Detail'); },
       default: ['sub', 'rank', 'slot', 'needed', 'status'],
       move: ['status', 'rank'], remove: 'Slot', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
-      afterSort: { header: 'rank', expectFirst: ['character', 'world', 'sub'] },
+      afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
     {
       name: 'Route Optimization', nav: 'Route Optimization',
-      default: ['character', 'world', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain'],
-      move: ['gil/day gain', 'world'], remove: 'Sub', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
+      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain'],
+      move: ['gil/day gain', 'sub'], remove: 'Sub', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
     },
     {
       name: 'Inventory (Fleet)', nav: 'Inventory', prepare: async () => { await pressWhenThere('Fleet'); },
@@ -124,13 +124,13 @@ module.exports = async (t) => {
     }
     await c.closeMenu();
 
-    // sorting a per-character table turns on Character and World automatically
+    // sorting a per-character table turns on Character (with its world) automatically
     if (spec.afterSort) {
       const shown = await c.headers();
       check(!shown.includes('character'), `${label}: Character is not a column while the tab is split by character`);
       await c.clickHeader(spec.afterSort.header); await sleep(400);
       const flat = await c.headers();
-      check(JSON.stringify(flat.slice(0, 3)) === JSON.stringify(spec.afterSort.expectFirst), `${label}: sorting shows Character and World in front: ${flat.slice(0, 4).join(', ')}`);
+      check(JSON.stringify(flat.slice(0, spec.afterSort.expectFirst.length)) === JSON.stringify(spec.afterSort.expectFirst), `${label}: sorting shows Character in front: ${flat.slice(0, 4).join(', ')}`);
       for (let i = 0; i < 2; i++) { await c.clickHeader(spec.afterSort.header); await sleep(250); }
       check((await c.headers()).join() === shown.join(), `${label}: clearing the sort returns to the same columns`);
     }

@@ -49,9 +49,9 @@ module.exports = async (t) => {
   check(lootRow && lootRow[0] === pick.name && lootRow[3] === '2' && lootRow[4] === (121500 / 2).toLocaleString(),
     'a sub\'s voyages, with its character and gil per voyage: ' + JSON.stringify(lootRow));
   check(await ev(`[...document.querySelectorAll('.loot-routes tbody tr')].some(r => r.children[0].innerText.trim() !== '')`), 'the routes taken are listed');
-  const ventureRow = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim() === ${JSON.stringify(pick.name)});
+  const ventureRow = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim().replace(/ \\([^()]*\\)$/, '') === ${JSON.stringify(pick.name)});
     return tr ? [...tr.children].map(td => td.innerText.trim()) : null; })()`);
-  check(ventureRow && ventureRow[2] === '2' && ventureRow[3] === '3', 'venture rewards per character: 2 retainers, 3 rewards: ' + JSON.stringify(ventureRow));
+  check(ventureRow && ventureRow[1] === '2' && ventureRow[2] === '3', 'venture rewards per character: 2 retainers, 3 rewards: ' + JSON.stringify(ventureRow));
   await shot('loot');
 
   // ---- Gil & Market ----

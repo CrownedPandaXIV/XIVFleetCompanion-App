@@ -41,7 +41,7 @@ const FC_COLUMN_DEFS = [
   { key: 'fcName', label: 'FC Name', locked: true, cell: (r) => <>{r.fc_name ? <span className="fc-name">{r.fc_name}</span> : <span className="dim">—</span>}{r.fc_id && <TrendDetailLink kind="fc" id={r.fc_id} name={r.fc_name || 'Free Company'} />}</>, sort: (r) => r.fc_name },
   { key: 'leader', label: 'Leader', cell: (r) => r.fc_master || '—', sort: (r) => r.fc_master },
   { key: 'world', label: 'World', cell: (r) => r.fc_world || '—', sort: (r) => r.fc_world },
-  { key: 'points', label: 'FC Points', td: (r) => <td className="num">{typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'}</td>, sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
+  { key: 'points', label: 'FC Points', td: (r) => <td className="num fc-points">{typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'}</td>, sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
   { key: 'members', label: 'Members', td: (r) => <td className="num">{typeof r.total_members === 'number' ? r.total_members : '—'}</td>, sort: (r) => (typeof r.total_members === 'number' ? r.total_members : null) },
   { key: 'house', label: 'House', td: (r) => <HouseCell row={r} />, sort: (r) => (r.has_house ? 1 : 0) },
   // Unknown dates sort as the oldest, since they are the ones to check.

@@ -26,6 +26,35 @@ function GilText({ gil }) {
   return <span className="gil">{g.toLocaleString()}</span>;
 }
 
+// A character's world after its name, softer (as the plugin's): "Wa'kana Gojo  Cuchulainn".
+function WorldAfter({ world }) {
+  // The brackets aren't shown, but a copied or exported table reads "Wa'kana Gojo (Cuchulainn)".
+  return world ? <span className="world-after"><span className="copy-only"> (</span>{world}<span className="copy-only">)</span></span> : null;
+}
+function CharacterName({ name, world }) {
+  return <>{name || '—'}<WorldAfter world={world} /></>;
+}
+
+// A class's role for its colour, as the plugin's (FleetReader.JobRole): tanks blue, healers green, damage red, a
+// base class (Gladiator, Conjurer, ...) a lighter shade of its job's; none for gatherers and crafters.
+const JOB_ROLES = {
+  tank: ['PLD', 'WAR', 'DRK', 'GNB'], tankBase: ['GLA', 'MRD'],
+  healer: ['WHM', 'SCH', 'AST', 'SGE'], healerBase: ['CNJ'],
+  dps: ['MNK', 'DRG', 'NIN', 'SAM', 'RPR', 'VPR', 'BRD', 'MCH', 'DNC', 'BLM', 'SMN', 'RDM', 'PCT', 'BLU'],
+  dpsBase: ['PGL', 'LNC', 'ROG', 'ARC', 'THM', 'ACN'],
+};
+function roleClass(abbreviation) {
+  const role = Object.keys(JOB_ROLES).find((key) => JOB_ROLES[key].includes(abbreviation));
+  return role ? `role-${role.replace('Base', '-base').toLowerCase()}` : undefined;
+}
+
+// When something is done, for after its countdown: "5:12 PM" today, "Thu 5:12 PM" later (as the plugin's).
+function finishClock(endsAtUnix, now = new Date()) {
+  const at = new Date(Number(endsAtUnix) * 1000);
+  const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return at.toDateString() === now.toDateString() ? clock : `${at.toLocaleDateString([], { weekday: 'short' })} ${clock}`;
+}
+
 // Dots, filled out of total (subs out of the sub slots unlocked): green when every one is filled, amber otherwise.
 function Pips({ filled, total, title }) {
   const tone = filled >= total ? 'good' : 'warn';

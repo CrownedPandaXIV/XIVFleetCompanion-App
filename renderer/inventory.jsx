@@ -501,8 +501,7 @@ function FleetInventoryTab() {
 // come in Roster order, grouped by account like the other tabs (an FC chest with the member holding it).
 // Where Is It?: one table per item found, all sharing these columns.
 const WHERE_COLUMN_DEFS = [
-  { key: 'who', label: 'Character / FC', locked: true, cell: (p) => `${p.who}${p.kind === 'fc' ? ' (FC)' : ''}`, sort: (p) => p.who },
-  { key: 'world', label: 'World', cell: (p) => p.world || '', sort: (p) => p.world },
+  { key: 'who', label: 'Character / FC', locked: true, cell: (p) => <CharacterName name={`${p.who}${p.kind === 'fc' ? ' (FC)' : ''}`} world={p.world} />, sort: (p) => p.who },
   { key: 'where', label: 'Where', cell: (p) => p.where, sort: (p) => p.where },
   { key: 'qty', label: 'Quantity', cell: (p) => p.qty.toLocaleString(), sort: (p) => p.qty },
 ];

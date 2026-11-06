@@ -19,8 +19,7 @@ const incomeIf = (r, value) => (r.enough ? value : null);
 // The Income table's own columns (rows are characters with subs). A character with less than a day of
 // salvage history says so in the Salvage column and leaves the other real-income columns blank.
 const INCOME_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world}</span>, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
   { key: 'subs', label: 'Subs', td: (r) => <td className="num">{r.subs}</td>, sort: (r) => r.subs },
   {
     key: 'salvage', label: 'Salvage / day',
@@ -61,8 +60,7 @@ const LOOT_ROUTE_COLUMN_DEFS = [
   { key: 'per_voyage', label: 'Vendor gil / voyage', cell: (r) => incomeGil(r.perVoyage), sort: (r) => r.perVoyage },
 ];
 const VENTURE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world || '—'}</span>, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
   { key: 'retainers', label: 'Retainers', td: (r) => <td className="num">{r.retainers}</td>, sort: (r) => r.retainers },
   { key: 'rewards', label: 'Rewards', td: (r) => <td className="num">{r.rewards}</td>, sort: (r) => r.rewards },
   { key: 'per_day', label: 'Vendor value / day', td: (r) => <td className="income-real num tone-good">{incomeGil(r.perDay)}</td>, sort: (r) => r.perDay },
