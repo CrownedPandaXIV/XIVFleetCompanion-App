@@ -15,12 +15,16 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_item_totals_view;
+DROP VIEW IF EXISTS fleet_holdings_view;
+DROP VIEW IF EXISTS fleet_fcs_view;
 DROP VIEW IF EXISTS fleet_pcs_view;
 DROP VIEW IF EXISTS fleet_retainer_gear_view;
 DROP VIEW IF EXISTS fleet_retainers_view;
 DROP VIEW IF EXISTS fleet_roster_view;
 DROP VIEW IF EXISTS fleet_alerts_view;
 DROP VIEW IF EXISTS fleet_summary_view;
+DROP VIEW IF EXISTS fleet_retainer_counts_view;
 DROP VIEW IF EXISTS fleet_not_synced_view;
 DROP VIEW IF EXISTS fleet_subs_view;
 DROP VIEW IF EXISTS fleet_supplies_view;
@@ -159,6 +163,21 @@ JOIN accounts a ON a.account = coalesce(nullif(c.account_label, ''), 'Ungrouped'
 CROSS JOIN setting st
 WHERE a.newest - c.last_synced_at >= st.minutes * 60;
 
+-- The retainers with a class right now, as the app's Summary (characters/retainer-summary.js): how many there are,
+-- ventures done and waiting to be collected, away on one, and without one. Only retainers of characters in the Roster
+-- that the plugin still syncs. A venture with no end time counts as away, as there. Small and quick, so the plugin
+-- reads it with the subs (every 30 seconds): a retainer caught between two ventures while AutoRetainer collects and
+-- sends it again clears at the next read after the next sync.
+CREATE VIEW fleet_retainer_counts_view AS
+SELECT count(*) AS retainers,
+       count(*) FILTER (WHERE rl.has_venture AND coalesce(rl.venture_ends_at, 0) <> 0 AND rl.venture_ends_at <= ((julianday('now') - 2440587.5) * 86400.0)) AS ventures_done,
+       count(*) FILTER (WHERE rl.has_venture AND NOT (coalesce(rl.venture_ends_at, 0) <> 0 AND rl.venture_ends_at <= ((julianday('now') - 2440587.5) * 86400.0))) AS retainers_away,
+       count(*) FILTER (WHERE NOT coalesce(rl.has_venture, 0)) AS retainers_idle
+FROM companion_retainer_lookup rl
+JOIN companion_character_current c ON c.cid = rl.owner_cid
+WHERE rl.job > 0
+  AND rl.owner_cid NOT IN (SELECT cid FROM fleet_not_synced_view);
+
 CREATE VIEW fleet_summary_view AS
 WITH thresholds AS (
   SELECT
@@ -174,10 +193,7 @@ subs AS (
   FROM fleet_subs_view
 ),
 retainers AS (
-  SELECT count(*) AS retainers,
-         count(*) FILTER (WHERE has_venture AND venture_ends_at <= ((julianday('now') - 2440587.5) * 86400.0)) AS ventures_done,
-         count(*) FILTER (WHERE NOT coalesce(has_venture, 0)) AS retainers_idle
-  FROM companion_retainer_lookup WHERE coalesce(job, 0) > 0
+  SELECT retainers, ventures_done, retainers_idle FROM fleet_retainer_counts_view
 ),
 supplies AS (
   SELECT count(*) FILTER (WHERE t.ceruleum > 0 AND f.ceruleum < t.ceruleum) AS low_ceruleum,
@@ -290,3 +306,152 @@ SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready,
        submarinetracker_found, venture_stats_found, characters_synced, characters_left_out, characters_elsewhere,
        problems, check_text, check_to_fix, check_at
 FROM companion_pc_status;
+
+-- Every Free Company, as the Free Companies tab (characters/fc-directory-rows.js): its newest details (from whichever
+-- member's row was updated last), leader, points, rank, members, house, when a member last entered it and how that
+-- compares with the house warning (house_level: 'ok', 'warn', 'danger' from 30 days, 'unknown' with no date; NULL
+-- without a house), and, without a house, when it can bid (eligibility: 'Eligible', 'Eligible in N days' or 'Rank too
+-- low (N/6)', 30 days after founding or FC Tracker's override date, at rank 6). home_world_id is a World number the
+-- plugin names. account_label: the first of its members' account labels; sort_index: its first member in the Roster.
+CREATE VIEW fleet_fcs_view AS
+WITH settings AS (
+  SELECT coalesce((SELECT CAST(setting_value AS INTEGER) FROM fleet_economics_settings
+                   WHERE setting_key = 'house_warn_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 44), 7) AS house_days
+),
+newest AS (
+  SELECT * FROM (
+    SELECT h.*, row_number() OVER (PARTITION BY fc_id ORDER BY updated_at DESC) AS rn
+    FROM companion_character_housing h WHERE fc_id IS NOT NULL) ranked
+  WHERE rn = 1
+),
+visited AS (
+  SELECT fc_id, max(house_last_visited) AS house_last_visited
+  FROM companion_character_housing WHERE fc_id IS NOT NULL GROUP BY fc_id
+),
+members AS (
+  SELECT c.fc_id, min(c.account_label) AS account_label, min(so.sort_index) AS sort_index
+  FROM companion_character_current c LEFT JOIN character_sort_order so ON so.cid = c.cid
+  WHERE c.fc_id IS NOT NULL GROUP BY c.fc_id
+),
+fcs AS (
+  SELECT n.fc_id, n.fc_name, n.fc_master, n.fc_points, n.fc_rank, n.total_members, n.has_house,
+         n.house_city, n.house_ward, n.house_plot, k.city_name AS district_name, n.fc_home_world_id AS home_world_id,
+         n.fc_founding_date, n.fc_eligibility_override, v.house_last_visited, m.account_label, m.sort_index,
+         coalesce(n.fc_eligibility_override, n.fc_founding_date) AS reference,
+         CASE WHEN ltrim(n.fc_rank, ' ' || char(9) || char(10) || char(13)) GLOB '[0-9]*'
+              THEN CAST(ltrim(n.fc_rank, ' ' || char(9) || char(10) || char(13)) AS INTEGER) END AS rank_number,
+         CASE WHEN n.has_house AND v.house_last_visited IS NOT NULL
+              THEN max(0, CAST((((julianday('now') - 2440587.5) * 86400.0) - v.house_last_visited) / 86400 AS INTEGER)) END AS house_days
+  FROM newest n
+  LEFT JOIN visited v ON v.fc_id = n.fc_id
+  LEFT JOIN housing_key_city_lookup k ON k.city_id = n.house_city
+  LEFT JOIN members m ON m.fc_id = n.fc_id
+),
+ages AS (
+  SELECT f.*, (((julianday('now') - 2440587.5) * 86400.0) - f.reference) / 86400 AS days_since_founding FROM fcs f
+)
+SELECT a.fc_id, a.fc_name, a.fc_master, a.fc_points, a.fc_rank, a.total_members, a.has_house,
+       CASE WHEN a.has_house THEN coalesce(a.district_name, 'City ' || a.house_city) || ' W' || a.house_ward || ' P' || a.house_plot END AS house,
+       a.home_world_id, a.house_last_visited, a.house_days,
+       CASE WHEN NOT a.has_house OR a.has_house IS NULL THEN NULL
+            WHEN a.house_days IS NULL THEN 'unknown'
+            WHEN a.house_days >= 30 THEN 'danger'
+            WHEN a.house_days >= st.house_days THEN 'warn'
+            ELSE 'ok' END AS house_level,
+       CASE WHEN a.has_house AND a.house_days IS NOT NULL THEN max(0, 45 - a.house_days) END AS demolition_in_days,
+       CASE WHEN NOT coalesce(a.has_house, 0) AND a.reference IS NOT NULL THEN a.reference + 30 * 86400 END AS eligible_at,
+       CASE WHEN coalesce(a.has_house, 0) OR a.reference IS NULL THEN NULL
+            WHEN a.rank_number >= 6 AND a.days_since_founding >= 30 THEN 'Eligible'
+            WHEN a.days_since_founding < 30 THEN 'Eligible in ' || (CAST(30 - a.days_since_founding AS INTEGER) + (30 - a.days_since_founding > CAST(30 - a.days_since_founding AS INTEGER))) || ' day'
+                 || CASE WHEN CAST(30 - a.days_since_founding AS INTEGER) + (30 - a.days_since_founding > CAST(30 - a.days_since_founding AS INTEGER)) = 1 THEN '' ELSE 's' END
+            ELSE 'Rank too low (' || coalesce(CAST(a.rank_number AS TEXT), '?') || '/6)' END AS eligibility,
+       a.account_label, a.sort_index
+FROM ages a CROSS JOIN settings st;
+
+-- Every stack of every item the fleet holds, one row each, for the in-game Inventory (characters, Free Companies, the
+-- whole fleet, and Where is it?). kind: 'character' (its own bags and so on), 'retainer' or 'fc' (a Free Company
+-- chest). item_id is the plain item, with hq for a high-quality one (the game stores those 1,000,000 higher).
+-- place says where in plain words, as Where is it? (characters/item-locations.js placeLabel); container_name is the
+-- app's own name for the container. money: a container that holds gil, not items. For a Free Company chest, owner_cid,
+-- owner_name, account_label and sort_index are those of the member the chest is counted on (the leader when tracked,
+-- else the first in the Roster: characters/fc-chest.js chestHolders), so it sorts with that character.
+CREATE VIEW fleet_holdings_view AS
+WITH fc_names AS (
+  SELECT fc_id, fc_name FROM (
+    SELECT fc_id, fc_name, row_number() OVER (PARTITION BY fc_id ORDER BY updated_at DESC) AS rn
+    FROM companion_character_housing WHERE fc_id IS NOT NULL) ranked
+  WHERE rn = 1
+),
+holders AS (
+  SELECT fc_id, cid FROM (
+    SELECT c.fc_id, c.cid,
+           row_number() OVER (PARTITION BY c.fc_id
+             ORDER BY CASE WHEN h.fc_master IS NOT NULL AND c.name IS NOT NULL AND lower(c.name) = lower(h.fc_master) THEN 0 ELSE 1 END,
+                      so.sort_index NULLS LAST, c.name, CAST(c.cid AS TEXT)) AS rn
+    FROM companion_character_current c
+    LEFT JOIN character_sort_order so ON so.cid = c.cid
+    LEFT JOIN companion_character_housing h ON h.cid = c.cid AND h.fc_id = c.fc_id
+    WHERE c.fc_id IS NOT NULL AND c.fc_id <> 0) ranked
+  WHERE rn = 1
+),
+stacks AS (
+  SELECT CASE WHEN inv.retainer_id = inv.owner_cid THEN 'character' ELSE 'retainer' END AS kind,
+         inv.owner_cid, inv.retainer_id, NULL AS fc_id, inv.sorted_container AS container, inv.item_id, inv.quantity,
+         rl.name AS retainer_name, rl.hire_order_index, til.display_name AS container_name,
+         coalesce(c.name, 'Character ' || inv.owner_cid) AS who, c.world, c.name AS owner_name, c.account_label, so.sort_index
+  FROM companion_inventory_snapshot inv
+  LEFT JOIN companion_character_current c ON c.cid = inv.owner_cid
+  LEFT JOIN character_sort_order so ON so.cid = inv.owner_cid
+  LEFT JOIN companion_retainer_lookup rl ON rl.retainer_id = inv.retainer_id
+  LEFT JOIN companion_inventory_type_lookup til ON til.sorted_container = inv.sorted_container
+  WHERE inv.quantity > 0
+  UNION ALL
+  SELECT 'fc', ho.cid, NULL, inv.fc_id, inv.sorted_container, inv.item_id, inv.quantity,
+         NULL, NULL, til.display_name,
+         coalesce(fn.fc_name, 'Free Company ' || inv.fc_id), NULL, c.name, c.account_label, so.sort_index
+  FROM companion_fc_inventory_snapshot inv
+  LEFT JOIN fc_names fn ON fn.fc_id = inv.fc_id
+  LEFT JOIN holders ho ON ho.fc_id = inv.fc_id
+  LEFT JOIN companion_character_current c ON c.cid = ho.cid
+  LEFT JOIN character_sort_order so ON so.cid = ho.cid
+  LEFT JOIN companion_inventory_type_lookup til ON til.sorted_container = inv.sorted_container
+  WHERE inv.quantity > 0
+)
+SELECT kind, owner_cid, retainer_id, fc_id, container,
+       CASE WHEN item_id >= 1000000 AND item_id < 2000000 THEN item_id - 1000000 ELSE item_id END AS item_id,
+       (item_id >= 1000000 AND item_id < 2000000) AS hq,
+       quantity, who, world, owner_name, account_label, sort_index, retainer_name, hire_order_index, container_name,
+       container IN (2000, 2502, 12000, 22000) AS money,
+       CASE kind
+         WHEN 'fc' THEN
+           CASE WHEN container BETWEEN 20000 AND 20010 THEN 'FC chest tab ' || (container - 20000 + 1)
+                WHEN container = 22001 THEN 'FC crystals'
+                ELSE coalesce(nullif(container_name, ''), 'FC container ' || container) END
+         WHEN 'retainer' THEN
+           'Retainer ' || coalesce(nullif(retainer_name, ''), 'unknown') ||
+           CASE WHEN container BETWEEN 10000 AND 10006 THEN ''
+                WHEN container = 11000 THEN ' (equipped)'
+                WHEN container = 12001 THEN ' (crystals)'
+                WHEN container = 12002 THEN ' (for sale)'
+                ELSE ' (' || coalesce(nullif(container_name, ''), CAST(container AS TEXT)) || ')' END
+         ELSE
+           CASE WHEN container BETWEEN 0 AND 3 THEN 'Bags'
+                WHEN container BETWEEN 1000 AND 1001 THEN 'Equipped'
+                WHEN container = 2001 THEN 'Crystals'
+                WHEN container = 2003 THEN 'Mail'
+                WHEN container = 2004 THEN 'Key items'
+                WHEN container = 2500 THEN 'Armoire'
+                WHEN container = 2501 THEN 'Glamour dresser'
+                WHEN container BETWEEN 3200 AND 3500 THEN 'Armoury chest'
+                WHEN container BETWEEN 4000 AND 4001 THEN 'Saddlebag'
+                WHEN container BETWEEN 4100 AND 4101 THEN 'Premium saddlebag'
+                WHEN container >= 25000 AND container < 28000 THEN 'House: ' || coalesce(nullif(container_name, ''), CAST(container AS TEXT))
+                ELSE coalesce(nullif(container_name, ''), 'Container ' || container) END
+       END AS place
+FROM stacks;
+
+CREATE VIEW fleet_item_totals_view AS
+SELECT item_id, hq, sum(quantity) AS total
+FROM fleet_holdings_view
+WHERE NOT (kind <> 'fc' AND container = 2000)
+GROUP BY item_id, hq;

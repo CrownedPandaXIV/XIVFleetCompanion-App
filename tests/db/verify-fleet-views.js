@@ -15,6 +15,11 @@ const { SUB_PART_CLASS, partLetter } = require('../../subs/submarine-builds');
 const { notSyncedCharacters } = require('../../characters/not-synced');
 const { daysSince, houseLevel } = require('../../characters/house-warning');
 const { rosterWarnings } = require('../../characters/roster-warnings');
+const { retainerSummary } = require('../../characters/retainer-summary');
+const { fcDirectorySql, fcDirectoryRows } = require('../../characters/fc-directory-rows');
+const { buildSnapshotFragments } = require('../../db/snapshot-fragments');
+const { placeLabel, MONEY_CONTAINERS } = require('../../characters/item-locations');
+const { chestHolders } = require('../../characters/fc-chest');
 
 let n = 0;
 async function scenario(name, fn) {
@@ -95,7 +100,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   await admin.query(`CREATE DATABASE ${NAME}`);
   const client = new Client({ host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: NAME });
   await client.connect();
-  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets');
+  const clear = () => client.query('TRUNCATE companion_character_current, companion_submarine_snapshot, companion_metric_history, companion_retainer_lookup, fleet_economics_settings, companion_character_housing, companion_pc_status, character_sort_order, companion_character_login, companion_inventory_snapshot, retainer_gear_targets, companion_fc_inventory_snapshot');
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
@@ -355,6 +360,124 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
         ['DESKTOP-1', 'A', '2.0.0.9', true, false, 12, 2, 3, 'Aki: no FC chest\nBex: no retainers', 'All good'],
         ['LAPTOP', '', '1.0.3.4', null, null, null, null, null, '', null],
       ]);
+    });
+
+    await scenario('retainer counts: the app Summary\'s own (characters/retainer-summary.js), leaving out characters no longer synced', async () => {
+      await clear();
+      await character(client, 1, { name: 'Aki', label: 'A' });
+      await character(client, 2, { name: 'Bex', label: 'A', syncedHoursAgo: 2 }); // no longer synced
+      const secs = Math.floor(Date.now() / 1000);
+      await client.query(`INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name, job, has_venture, venture_ends_at) VALUES
+        (1, 1, 'Done', 1, true, $1), (2, 1, 'Away', 1, true, $2), (3, 1, 'Idle', 1, false, NULL), (4, 1, 'NoEnd', 1, true, 0),
+        (5, 1, 'Unknown', 1, NULL, NULL), (6, 1, 'NoClass', 0, false, NULL), (7, 1, 'NullClass', NULL, false, NULL),
+        (8, 2, 'BexIdle', 1, false, NULL), (9, 99, 'Orphan', 1, false, NULL)`, [secs - 10, secs + 999]);
+      const { rows: [v] } = await client.query('SELECT * FROM fleet_retainer_counts_view');
+      // What the app's Summary makes of the same retainers (ipc/retainers.js get-retainer-summary).
+      const rows = (await client.query(`SELECT rl.owner_cid::text AS owner_cid, c.name AS owner_name, c.account_label, c.last_synced_at, rl.name AS retainer_name,
+        rl.has_venture, rl.venture_ends_at FROM companion_retainer_lookup rl JOIN companion_character_current c ON c.cid = rl.owner_cid WHERE rl.job > 0`)).rows;
+      const behind = notSyncedCharacters(rows.map((r) => ({ cid: r.owner_cid, account_label: r.account_label, last_synced_at: r.last_synced_at })), 30);
+      const app = retainerSummary(rows.filter((r) => !behind.has(String(r.owner_cid))));
+      assert.deepStrictEqual([v.retainers, v.ventures_done, v.retainers_away, v.retainers_idle], [app.total, app.ready, app.away, app.idle.length]);
+      assert.deepStrictEqual([v.retainers, v.ventures_done, v.retainers_away, v.retainers_idle], [5, 1, 2, 2], 'no end time counts as away; no class, no longer synced and no owner left out');
+      const { rows: [s] } = await client.query('SELECT retainers, ventures_done, retainers_idle FROM fleet_summary_view');
+      assert.deepStrictEqual([s.retainers, s.ventures_done, s.retainers_idle], [5, 1, 2], 'the summary counts the same');
+    });
+
+    await scenario('Free Companies: as the Free Companies tab (characters/fc-directory-rows.js), houses and bid eligibility', async () => {
+      await clear();
+      await setting(client, 'house_warn_days', 7);
+      await client.query('ALTER TABLE ffxiv_world ADD COLUMN IF NOT EXISTS name text');
+      await character(client, 1, { name: 'Aki', label: 'B' });
+      await character(client, 2, { name: 'Bex', label: 'A' });
+      await character(client, 3, { name: 'Cal', label: null });
+      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 11 WHEN 2 THEN 11 WHEN 3 THEN 12 END');
+      await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 5), (2, 3)');
+      const day = 86400 * 1000;
+      const at = (days) => new Date(Date.now() - days * day - 3600 * 1000);
+      // FC 11: a house entered 9 days ago (two members' rows: the newer details win). FC 12-17: no house, founded at
+      // different times, ranks good, low, missing and not a number. FC 18: a house with no date.
+      await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, fc_points, fc_rank, total_members, has_house,
+          house_city, house_ward, house_plot, house_last_visited, fc_home_world_id, fc_founding_date, fc_eligibility_override, updated_at) VALUES
+        (1, 11, 'Old name', 'Aki', 10, '8', 3, true, 8, 12, 30, $1, 34, NULL, NULL, now() - interval '1 day'),
+        (2, 11, 'Cute Kittehs!', 'Aki', 52000, '8', 3, true, 8, 12, 30, $2, 34, NULL, NULL, now()),
+        (3, 12, 'Young', 'Cal', 0, '7', 1, false, NULL, NULL, NULL, NULL, 63, $3, NULL, now()),
+        (31, 13, 'Ready', 'X', 0, ' 6', 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
+        (32, 14, 'Low rank', 'X', 0, '3', 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
+        (33, 15, 'No rank', 'X', 0, NULL, 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
+        (34, 16, 'Odd rank', 'X', 0, 'x', 1, false, NULL, NULL, NULL, NULL, NULL, $4, NULL, now()),
+        (35, 17, 'Override', 'X', 0, '9', 1, false, NULL, NULL, NULL, NULL, NULL, $4, $5, now()),
+        (36, 18, 'No date', 'X', 0, '9', 1, true, 999, 1, 2, NULL, NULL, NULL, NULL, now())`,
+      [at(12), at(9), at(29.5), at(45), at(1)]);
+      const view = (await client.query('SELECT * FROM fleet_fcs_view ORDER BY fc_id')).rows;
+      const current = buildSnapshotFragments({ useCurrent: true }).latestFcMember;
+      const app = fcDirectoryRows((await client.query(fcDirectorySql(current))).rows, 7);
+      assert.strictEqual(view.length, app.length, 'one row per Free Company');
+      const formatHouse = (h) => (h.has_house ? `${h.district_name || `City ${h.house_city}`} W${h.house_ward} P${h.house_plot}` : null);
+      for (const v of view) {
+        const a = app.find((x) => String(x.fc_id) === String(v.fc_id));
+        const got = [v.fc_name, v.fc_master, v.fc_points, v.fc_rank, v.total_members, v.has_house, v.house, v.house_days, v.house_level, v.demolition_in_days,
+          v.eligibility, v.eligible_at ? v.eligible_at.toISOString() : null, v.account_label, v.sort_index];
+        const want = [a.fc_name, a.fc_master, a.fc_points, a.fc_rank, a.total_members, a.has_house, formatHouse(a), a.house_days, a.house_level, a.demolition_in_days,
+          a.eligibility, a.eligible_at, a.account_label, a.sort_index];
+        assert.deepStrictEqual(got, want, `FC ${v.fc_id}`);
+      }
+      const by = Object.fromEntries(view.map((v) => [v.fc_name, v]));
+      assert.deepStrictEqual([by['Cute Kittehs!'].house, by['Cute Kittehs!'].house_days, by['Cute Kittehs!'].house_level, by['Cute Kittehs!'].account_label, by['Cute Kittehs!'].sort_index],
+        ['Mist W12 P30', 9, 'warn', 'A', 3], 'the newest details, the latest visit, the first account label and Roster place');
+      assert.deepStrictEqual([by.Young.eligibility, by.Ready.eligibility, by['Low rank'].eligibility, by['No rank'].eligibility, by['Odd rank'].eligibility, by.Override.eligibility, by['No date'].house_level],
+        ['Eligible in 1 day', 'Eligible', 'Rank too low (3/6)', 'Rank too low (?/6)', 'Rank too low (?/6)', 'Eligible in 29 days', 'unknown']);
+      assert.strictEqual(Number(by.Young.home_world_id), 63);
+    });
+
+    await scenario('holdings: every stack with the place Where is it? names, FC chests on the member the app counts them on', async () => {
+      await clear();
+      await character(client, 1, { name: 'Aki', label: 'A' });
+      await character(client, 2, { name: 'Bex', label: 'B' });
+      await character(client, 3, { name: 'Cal', label: 'B' });
+      await client.query('UPDATE companion_character_current SET fc_id = CASE cid WHEN 1 THEN 11 WHEN 2 THEN 11 WHEN 3 THEN 12 END');
+      await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 5), (2, 3), (3, 9)');
+      await client.query(`INSERT INTO companion_character_housing (cid, fc_id, fc_name, fc_master, updated_at) VALUES
+        (1, 11, 'Kittehs', 'aki', now()), (2, 11, 'Kittehs', 'aki', now() - interval '1 day'), (3, 12, NULL, 'Nobody', now())`);
+      await client.query(`INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name, hire_order_index) VALUES (100, 1, 'Ret A', 0), (101, 1, '', 1)`);
+      const containers = [0, 3, 1000, 2000, 2001, 2003, 2004, 2500, 2501, 2502, 3200, 3500, 4000, 4101, 25000, 27010, 9999];
+      let slot = 0;
+      const own = containers.map((c) => `(1, 1, ${c}, ${slot++}, ${c === 2000 ? 1 : 1010155}, 5)`);
+      const retainer = [10000, 10006, 11000, 12000, 12001, 12002, 13000].map((c) => `(1, ${c === 13000 ? 101 : 100}, ${c}, ${slot++}, 10155, 2)`);
+      const empty = ['(2, 2, 0, 0, 10155, 0)', '(3, 3, 1, 1, 10155, 7)', '(77, 77, 0, 0, 10373, 1)'];
+      await client.query(`INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES ${[...own, ...retainer, ...empty].join(', ')}`);
+      await client.query(`INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity) VALUES
+        (11, 20000, 0, 10155, 100), (11, 20004, 1, 10155, 1), (11, 22000, 0, 1, 500000), (11, 22001, 0, 2, 9), (12, 21000, 0, 10155, 3), (12, 20010, 1, 10155, 0)`);
+      const rows = (await client.query('SELECT * FROM fleet_holdings_view')).rows;
+      assert.strictEqual(rows.length, own.length + retainer.length + 2 + 5, 'every stack with something in it (2 more bags, 5 FC stacks)');
+      // The app's own names for the places (characters/item-locations.js), and its chest holders (characters/fc-chest.js).
+      const names = new Map((await client.query('SELECT sorted_container, display_name FROM companion_inventory_type_lookup')).rows.map((r) => [r.sorted_container, r.display_name]));
+      const characters = (await client.query(`SELECT c.cid, c.name, c.fc_id, h.fc_master, so.sort_index FROM companion_character_current c
+        LEFT JOIN character_sort_order so ON so.cid = c.cid LEFT JOIN companion_character_housing h ON h.cid = c.cid AND h.fc_id = c.fc_id`)).rows;
+      const holders = chestHolders(characters);
+      const retainerNames = { 100: 'Ret A', 101: '' };
+      for (const r of rows) {
+        const want = placeLabel({ kind: r.kind, container: r.container, containerName: names.get(r.container), retainerName: retainerNames[Number(r.retainer_id)] });
+        assert.strictEqual(r.place, want, `${r.kind} container ${r.container}`);
+        assert.strictEqual(r.money, MONEY_CONTAINERS.includes(r.container), `container ${r.container}: money`);
+        if (r.kind === 'fc') assert.strictEqual(String(r.owner_cid), holders.get(String(r.fc_id)), `FC ${r.fc_id}: counted on the app's holder`);
+      }
+      const bag = rows.find((r) => r.kind === 'character' && r.container === 0);
+      assert.deepStrictEqual([bag.item_id, bag.hq, bag.who, bag.account_label, bag.sort_index], [10155, true, 'Aki', 'A', 5], 'HQ items as the plain item, marked hq');
+      const kittehs = rows.find((r) => r.kind === 'fc' && r.container === 20000);
+      assert.deepStrictEqual([kittehs.who, kittehs.owner_name, kittehs.account_label, kittehs.place], ['Kittehs', 'Aki', 'A', 'FC chest tab 1'], 'the leader holds the chest (names compared without case)');
+      const nameless = rows.find((r) => r.kind === 'fc' && r.fc_id == 12);
+      assert.deepStrictEqual([nameless.who, nameless.owner_name], ['Free Company 12', 'Cal'], 'no FC name; the only member holds it');
+      assert.strictEqual(rows.find((r) => String(r.owner_cid) === '77').who, 'Character 77', 'a character not in the Roster');
+
+      // Fleet totals, as the Inventory tab's (ipc/inventory.js get-fleet-inventory-summary): bags except the character's
+      // gil, plus every FC chest, by item as stored (HQ apart).
+      const app = new Map();
+      for (const r of (await client.query(`SELECT item_id, SUM(quantity) AS q FROM companion_inventory_snapshot WHERE quantity > 0 AND sorted_container != 2000 GROUP BY item_id
+          UNION ALL SELECT item_id, SUM(quantity) FROM companion_fc_inventory_snapshot WHERE quantity > 0 GROUP BY item_id`)).rows) {
+        app.set(Number(r.item_id), (app.get(Number(r.item_id)) || 0) + Number(r.q));
+      }
+      const totals = (await client.query('SELECT * FROM fleet_item_totals_view')).rows;
+      assert.deepStrictEqual(new Map(totals.map((t) => [t.item_id + (t.hq ? 1000000 : 0), Number(t.total)])), app);
     });
   } finally {
     await client.end();

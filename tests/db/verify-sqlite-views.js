@@ -20,12 +20,16 @@ const VIEWS = [
   ['fleet_supplies_view', ['cid']],
   ['fleet_subs_view', ['cid', 'sub_name']],
   ['fleet_not_synced_view', ['cid']],
+  ['fleet_retainer_counts_view', []],
   ['fleet_summary_view', []],
   ['fleet_alerts_view', null], // in the view's own order
   ['fleet_roster_view', ['cid']],
   ['fleet_retainers_view', ['retainer_id']],
   ['fleet_retainer_gear_view', ['retainer_id', 'item_id']],
   ['fleet_pcs_view', ['pc_name', 'account_label']],
+  ['fleet_fcs_view', ['fc_id']],
+  ['fleet_holdings_view', 'all'], // several stacks can sit in the same place: compared as whole rows
+  ['fleet_item_totals_view', ['item_id', 'hq']],
 ];
 
 let n = 0;
@@ -36,6 +40,7 @@ async function scenario(name, fn) {
 // Column kinds that are stored differently: times (PostgreSQL timestamps, SQLite Unix seconds), booleans (true/false,
 // 0/1) and lists (text[], one per line).
 const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorded_at', 'items_seen_at', 'house_last_visited',
+  'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
   'logged_in_at', 'last_sync_at', 'check_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
   'submarinetracker_found', 'venture_stats_found']);
@@ -84,15 +89,17 @@ async function compare(pg, lite, view, key) {
   const liteRows = stmt.all().map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plain(v)])));
   assert.deepStrictEqual(Object.keys(liteRows[0] || {}).sort(), Object.keys(pgRows[0] || {}).sort(), `${view}: the same columns`);
   assert.strictEqual(liteRows.length, pgRows.length, `${view}: the same number of rows`);
-  const order = (rows) => (key ? [...rows].sort((a, b) => {
-    for (const k of key) { if (a[k] < b[k]) return -1; if (a[k] > b[k]) return 1; }
-    return 0;
-  }) : rows);
+  const whole = (r) => JSON.stringify(Object.keys(r).sort().map((k) => [k, typeof r[k] === 'number' ? Number(r[k].toPrecision(12)) : r[k]]));
+  const order = (rows) => (key === 'all' ? [...rows].sort((a, b) => (whole(a) < whole(b) ? -1 : whole(a) > whole(b) ? 1 : 0))
+    : key ? [...rows].sort((a, b) => {
+      for (const k of key) { if (a[k] < b[k]) return -1; if (a[k] > b[k]) return 1; }
+      return 0;
+    }) : rows);
   const [p, l] = [order(pgRows), order(liteRows)];
   for (let i = 0; i < p.length; i++) {
     for (const col of Object.keys(p[i])) {
       assert.ok(same(p[i][col], l[i][col]),
-        `${view} row ${i + 1} (${(key || []).map((k) => `${k} ${p[i][k]}`).join(', ') || 'in order'}), ${col}: PostgreSQL ${JSON.stringify(p[i][col])}, SQLite ${JSON.stringify(l[i][col])}`);
+        `${view} row ${i + 1} (${(Array.isArray(key) ? key : []).map((k) => `${k} ${p[i][k]}`).join(', ') || 'in order'}), ${col}: PostgreSQL ${JSON.stringify(p[i][col])}, SQLite ${JSON.stringify(l[i][col])}`);
     }
   }
   return p.length;
@@ -113,7 +120,8 @@ function fleet(seed, now) {
   const PARTS = [21792, 21795, 21797, 22527, 23904, 24346, 24349, 24353, 24358, 24361, 24366];
   const t = { companion_character_current: [], character_sort_order: [], companion_submarine_snapshot: [], companion_metric_history: [],
     companion_retainer_lookup: [], companion_character_housing: [], companion_character_login: [], companion_pc_status: [],
-    companion_inventory_snapshot: [], retainer_gear_targets: [] };
+    companion_inventory_snapshot: [], retainer_gear_targets: [], companion_fc_inventory_snapshot: [] };
+  const item = () => (chance(0.1) ? 1000000 : 0) + pick([1, 2, 5, 10155, 10373, 22500, 22507, 40000 + Math.floor(random() * 300)]);
   let retainerId = 33777097243660300n;
   for (let i = 0; i < 160; i++) {
     const cid = 18014498578000000n + BigInt(i);
@@ -157,21 +165,37 @@ function fleet(seed, now) {
       const visited = chance(0.15) ? null : ago(random() * 60 * 24);
       t.companion_character_housing.push({ cid, fc_id: fc, fc_name: chance(0.1) ? null : `FC ${fc % 100n}${chance(0.3) ? ' (renamed)' : ''}`,
         fc_points: chance(0.2) ? null : Math.floor(random() * 1e5), has_house: chance(0.7), house_city: pick([2, 8, 9, 70, 111, 999]),
-        house_ward: Math.floor(random() * 30) + 1, house_plot: Math.floor(random() * 60) + 1, house_last_visited: visited, updated_at: ago(random() * 100) });
+        house_ward: Math.floor(random() * 30) + 1, house_plot: Math.floor(random() * 60) + 1, house_last_visited: visited, updated_at: ago(random() * 100),
+        fc_master: pick([`Char${i}`, `char${i}`, `Char${i + 1}`, 'Someone Else', null]), fc_rank: pick(['6', '8', ' 7', '3', 'x', null]),
+        total_members: chance(0.2) ? null : Math.floor(random() * 50), fc_home_world_id: pick([34, 63, 81, null]),
+        // founded 0 to 60 days ago, never on a whole day (so never right on the 30-day edge)
+        fc_founding_date: chance(0.2) ? null : ago(random() * 60 * 24 + 0.37), fc_eligibility_override: chance(0.1) ? ago(random() * 40 * 24 + 0.37) : null });
+    }
+    // What the character holds in its own bags and elsewhere (owner and retainer the same).
+    for (let slot = 0; slot < 25; slot++) {
+      if (chance(0.5)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: cid,
+        sorted_container: pick([0, 1, 2, 3, 1000, 2000, 2001, 2003, 2004, 2500, 2501, 2502, 3201, 3500, 4000, 4100, 25000, 27010, 9999]),
+        sorted_slot_index: slot, item_id: item(), quantity: pick([0, 1, 3, 99, 999]), updated_at: ago(1) });
+    }
+    if (fc && chance(0.5)) {
+      for (let slot = 0; slot < 10; slot++) {
+        if (chance(0.6)) t.companion_fc_inventory_snapshot.push({ fc_id: fc, sorted_container: pick([20000, 20001, 20004, 20010, 22000, 22001, 21000]),
+          sorted_slot_index: i * 100 + slot, item_id: item(), quantity: pick([0, 1, 50, 999]), updated_at: ago(1) });
+      }
     }
     if (chance(0.6)) t.companion_character_login.push({ cid, pc_name: pick(['DESKTOP-1', 'LAPTOP']), account_label: label || '', logged_in_at: ago(random() * 48) });
     const retainers = Math.floor(random() * 6);
     for (let r = 0; r < retainers; r++) {
       const id = retainerId++;
       const venture = pick([true, true, false, null]);
-      t.companion_retainer_lookup.push({ retainer_id: id, owner_cid: chance(0.03) ? 999n : cid, name: `Ret${i}-${r}`, updated_at: ago(1),
+      t.companion_retainer_lookup.push({ retainer_id: id, owner_cid: chance(0.03) ? 999n : cid, name: chance(0.05) ? '' : `Ret${i}-${r}`, updated_at: ago(1),
         job: pick([0, 0, 1, 10, 18, 33, null]), gil: chance(0.1) ? null : Math.floor(random() * 1e7), has_venture: venture,
         venture_id: venture ? Math.floor(random() * 800) : null, venture_begins_at: null,
         venture_ends_at: venture ? pick([0, Math.floor(now - random() * 50000), Math.floor(now + random() * 50000) + 60]) : null,
         level: chance(0.1) ? null : Math.floor(random() * 100) + 1, hire_order_index: chance(0.1) ? null : r, items_seen_at: chance(0.4) ? ago(5) : null });
       if (chance(0.5)) {
         for (let slot = 0; slot < 12; slot++) {
-          if (chance(0.7)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: id, sorted_container: chance(0.8) ? 11000 : 10000,
+          if (chance(0.7)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: id, sorted_container: pick([11000, 11000, 10000, 10006, 12000, 12001, 12002, 13000]),
             sorted_slot_index: slot, item_id: chance(0.05) ? null : 40000 + Math.floor(random() * 2000), quantity: 1, updated_at: ago(1) });
         }
       }

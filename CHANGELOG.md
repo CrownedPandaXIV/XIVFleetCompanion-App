@@ -24,6 +24,18 @@ do by hand.
   that syncs it; every retainer with its class, venture, gear target and what it wears; and every setup of the
   plugin. The views give the game's numbers for classes, ventures and items, never names, so they work on a database
   that has no game data yet; the plugin names them from the game's own files.
+- **Free Companies and Inventory for the game** (plugin 2.0's next pages): every Free Company with its house, how long
+  since a member entered it and when it can bid; every stack of every item held (bags, retainers, Free Company chests),
+  with the same place names as Where is it?; and the fleet's totals per item. The Free Companies tab's own working out
+  moved into characters/fc-directory-rows.js so the game's is checked against it; a Free Company whose rank isn't a
+  number now reads "Rank too low (?/6)" instead of "NaN/6".
+- **Retainer counts for the game's Summary, the same as the app's:** retainers of characters no longer synced, and of
+  characters not in the Roster, are left out, and a venture with no end time counts as away. The game reads them every
+  30 seconds instead of every 5 minutes, so a retainer caught between two ventures while AutoRetainer sends it out
+  again clears within a minute.
+- **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
+  for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
+  whatever the database's language setting.
 - The views live in one file the app applies again whenever it changes, so later versions can improve them without a
   database update each time (update 15 records which version a database has). An older copy of the app never
   replaces a newer one's views.
