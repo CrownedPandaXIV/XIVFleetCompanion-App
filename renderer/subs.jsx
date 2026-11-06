@@ -94,6 +94,11 @@ function formatGilDay(value) {
   return value === '' || value === null || value === undefined ? '—' : Number(value).toLocaleString();
 }
 
+// Gil a day in gold (large amounts as "5.86M"), a softer dash when unknown: as the plugin.
+function GilDay({ value }) {
+  return value === '' || value === null || value === undefined ? <span className="dim">—</span> : <GilText gil={Number(value)} />;
+}
+
 // "in 2d 5h" / "in 7h" / "in 40 min" until a time; "now" once it is past.
 function formatTimeUntil(at, now = Date.now()) {
   const minutes = Math.round((at - now) / 60000);
@@ -170,7 +175,7 @@ function NextBuildCell({ sub }) {
     : undefined;
   return (
     <span>
-      <span className="next-build" title={why}>{b.build} at {b.rank}</span>
+      <span className={`next-build${b.rank <= sub.rank ? ' tone-good' : ''}`} title={why}>{b.build} at {b.rank}</span>
       {b.rank <= sub.rank
         ? <span className="subs-dim"> · now</span>
         : b.at ? <span className="subs-dim"> · <RankUpWhen rankUp={r} at={b.at} voyages={b.voyages} label={`Rank ${b.rank}`} /></span> : null}
@@ -192,9 +197,12 @@ const SUB_COLUMN_DEFS = [
   { key: 'speed', label: 'Speed', cell: (s) => (s.speed === '' ? '—' : s.speed), sort: (r) => (r.speed === '' ? null : r.speed) },
   { key: 'range', label: 'Range', cell: (s) => (s.range === '' ? '—' : s.range), sort: (r) => (r.range === '' ? null : r.range) },
   { key: 'currentRoute', label: 'Current Route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },
-  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => formatGilDay(s.current_gil_day), sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
-  { key: 'targetRoute', label: 'Target Route', cell: (s) => s.target_route || '—', sort: (r) => r.target_route || null },
-  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => formatGilDay(s.target_gil_day), sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
+  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
+  // Green when it's on it, amber when it isn't (Route Optimization lists those).
+  { key: 'targetRoute', label: 'Target Route', cell: (s) => (s.target_route
+    ? <span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span>
+    : <span className="dim">—</span>), sort: (r) => r.target_route || null },
+  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   { key: 'craft', label: 'Craft?', cell: (s, ctx) => (
       <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)} />
     ), sort: (r) => (r.craft_enabled ? 1 : 0) }

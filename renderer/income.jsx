@@ -11,7 +11,9 @@ function IncomeExpectedCell({ row }) {
   const unmatched = row.subs_unmatched > 0
     ? `${row.subs_unmatched} of ${row.subs} sub${row.subs === 1 ? ' is' : 's are'} on a route Fight Club does not list, so ${row.subs_unmatched === 1 ? 'it is' : 'they are'} left out of expected.`
     : '';
-  return <td title={unmatched}>{incomeGil(row.expectedPerDay)}{unmatched ? ' *' : ''}</td>;
+  // Gold, as gil everywhere.
+  return <td title={unmatched}>{row.expectedPerDay === null || row.expectedPerDay === undefined ? <span className="dim">—</span>
+    : <span className="gil">{incomeGil(row.expectedPerDay)}</span>}{unmatched ? ' *' : ''}</td>;
 }
 
 const incomeIf = (r, value) => (r.enough ? value : null);

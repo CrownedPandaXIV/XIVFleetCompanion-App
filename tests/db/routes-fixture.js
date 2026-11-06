@@ -22,6 +22,7 @@ Module._load = function load(request, ...rest) {
   return original.call(this, request, ...rest);
 };
 const { loadSubmarinesWithRankUps } = require('../../ipc/subs');
+const { computePartsNeeded } = require('../../ipc/parts');
 Module._load = original;
 
 const NAME = 'fleet_routes_check';
@@ -35,6 +36,10 @@ const VIEWS = {
   fightClub: 'SELECT * FROM fleet_route_fight_club_view ORDER BY id',
   history: 'SELECT * FROM fleet_sub_history_view ORDER BY cid, metric, recorded_at',
   voyages: 'SELECT * FROM fleet_voyage_sectors_view ORDER BY fc_id, sub_register, returned_at, sector',
+  // For Look ahead on the Parts page: the Parts views too.
+  partsSubs: 'SELECT * FROM fleet_parts_subs_view ORDER BY cid, sub_name COLLATE "C"',
+  partsFightClub: 'SELECT * FROM fleet_parts_fight_club_view ORDER BY id',
+  spares: 'SELECT * FROM fleet_parts_spares_view ORDER BY cid, is_retainer, retainer_id, fc_id, sorted_container, sorted_slot_index',
 };
 
 // Whole numbers as text when JavaScript's numbers can't hold them exactly (character ids), numbers otherwise; times
@@ -50,7 +55,8 @@ function plain(v) {
 const row = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plain(v)]));
 
 const TABLES = ['companion_character_current', 'character_sort_order', 'companion_submarine_snapshot', 'sub_craft_toggle', 'sub_build_rules',
-  'fight_club_routes', 'fleet_economics_settings', 'companion_metric_history', 'companion_voyage_loot'];
+  'fight_club_routes', 'fleet_economics_settings', 'companion_metric_history', 'companion_voyage_loot', 'companion_inventory_snapshot',
+  'companion_fc_inventory_snapshot'];
 
 async function insert(client, table, rows) {
   for (let start = 0; start < rows.length; start += 500) {
@@ -138,6 +144,11 @@ function randomFleet(seed, now, game) {
     t.companion_character_current.push({ cid, name: `Char${i}`, world: pick(['Maduin', 'Golem']), account_label: pick(['A', 'B', null]), gil: 0, ceruleum: 0,
       repair_kits: 0, retainer_count: 0, submarine_count: 0, num_sub_slots: 4, fc_id: fc, first_seen_at: new Date(now - 90 * DAY), last_synced_at: new Date(now - 60000) });
     if (chance(0.7)) t.character_sort_order.push({ cid, sort_index: Math.floor(random() * 100) });
+    // A few spare parts in its bags, for Look ahead's spares (needed now first, then soonest first).
+    for (let k = 0; k < 4; k++) {
+      if (chance(0.5)) t.companion_inventory_snapshot.push({ owner_cid: cid, retainer_id: cid, sorted_container: pick([0, 1, 2, 3]), sorted_slot_index: k,
+        item_id: BASE[pick(LETTERS)] + pick([0, 1, 2, 3]), quantity: pick([1, 1, 2]), updated_at: new Date(now - 60000) });
+    }
     const subs = 1 + Math.floor(random() * 4);
     for (let s = 1; s <= subs; s++) {
       const name = chance(0.3) ? `Sub ${s}` : `Submersible-${s}`;
@@ -201,6 +212,12 @@ function randomFleet(seed, now, game) {
     t.sub_build_rules.push({ id: r, rank: pick([1, 30, 45, 70, 85, 90, 100, 110]), cid_override: chance(0.15) ? 18014498578000000n + BigInt(Math.floor(random() * 12)) : null,
       sub_filter: pick(['', 'All', null, 'Sub1Only', 'Sub2,Sub4', 'Sub3']), hull: letter(), stern: letter(), bow: letter(), bridge: letter() });
   }
+  for (let f = 0; f < 5; f++) {
+    for (let k = 0; k < 3; k++) {
+      if (chance(0.5)) t.companion_fc_inventory_snapshot.push({ fc_id: 9232379236109516800n + BigInt(f), sorted_container: pick([20000, 20001, 20002]), sorted_slot_index: k,
+        item_id: BASE[pick(LETTERS)] + pick([0, 1, 2, 3]), quantity: pick([1, 2]), updated_at: new Date(now - 60000) });
+    }
+  }
   if (chance(0.8)) t.fleet_economics_settings.push({ setting_key: 'repair_kit_cost', setting_value: pick([0, 1730, 2500.5]) });
   return t;
 }
@@ -230,7 +247,12 @@ function randomFleet(seed, now, game) {
       // The app's answers at the same moment (its clock held at `now`).
       Date.now = () => now;
       let subs;
-      try { subs = await loadSubmarinesWithRankUps(client); } finally { Date.now = realNow; }
+      let partsAhead;
+      try {
+        subs = await loadSubmarinesWithRankUps(client);
+        // The Parts page with Look ahead at 14 days: what's needed now, then the next builds due by then.
+        partsAhead = await computePartsNeeded(client, { aheadDays: 14 });
+      } finally { Date.now = realNow; }
       const expected = subs.map((s) => row({
         cid: String(s.cid), sub_name: s.sub_name, current_setup: s.current_setup, current_route: s.current_route,
         current_map: s.current_map ? s.current_map.id : null, target_route: s.target_route, target_gil_day: s.target_gil_day === '' ? null : s.target_gil_day,
@@ -238,14 +260,21 @@ function randomFleet(seed, now, game) {
         rank_progress_pct: s.rank_progress_pct,
         rank_up: JSON.stringify(s.rank_up),
       }));
-      for (const r of [...inputs.characters, ...inputs.subs, ...inputs.history]) r.cid = String(r.cid);
+      const expectedParts = partsAhead.map((r) => row({
+        cid: String(r.cid), sub_name: r.sub_name, rank: r.rank, slot: r.slot, needed_class: r.needed_class, needed_modified: r.needed_modified,
+        spare_location: r.spare_location, recycled_from: r.recycled_from, due_at: r.due_at,
+      }));
+      for (const r of expectedParts) r.cid = String(r.cid);
+      for (const r of [...inputs.characters, ...inputs.subs, ...inputs.history, ...inputs.partsSubs]) r.cid = String(r.cid);
+      for (const r of inputs.spares) { if (r.cid !== null) r.cid = String(r.cid); if (r.retainer_id !== null) r.retainer_id = String(r.retainer_id); }
       for (const r of inputs.rules) if (r.cid_override !== null) r.cid_override = String(r.cid_override);
       const methods = {};
       for (const s of subs) methods[s.rank_up.method] = (methods[s.rank_up.method] || 0) + 1;
       console.log(`random fleet ${seed}: ${subs.length} subs, ${subs.filter((s) => s.target_route).length} with a Target Route, `
         + `${subs.filter((s) => typeof s.current_gil_day === 'number').length} with a Current Gil/Day, ${subs.filter((s) => s.rank_up.nextBuild).length} with a Next Build; `
         + `dates: ${Object.entries(methods).map(([m, n]) => `${m} ${n}`).join(', ')}`);
-      cases.push({ name: `random fleet ${seed}`, now, inputs, expected });
+      console.log(`   Look ahead 14 days: ${expectedParts.length} parts, ${expectedParts.filter((p) => p.due_at !== null).length} for builds coming up`);
+      cases.push({ name: `random fleet ${seed}`, now, inputs, expected, expectedParts });
     }
     if (out) {
       fs.writeFileSync(out, `${JSON.stringify({ about: 'Written by XIVFleetCompanion-App tests/db/routes-fixture.js: the fleet_route_* views, made-up game data and the app\'s Subs answers for made-up fleets.', game, cases })}\n`);
