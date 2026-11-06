@@ -10,7 +10,9 @@ function HouseCell({ row }) {
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      {row.has_house ? formatHouse(row) : (row.eligibility || '—')}
+      {row.has_house
+        ? <span className="address">{formatHouse(row)}</span>
+        : <span className={row.eligibility === 'Eligible' ? 'tone-good' : row.eligibility ? undefined : 'dim'}>{row.eligibility || '—'}</span>}
       {hovering && showTooltip && (
         <div
           style={{
@@ -36,11 +38,11 @@ function HouseCell({ row }) {
 
 // The Free Companies tab's own columns. Anything else (members' totals, the FC chest, ...) comes from the master list.
 const FC_COLUMN_DEFS = [
-  { key: 'fcName', label: 'FC Name', locked: true, cell: (r) => <>{r.fc_name || '—'}{r.fc_id && <TrendDetailLink kind="fc" id={r.fc_id} name={r.fc_name || 'Free Company'} />}</>, sort: (r) => r.fc_name },
+  { key: 'fcName', label: 'FC Name', locked: true, cell: (r) => <>{r.fc_name ? <span className="fc-name">{r.fc_name}</span> : <span className="dim">—</span>}{r.fc_id && <TrendDetailLink kind="fc" id={r.fc_id} name={r.fc_name || 'Free Company'} />}</>, sort: (r) => r.fc_name },
   { key: 'leader', label: 'Leader', cell: (r) => r.fc_master || '—', sort: (r) => r.fc_master },
   { key: 'world', label: 'World', cell: (r) => r.fc_world || '—', sort: (r) => r.fc_world },
-  { key: 'points', label: 'FC Points', cell: (r) => (typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'), sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
-  { key: 'members', label: 'Members', cell: (r) => (typeof r.total_members === 'number' ? r.total_members : '—'), sort: (r) => (typeof r.total_members === 'number' ? r.total_members : null) },
+  { key: 'points', label: 'FC Points', td: (r) => <td className="num">{typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'}</td>, sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
+  { key: 'members', label: 'Members', td: (r) => <td className="num">{typeof r.total_members === 'number' ? r.total_members : '—'}</td>, sort: (r) => (typeof r.total_members === 'number' ? r.total_members : null) },
   { key: 'house', label: 'House', td: (r) => <HouseCell row={r} />, sort: (r) => (r.has_house ? 1 : 0) },
   // Unknown dates sort as the oldest, since they are the ones to check.
   { key: 'lastEntered', label: 'Last Entered', cell: (r) => <HouseAge row={r} />, sort: (r) => (!r.has_house ? null : (r.house_days ?? 9999)) }

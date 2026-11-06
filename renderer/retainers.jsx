@@ -4,7 +4,8 @@
 // per-item breakdown (name, qty, price each, subtotal) behind that
 // total. Popup only renders while hovering - no click/toggle state
 // needed, matches a plain tooltip pattern.
-function RetainerStatusCell({ hasVenture, ventureEndsAt }) {
+// Done in green; idle in amber when the retainer has a class (it could be out on a venture), dim when it hasn't.
+function RetainerStatusCell({ hasVenture, ventureEndsAt, hasJob = true }) {
   const [nowEpoch, setNowEpoch] = useState(() => Math.floor(Date.now() / 1000));
   const endEpoch = ventureEndsAt ? Number(ventureEndsAt) : 0;
   const onVenture = !!hasVenture && endEpoch > 0 && endEpoch > nowEpoch;
@@ -15,8 +16,8 @@ function RetainerStatusCell({ hasVenture, ventureEndsAt }) {
     return () => clearInterval(interval);
   }, [onVenture]);
 
-  if (!hasVenture || !endEpoch) return 'Idle';
-  if (!onVenture) return 'Venture Complete';
+  if (!hasVenture || !endEpoch) return <span className={hasJob ? 'tone-warn' : 'dim'}>Idle</span>;
+  if (!onVenture) return <span className="tone-good">Venture Complete</span>;
   return formatCountdown(endEpoch - nowEpoch);
 }
 
@@ -159,14 +160,14 @@ function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetVa
 // and change the row's working state, passed in as `ctx`.
 const RETAINER_COLUMN_DEFS = [
   { key: 'owner', label: 'Owner', cell: (r) => r.owner_name || '—', sort: (r) => r.owner_name },
-  { key: 'world', label: 'World', cell: (r) => r.world || '—', sort: (r) => r.world },
+  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world || '—'}</span>, sort: (r) => r.world },
   { key: 'retainer', label: 'Retainer', locked: true, cell: (r) => r.retainer_name, sort: (r) => r.retainer_name },
   { key: 'job', label: 'Class/Level', cell: (r) => (r.job_abbreviation ? `${r.job_abbreviation}/${r.level ?? '?'}` : '—'), sort: (r) => r.job_abbreviation },
-  { key: 'gil', label: 'Gil', cell: (r) => (typeof r.gil === 'number' ? r.gil.toLocaleString() : '—'), sort: (r) => (typeof r.gil === 'number' ? r.gil : null) },
+  { key: 'gil', label: 'Gil', td: (r) => <td className="num"><GilText gil={typeof r.gil === 'number' ? r.gil : null} /></td>, sort: (r) => (typeof r.gil === 'number' ? r.gil : null) },
   { key: 'avgIlvl', label: 'Avg ilvl', sort: (r) => (typeof r.avg_ilvl === 'number' ? r.avg_ilvl : null),
     td: (r) => <AvgIlvlCell avgIlvl={r.avg_ilvl} gearSlots={r.gear_slots} jobAbbreviation={r.job_abbreviation} targetMode={r.target_mode} targetValue={r.target_value} onlyCrafted={r.only_crafted} /> },
   { key: 'ventureType', label: 'Venture Type', cell: (r) => r.venture_type || '—', sort: (r) => r.venture_type },
-  { key: 'status', label: 'Status', sortable: false, cell: (r) => <RetainerStatusCell hasVenture={r.has_venture} ventureEndsAt={r.venture_ends_at} /> },
+  { key: 'status', label: 'Status', sortable: false, cell: (r) => <RetainerStatusCell hasVenture={r.has_venture} ventureEndsAt={r.venture_ends_at} hasJob={!!r.job_abbreviation} /> },
   { key: 'targetMode', label: 'Target Mode', sort: (r) => r.target_mode,
     cell: (r, ctx) => (
       <select value={ctx.targetMode} onChange={(e) => ctx.setTargetMode(e.target.value)}>

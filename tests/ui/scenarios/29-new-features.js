@@ -95,8 +95,8 @@ module.exports = async (t) => {
   check(/^Update the plugin on DESKTOP-1 \(acct1\)\. This version of the app needs plugin 0\.14\.0 or newer/.test(await ev(`document.querySelector('.pcs-update-plugin').innerText`)),
     'and a note above the table says which PC to update and how');
   check(pcs[0][10].text.startsWith('2 things') && pcs[1][10].text === 'Nothing', 'what each PC could not see');
-  check(pcs[0][5].text === 'Yes' && pcs[1][5].text === 'No' && pcs[1][5].cls.includes('supply-warn') && !pcs[0][5].cls.includes('supply-warn'),
-    'AutoRetainer comes first of the other plugins, amber when it is not running: ' + JSON.stringify(pcs.map((r) => r[5])));
+  check(pcs[0][5].text === 'Yes' && pcs[1][5].text === 'No' && pcs[1][5].cls.includes('tone-warn') && pcs[0][5].cls.includes('tone-good'),
+    'AutoRetainer comes first of the other plugins, green when running, amber when it is not: ' + JSON.stringify(pcs.map((r) => r[5])));
   check(await ev(`[...document.querySelectorAll('.pcs-table thead th')].map(th => th.textContent.replace(/[▲▼]/g, '').trim()).slice(5, 10).join('|')`) ===
     'AutoRetainer|Allagan Tools|FC Tracker|Submarine Tracker|Venture Log', 'the other plugins, AutoRetainer first');
   check(await ev(`document.querySelectorAll('.pcs-check').length`) === 1 && /Check what I can see: DESKTOP-1 \(acct1\), .*, 1 thing to fix/.test(await ev(`document.querySelector('.pcs-check summary').innerText`)),

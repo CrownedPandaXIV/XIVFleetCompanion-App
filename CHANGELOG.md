@@ -47,6 +47,14 @@ do by hand.
   "diadochos healing" finds every piece of Diadochos healing gear.
 - **Hide equipped gear** on the Inventory tab's Characters, Fleet totals and Where is it?: leaves out gear being worn by
   the characters and their retainers. One choice for all three, remembered.
+- **The same colours as the plugin's tables**: green when fine, amber getting low, red well below a warning (the
+  Roster's ceruleum and repair kits, Last Synced, Supplies' days left, Income, the PCs' plugins and what they could
+  not see, retainers' ventures, houses), subs as dots out of the slots unlocked on the Roster, gil in gold (large
+  amounts as "5.86M", the full amount on hover), house addresses in blue, Free Company names in lavender, worlds
+  softer, and numbers on the right. The warning colour is now orange rather than gold, so it's never mistaken for gil.
+- **Every column can be resized, the last one too**: a table keeps each column at the width it's given instead of
+  stretching them all to fill the page, so dragging the last column's edge works, the room left over sits after it,
+  and a wider table scrolls sideways.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.

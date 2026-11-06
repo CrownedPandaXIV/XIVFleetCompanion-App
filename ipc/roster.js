@@ -31,7 +31,7 @@ ipcMain.handle('get-roster', async () => {
       SELECT
         ${loginTable.ok ? 'l.pc_name AS login_pc, l.account_label AS login_label, l.logged_in_at,' : ''}
         s.cid, s.name, s.world, s.gil, s.retainer_count, s.submarine_count,
-        s.account_label, s.snapshot_at, s.repair_kits, s.ceruleum,
+        s.account_label, s.snapshot_at, s.repair_kits, s.ceruleum, s.num_sub_slots,
         h.fc_name, h.fc_points, h.has_house, h.house_ward, h.house_plot,
         k.city_name AS district_name,
         so.sort_index,

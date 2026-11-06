@@ -10,6 +10,8 @@ const pcAgo = (at) => {
   return `${Math.round(minutes / 1440)} days ago`;
 };
 const pcYes = (value) => (value ? 'Yes' : value === false ? 'No' : '—');
+// Yes in green; No in amber when it's needed ('warn'), dim when it's optional; unknown dim (as the plugin's PCs page).
+const pcYesClass = (value, noTone = 'dim') => (value ? 'tone-good' : value === false ? (noTone === 'warn' ? 'tone-warn' : 'dim') : 'dim');
 
 // Compares "0.10.0"-style versions.
 function pcVersionCompare(a, b) {
@@ -23,9 +25,9 @@ function PcProblemsCell({ problems }) {
   const list = problems || [];
   return (
     <td className="pcs-problems">
-      {list.length === 0 ? 'Nothing' : (
+      {list.length === 0 ? <span className="tone-good">Nothing</span> : (
         <details>
-          <summary>{list.length} thing{list.length === 1 ? '' : 's'}</summary>
+          <summary className="tone-warn">{list.length} thing{list.length === 1 ? '' : 's'}</summary>
           <ul>{list.map((text) => <li key={text}>{text}</li>)}</ul>
         </details>
       )}
@@ -75,15 +77,15 @@ const PC_COLUMN_DEFS = [
     ) },
   {
     key: 'autoretainer', label: 'AutoRetainer',
-    td: (p) => <td className={p.autoretainer_ready === false ? 'supply-warn' : ''} title="AutoRetainer running (needed: nothing syncs without it)">{pcYes(p.autoretainer_ready)}</td>,
+    td: (p) => <td className={pcYesClass(p.autoretainer_ready, 'warn')} title="AutoRetainer running (needed: nothing syncs without it)">{pcYes(p.autoretainer_ready)}</td>,
     sort: (p) => pcYes(p.autoretainer_ready),
   },
-  { key: 'allagan', label: 'Allagan Tools', td: (p) => <td className={p.allagantools_ready === false ? 'supply-warn' : ''} title="Allagan Tools running (bags, retainers' items, FC chests and listings)">{pcYes(p.allagantools_ready)}</td>, sort: (p) => pcYes(p.allagantools_ready) },
-  { key: 'fctracker', label: 'FC Tracker', td: (p) => <td title="FC Tracker running in that game (optional: Free Company house details).">{pcYes(p.fctracker_found)}</td>, sort: (p) => pcYes(p.fctracker_found) },
-  { key: 'subtracker', label: 'Submarine Tracker', td: (p) => <td title="Submarine Tracker running in that game (loot per voyage; only needed with subs).">{pcYes(p.submarinetracker_found)}</td>, sort: (p) => pcYes(p.submarinetracker_found) },
+  { key: 'allagan', label: 'Allagan Tools', td: (p) => <td className={pcYesClass(p.allagantools_ready, 'warn')} title="Allagan Tools running (bags, retainers' items, FC chests and listings)">{pcYes(p.allagantools_ready)}</td>, sort: (p) => pcYes(p.allagantools_ready) },
+  { key: 'fctracker', label: 'FC Tracker', td: (p) => <td className={pcYesClass(p.fctracker_found)} title="FC Tracker running in that game (optional: Free Company house details).">{pcYes(p.fctracker_found)}</td>, sort: (p) => pcYes(p.fctracker_found) },
+  { key: 'subtracker', label: 'Submarine Tracker', td: (p) => <td className={pcYesClass(p.submarinetracker_found)} title="Submarine Tracker running in that game (loot per voyage; only needed with subs).">{pcYes(p.submarinetracker_found)}</td>, sort: (p) => pcYes(p.submarinetracker_found) },
   {
     key: 'ventures', label: 'Venture Log',
-    td: (p) => <td title="AutoRetainer's venture statistics files found: what each retainer's ventures brought back, for venture income (only with retainers)">{pcYes(p.venture_stats_found)}</td>,
+    td: (p) => <td className={pcYesClass(p.venture_stats_found)} title="AutoRetainer's venture statistics files found: what each retainer's ventures brought back, for venture income (only with retainers)">{pcYes(p.venture_stats_found)}</td>,
     sort: (p) => pcYes(p.venture_stats_found),
   },
   { key: 'problems', label: 'Could not see', td: (p) => <PcProblemsCell problems={p.problems} />, sort: (p) => (p.problems || []).length },

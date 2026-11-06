@@ -14,8 +14,22 @@ function rosterWarnings(rows, behind, { ceruleum = 0, repairKits = 0 } = {}) {
       not_synced_ms: behind.get(String(r.cid)) ?? null,
       low_repair: subsBuilt && synced && r.repair_kits < repairKits,
       low_ceruleum: subsBuilt && synced && r.ceruleum < ceruleum,
+      ceruleum_tone: supplyTone(r.ceruleum, ceruleum, subsBuilt && synced),
+      repair_tone: supplyTone(r.repair_kits, repairKits, subsBuilt && synced),
     };
   });
 }
 
-module.exports = { rosterWarnings };
+// A supply's colour against its warning, as the plugin's (MainWindow.Lists.cs SupplyColor): 'danger' under half of
+// it, 'warn' under it, 'good' at or above it (or with the warning off), null when it doesn't count (no sub built,
+// or no longer synced) or isn't known.
+function supplyTone(have, warning, counted) {
+  if (!counted || have === null || have === undefined) return null;
+  const n = Number(have);
+  if (!(warning > 0)) return 'good';
+  if (n < warning / 2) return 'danger';
+  if (n < warning) return 'warn';
+  return 'good';
+}
+
+module.exports = { rosterWarnings, supplyTone };

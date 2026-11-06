@@ -22,11 +22,42 @@
       color: #8a8f9a;
       font-size: 13px;
     }
+    /* The colours that mean something (fine, getting low, well below a warning), and the ones that only say what a
+       thing is (gil, a house's address, a Free Company's name). The same as the plugin's (Theme.cs); the warning is
+       orange rather than gold so it is never mistaken for gil. */
+    :root {
+      --good: #6fbf82;
+      --warn: #e8a04c;
+      --danger: #e57373;
+      --dim: #8a8f9a;
+      --gil: #f2d06b;
+      --address: #8cc4f2;
+      --fc: #b8a6f0;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
     }
+    /* A table you can resize keeps each column at the width it is given, rather than stretching them all to fill
+       the page: so the last column can be dragged too, the room left over sits after it, and a wider table scrolls. */
+    table:has(> thead th.resizable) { width: max-content; }
+    /* Cells coloured by meaning or by what they are (tables.jsx: GilText, Pips, toneClass). */
+    .tone-good { color: var(--good); }
+    .tone-warn { color: var(--warn); }
+    .tone-danger { color: var(--danger); }
+    .gil { color: var(--gil); }
+    .address { color: var(--address); }
+    .fc-name { color: var(--fc); }
+    .dim { color: var(--dim); }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pips { display: inline-flex; gap: 5px; vertical-align: middle; cursor: help; }
+    .pip { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; }
+    .pip.on.good { background: var(--good); }
+    .pip.on.warn { background: var(--warn); }
+    .pip.off { border: 1.5px solid var(--dim); }
+    /* The count behind the dots: not shown, but copied and exported with the table. */
+    .pips-count { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     th, td {
       text-align: left;
       padding: 8px 24px;
@@ -148,9 +179,9 @@
       border-top: 1px solid #23262e;
     }
     .warning {
-      background: rgba(224, 185, 106, 0.1);
-      border: 1px solid rgba(224, 185, 106, 0.3);
-      color: #e0b96a;
+      background: rgba(232, 160, 76, 0.1);
+      border: 1px solid rgba(232, 160, 76, 0.3);
+      color: var(--warn);
       padding: 10px 14px;
       border-radius: 4px;
       font-size: 13px;
@@ -164,7 +195,7 @@
       padding: 6px 10px;
     }
     tr.flagged-row td {
-      background: rgba(224, 185, 106, 0.08);
+      background: rgba(232, 160, 76, 0.08);
     }
 
     .header-row {
@@ -274,7 +305,7 @@
     /* Help text under settings, and an amber attention line */
     .alerts-attention {
       margin: 6px 0 10px;
-      color: #e0b96a;
+      color: var(--warn);
       font-size: 13px;
     }
     .alerts-help {
@@ -287,7 +318,7 @@
       cursor: help;
     }
     .plugin-data.stale {
-      color: #e0b96a;
+      color: var(--warn);
     }
     /* Database connection: a dot in the header, and a banner while it cannot be reached. */
     .connection-dot {
@@ -305,18 +336,18 @@
       background: #6fbf82;
     }
     .connection-dot.offline {
-      color: #e0b96a;
+      color: var(--warn);
     }
     .connection-dot.offline::before {
-      background: #e0b96a;
+      background: var(--warn);
     }
     .connection-banner {
       margin: 0 0 16px;
       padding: 10px 14px;
-      border: 1px solid #e0b96a;
+      border: 1px solid var(--warn);
       border-radius: 6px;
       color: #e8d3a5;
-      background: rgba(224, 185, 106, 0.08);
+      background: rgba(232, 160, 76, 0.08);
       font-size: 13px;
       line-height: 1.5;
     }
@@ -369,7 +400,7 @@
     .credits-list { margin: 4px 0 8px; padding-left: 22px; }
     .speed-findings { margin: 8px 0; padding-left: 22px; }
     .speed-findings li { margin: 3px 0; }
-    .speed-findings li.speed-slow { color: #e0b96a; }
+    .speed-findings li.speed-slow { color: var(--warn); }
     .speed-findings li.speed-ok { color: #8a8f9a; }
     .speed-tabs { border-collapse: collapse; margin-top: 6px; }
     .speed-tabs th, .speed-tabs td { padding: 2px 14px 2px 0; text-align: left; }
@@ -402,7 +433,7 @@
     .setup-step-mark { display: inline-block; width: 18px; }
     .setup-step.done .setup-step-mark { color: #6fbf73; }
     .setup-step.failed .setup-step-mark, .setup-problem { color: #e57373; }
-    .setup-step.working .setup-step-mark { color: #e0b96a; }
+    .setup-step.working .setup-step-mark { color: var(--warn); }
     .setup-names { margin: 10px 0; }
     .setup-ts-status { margin: 8px 0; color: #e6e6e6; }
     /* Supplies */
@@ -412,14 +443,14 @@
     .supply-card-label { color: #8a8f9a; font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }
     .supply-card-note { color: #8a8f9a; font-size: 12px; margin-top: 4px; }
-    .not-synced-tag { white-space: nowrap; margin-left: 8px; padding: 1px 6px; border-radius: 3px; font-size: 11px; color: #e0b96a; border: 1px solid rgba(224, 185, 106, 0.4); cursor: help; }
+    .not-synced-tag { white-space: nowrap; margin-left: 8px; padding: 1px 6px; border-radius: 3px; font-size: 11px; color: var(--warn); border: 1px solid rgba(232, 160, 76, 0.4); cursor: help; }
     .not-synced-note { margin: 12px 24px; }
     .unseen-retainers { margin: 8px 24px 12px; }
     .unseen-retainers summary { cursor: pointer; }
     .unseen-retainers ul { margin: 8px 0 4px; padding-left: 20px; max-height: 200px; overflow-y: auto; }
     .unseen-retainers-note { color: #8a8f9a; font-size: 12px; }
     .supplies-note { color: #8a8f9a; font-size: 12px; padding: 0 24px 8px; }
-    .note-warn { color: #e0b96a; font-weight: 600; }
+    .note-warn { color: var(--warn); font-weight: 600; }
     .supplies-note-inline { color: #8a8f9a; font-size: 12px; }
     .fc-credits { margin-top: 16px; }
     .fc-credits table { margin-bottom: 12px; }
@@ -436,9 +467,9 @@
     .supplies > .status { padding: 0 24px; }
     .supplies-table th.supply-group { text-align: center; border-bottom: 1px solid #2c3039; }
     .supplies-table td:first-child, .supplies-table td:nth-child(2) { white-space: nowrap; }
-    .supplies-table td.supply-warn { color: #e0b96a; }
+    .supplies-table td.supply-warn { color: var(--warn); }
     .supplies-table td.supply-danger { color: #e57373; font-weight: 600; }
-    .pcs-table td.supply-warn { color: #e0b96a; }
+    .pcs-table td.supply-warn { color: var(--warn); }
     .pcs-table td.supply-danger { color: #e57373; font-weight: 600; }
     .pcs-update-plugin { margin: 8px 0 12px; padding: 10px 14px; border: 1px solid #e57373; border-radius: 6px; color: #f0c4c4; background: rgba(229, 115, 115, 0.08); font-size: 13px; line-height: 1.5; }
     .shared-sync { margin: 12px 24px; }
@@ -455,7 +486,7 @@
     .income-table td { white-space: nowrap; }
     .income-table td.income-real { font-weight: 600; }
     .income-table td.income-none { color: #8a8f9a; }
-    .income-table td.income-warn { color: #e0b96a; }
+    .income-table td.income-warn { color: var(--warn); }
     .income-table td.income-danger { color: #e57373; font-weight: 600; }
     .error-inline { color: #e57373; font-size: 12px; }
     /* Inventory → Where Is It? */
@@ -474,15 +505,16 @@
     .shopping-section td .shopping-note { padding: 0; }
     .shopping-section tr.shopping-done td { color: #8a8f9a; }
     .shopping-places { color: #c0c4cc; font-size: 12px; }
-    .shopping-total { margin-left: 10px; color: #e0b96a; font-size: 14px; }
+    .shopping-total { margin-left: 10px; color: var(--gil); font-size: 14px; }
     button.link-button { padding: 0; background: transparent; border: none; color: #7aa7e0; cursor: pointer; font-size: 12px; text-decoration: underline; }
-    /* How long since an FC house was last entered (Free Companies tab and Summary). */
+    /* How long since an FC house was last entered (Free Companies tab and Summary): green while recent. */
+    .house-age { color: var(--good); }
     .house-age.warn {
-      color: #e0b96a;
+      color: var(--warn);
     }
     .house-age.danger,
     .house-age.unknown {
-      color: #e57373;
+      color: var(--danger);
       font-weight: 600;
     }
 

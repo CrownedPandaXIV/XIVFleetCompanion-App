@@ -20,25 +20,25 @@ const incomeIf = (r, value) => (r.enough ? value : null);
 // salvage history says so in the Salvage column and leaves the other real-income columns blank.
 const INCOME_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
-  { key: 'subs', label: 'Subs', cell: (r) => r.subs, sort: (r) => r.subs },
+  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world}</span>, sort: (r) => r.world },
+  { key: 'subs', label: 'Subs', td: (r) => <td className="num">{r.subs}</td>, sort: (r) => r.subs },
   {
     key: 'salvage', label: 'Salvage / day',
     td: (r) => (r.enough
       ? <td title={`${r.pieces.toLocaleString()} salvage pieces came in over ${r.spanDays.toFixed(1)} days`
           + (r.fromChest ? `; ${r.fromChest.toLocaleString()} taken out of the FC chest are not counted` : '')
-          + (r.firstStored ? `; ${r.firstStored.toLocaleString()} seen for the first time (a retainer first opened on a PC) are not counted` : '')}>{incomeGil(r.salvagePerDay)}</td>
+          + (r.firstStored ? `; ${r.firstStored.toLocaleString()} seen for the first time (a retainer first opened on a PC) are not counted` : '')} className="num tone-good">{incomeGil(r.salvagePerDay)}</td>
       : <td className="income-none">Not enough history</td>),
     sort: (r) => incomeIf(r, r.salvagePerDay),
   },
   {
     key: 'repairs', label: 'Repairs / day',
     td: (r) => (r.enough
-      ? <td title={`${r.kitsUsed.toLocaleString()} repair kits used over ${r.spanDays.toFixed(1)} days`}>{r.kitPerDay ? `−${incomeGil(r.kitPerDay)}` : '0'}</td>
+      ? <td className={`num ${r.kitPerDay ? 'tone-warn' : ''}`} title={`${r.kitsUsed.toLocaleString()} repair kits used over ${r.spanDays.toFixed(1)} days`}>{r.kitPerDay ? `−${incomeGil(r.kitPerDay)}` : '0'}</td>
       : <td></td>),
     sort: (r) => incomeIf(r, r.kitPerDay),
   },
-  { key: 'real', label: 'Real net / day', td: (r) => <td className="income-real">{r.enough ? incomeGil(r.perDay) : ''}</td>, sort: (r) => incomeIf(r, r.perDay) },
+  { key: 'real', label: 'Real net / day', td: (r) => <td className={`income-real num ${r.enough ? (r.perDay > 0 ? 'tone-good' : 'tone-danger') : ''}`}>{r.enough ? incomeGil(r.perDay) : ''}</td>, sort: (r) => incomeIf(r, r.perDay) },
   { key: 'expected', label: 'Expected / day', td: (r) => <IncomeExpectedCell row={r} />, sort: (r) => r.expectedPerDay },
   { key: 'difference', label: 'Difference / day', td: (r) => <td className={r.status}>{r.enough ? incomeSigned(r.differencePerDay) : ''}</td>, sort: (r) => incomeIf(r, r.differencePerDay) },
   { key: 'share', label: 'Of expected', td: (r) => <td className={r.status}>{r.enough ? incomeShare(r.share) : ''}</td>, sort: (r) => incomeIf(r, r.share) },
@@ -62,10 +62,10 @@ const LOOT_ROUTE_COLUMN_DEFS = [
 ];
 const VENTURE_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => r.world || '—', sort: (r) => r.world },
-  { key: 'retainers', label: 'Retainers', cell: (r) => r.retainers, sort: (r) => r.retainers },
-  { key: 'rewards', label: 'Rewards', cell: (r) => r.rewards, sort: (r) => r.rewards },
-  { key: 'per_day', label: 'Vendor value / day', td: (r) => <td className="income-real">{incomeGil(r.perDay)}</td>, sort: (r) => r.perDay },
+  { key: 'world', label: 'World', cell: (r) => <span className="dim">{r.world || '—'}</span>, sort: (r) => r.world },
+  { key: 'retainers', label: 'Retainers', td: (r) => <td className="num">{r.retainers}</td>, sort: (r) => r.retainers },
+  { key: 'rewards', label: 'Rewards', td: (r) => <td className="num">{r.rewards}</td>, sort: (r) => r.rewards },
+  { key: 'per_day', label: 'Vendor value / day', td: (r) => <td className="income-real num tone-good">{incomeGil(r.perDay)}</td>, sort: (r) => r.perDay },
   { key: 'top', label: 'Most valuable', cell: (r) => r.top.map((t) => `${t.name} ×${t.n.toLocaleString()}`).join(', '), sortable: false },
 ];
 

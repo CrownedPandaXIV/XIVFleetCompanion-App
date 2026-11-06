@@ -19,10 +19,10 @@ function subsReadyForParts(partRows) {
 }
 
 const HOUSE_WARNING_COLUMN_DEFS = [
-  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => h.fc_name || '—', sort: (h) => h.fc_name },
+  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => (h.fc_name ? <span className="fc-name">{h.fc_name}</span> : '—'), sort: (h) => h.fc_name },
   { key: 'world', label: 'World', cell: (h) => h.fc_world || '—', sort: (h) => h.fc_world },
   { key: 'account', label: 'Account', cell: (h) => h.account_label || '—', sort: (h) => h.account_label },
-  { key: 'house', label: 'House', cell: (h) => formatHouse(h), sort: (h) => formatHouse(h) },
+  { key: 'house', label: 'House', cell: (h) => <span className="address">{formatHouse(h)}</span>, sort: (h) => formatHouse(h) },
   { key: 'last_entered', label: 'Last Entered', td: (h) => <td><HouseAge row={h} /></td>, sort: (h) => h.house_days },
   {
     key: 'demolition', label: 'Demolition Possible In',
@@ -50,8 +50,8 @@ const LOW_SUPPLY_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (w) => w.character_name, sort: (w) => w.character_name },
   { key: 'world', label: 'World', cell: (w) => w.world, sort: (w) => w.world },
   { key: 'account', label: 'Account', cell: (w) => w.account_label, sort: (w) => w.account_label },
-  { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? '#e57373' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
-  { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? '#e57373' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
+  { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? 'var(--danger)' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
+  { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? 'var(--danger)' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
 ];
 const SUMMARY_CHARACTER_DUPLICATE_EXTRAS = ['x_world', 'x_account', 'x_ceruleum', 'x_repair_kits'];
 

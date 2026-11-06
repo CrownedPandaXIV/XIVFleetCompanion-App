@@ -10,6 +10,33 @@ function matchesWords(text, query) {
   return String(query || '').toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
 }
 
+// ---- The tables' colours, as the plugin's (MainWindow.Lists.cs): green when fine, amber getting low, red well
+// below a warning; gil in gold, addresses in blue, Free Company names in lavender (index.html :root). ----
+
+// The class for a tone from the data ('good', 'warn', 'danger'), or none.
+const toneClass = (tone) => (tone ? `tone-${tone}` : undefined);
+
+// Gil in gold; a million or more as "5.86M", the full amount on hover.
+function GilText({ gil }) {
+  if (gil === null || gil === undefined || gil === '' || Number.isNaN(Number(gil))) return <span className="dim">—</span>;
+  const g = Number(gil);
+  if (Math.abs(g) >= 1e6) {
+    return <span className="gil" title={`${g.toLocaleString()} gil`}>{(g / 1e6).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M</span>;
+  }
+  return <span className="gil">{g.toLocaleString()}</span>;
+}
+
+// Dots, filled out of total (subs out of the sub slots unlocked): green when every one is filled, amber otherwise.
+function Pips({ filled, total, title }) {
+  const tone = filled >= total ? 'good' : 'warn';
+  return (
+    <span className="pips" title={title}>
+      {Array.from({ length: total }, (_, i) => <span key={i} className={`pip ${i < filled ? `on ${tone}` : 'off'}`} />)}
+      <span className="pips-count">{filled}</span>
+    </span>
+  );
+}
+
 // Shared resizable-column mechanism, used by every table in the app.
 // Widths persist per-machine (localStorage), keyed by a stable
 // per-table id so different tables' column sets never collide.
@@ -308,6 +335,7 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
   const COLUMN_DRAG = 'text/x-fleet-column';
   return (
     <th
+      className="resizable"
       style={{ width: `${widths[columnKey] || 150}px`, position: 'relative', boxShadow: dropTarget ? 'inset 3px 0 0 #5b8def' : undefined }}
       onDragOver={onMoveColumn ? (e) => {
         if (!Array.from(e.dataTransfer.types).includes(COLUMN_DRAG)) return;
