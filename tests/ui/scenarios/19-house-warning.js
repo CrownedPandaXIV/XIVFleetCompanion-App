@@ -42,10 +42,10 @@ module.exports = async (t) => {
   const rows = async () => ev(`[...document.querySelectorAll('table.house-warnings tbody tr')].map((tr) => [...tr.children].map((td) => td.innerText.trim()))`);
   let list = await rows();
   check(list.length === 4, 'the Summary lists 4 houses not entered in 7 days: ' + list.length);
-  check(JSON.stringify(list.map((r) => r[4])) === JSON.stringify(['Unknown', '50 days ago', '33 days ago', '9 days ago']), 'most at risk first: ' + list.map((r) => r[4]).join(', '));
-  check(JSON.stringify(list.map((r) => r[5])) === JSON.stringify(['Unknown, check in game', 'Any time now', 'about 12 days', 'about 36 days']),
-    'with how long until demolition is possible: ' + list.map((r) => r[5]).join(', '));
-  check(list.every((r) => /W\d+ P\d+/.test(r[3]) && r[1] !== '—'), 'each shows the house address and world');
+  check(JSON.stringify(list.map((r) => r[3])) === JSON.stringify(['Unknown', '50 days ago', '33 days ago', '9 days ago']), 'most at risk first: ' + list.map((r) => r[3]).join(', '));
+  check(JSON.stringify(list.map((r) => r[4])) === JSON.stringify(['Unknown, check in game', 'Any time now', 'about 12 days', 'about 36 days']),
+    'with how long until demolition is possible: ' + list.map((r) => r[4]).join(', '));
+  check(list.every((r) => /W\d+ P\d+/.test(r[2]) && / \(.+\)$/.test(r[0])), 'each shows the house address, and the world after the FC');
   await ev(`document.querySelector('table.house-warnings').scrollIntoView({ block: 'center' })`);
   await t.shot('house-warning-summary');
 
@@ -79,7 +79,7 @@ module.exports = async (t) => {
   await clickText('.settings-modal .modal-actions button', 'Close');
   await waitFor(`document.querySelectorAll('table.house-warnings tbody tr').length === 3`, 'three houses after raising the warning', 10000);
   list = await rows();
-  check(!list.some((r) => r[4] === '9 days ago'), 'at 10 days the 9-day house is no longer listed (the Summary reloads when Settings closes)');
+  check(!list.some((r) => r[3] === '9 days ago'), 'at 10 days the 9-day house is no longer listed (the Summary reloads when Settings closes)');
   check(await ev(`document.querySelector('.summary-thresholds').innerText.includes('10 days')`), 'and the Summary shows the new setting');
   await nav('Free Companies');
   await waitFor(`document.querySelectorAll('tbody tr').length > 0`, 'fc rows again');

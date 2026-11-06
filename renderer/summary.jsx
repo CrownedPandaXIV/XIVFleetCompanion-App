@@ -19,8 +19,7 @@ function subsReadyForParts(partRows) {
 }
 
 const HOUSE_WARNING_COLUMN_DEFS = [
-  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => (h.fc_name ? <span className="fc-name">{h.fc_name}</span> : '—'), sort: (h) => h.fc_name },
-  { key: 'world', label: 'World', cell: (h) => h.fc_world || '—', sort: (h) => h.fc_world },
+  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => <>{h.fc_name ? <span className="fc-name">{h.fc_name}</span> : '—'}<WorldAfter world={h.fc_world} /></>, sort: (h) => h.fc_name },
   { key: 'account', label: 'Account', cell: (h) => h.account_label || '—', sort: (h) => h.account_label },
   { key: 'house', label: 'House', cell: (h) => <span className="address">{formatHouse(h)}</span>, sort: (h) => formatHouse(h) },
   { key: 'last_entered', label: 'Last Entered', td: (h) => <td><HouseAge row={h} /></td>, sort: (h) => h.house_days },

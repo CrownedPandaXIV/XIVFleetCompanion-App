@@ -58,6 +58,8 @@ do by hand.
 - **Character and world together**: every table with characters (Roster, Retainers, Subs, Supplies, Salvage, Income,
   Route Optimization, Parts, Where is it?, the Summary's lists) names each with its world after it, softer, instead of
   a separate World column, as the plugin does. A copied or exported table gives it as "Wa'kana Gojo (Cuchulainn)".
+  Free Companies the same (the Free Companies tab, the Summary's house warnings and Supplies' FC credits): the FC's
+  name with its world after it.
 - **Livelier Subs and Retainers**: a thin bar beside each sub's rank for how far to the next, softer dashes in builds,
   subs back in green and in port softer; each retainer's owner named once, its class in its role's colour (tanks
   blue, healers green, damage red, a base class such as Gladiator or Conjurer a lighter shade) with the level softer,

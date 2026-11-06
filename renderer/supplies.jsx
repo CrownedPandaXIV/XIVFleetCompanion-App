@@ -61,8 +61,7 @@ const FC_CREDIT_ACCOUNT_COLUMN_DEFS = [
   { key: 'days', label: 'Tanks last', cell: (a) => creditDaysText(a.days), sort: (a) => creditDaysSort(a.days) },
 ];
 const FC_CREDIT_FC_COLUMN_DEFS = [
-  { key: 'fc', label: 'Free Company', locked: true, cell: (fc) => (fc.fc_name ? <span className="fc-name">{fc.fc_name}</span> : '—'), sort: (fc) => fc.fc_name },
-  { key: 'world', label: 'World', cell: (fc) => fc.fc_world || '—', sort: (fc) => fc.fc_world },
+  { key: 'fc', label: 'Free Company', locked: true, cell: (fc) => <>{fc.fc_name ? <span className="fc-name">{fc.fc_name}</span> : '—'}<WorldAfter world={fc.fc_world} /></>, sort: (fc) => fc.fc_name },
   { key: 'account', label: 'Account', cell: (fc) => fc.account_label, sort: (fc) => fc.account_label },
   { key: 'credits', label: 'Credits', cell: (fc) => creditNumber(fc.credits), sort: (fc) => fc.credits },
   { key: 'tanks', label: 'Tanks they buy', cell: (fc) => creditNumber(fc.tanks), sort: (fc) => fc.tanks },
