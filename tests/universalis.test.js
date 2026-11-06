@@ -174,3 +174,31 @@ test('the Shopping List asks for one world, data center or region at a time, kep
   assert.strictEqual(calls.length, 2, 'another scope is asked for');
   assert.deepStrictEqual((await u.listingsIn('Dynamis', [])).listings.size, 0);
 });
+
+test('each world, data center and region asked once, a few requests at a time (never more than 4)', async () => {
+  const asked = [];
+  let at = 0;
+  let most = 0;
+  const u = createUniversalis({
+    baseUrl: 'http://stub',
+    fetchImpl: async (url) => {
+      if (url.includes('/data-centers') || url.includes('/worlds')) return { ok: false, status: 500, json: async () => ({}) };
+      asked.push(decodeURIComponent(url));
+      at++;
+      most = Math.max(most, at);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      at--;
+      return { ok: false, status: 404, json: async () => ({}) };
+    },
+  });
+  // Maduin and Halicarnassus share Dynamis, Zalera is on Crystal; all in North America. 120 items: 3 requests each.
+  const ids = Array.from({ length: 120 }, (_, i) => i + 1);
+  const m = await u.marketFor(['Maduin', 'Halicarnassus', 'Zalera'], ids);
+  const places = asked.map((url) => url.split('/api/v2/')[1].split('/')[0]);
+  for (const place of ['Maduin', 'Halicarnassus', 'Zalera', 'Dynamis', 'Crystal', 'North-America'])
+    assert.strictEqual(places.filter((p) => p === place).length, 3, `${place} asked once (3 batches)`);
+  assert.strictEqual(asked.length, 18);
+  assert.ok(most > 1 && most <= 4, `${most} at once`);
+  assert.strictEqual(m.get('Halicarnassus').names.dc, 'Dynamis');
+  assert.deepStrictEqual([...m.keys()], ['Maduin', 'Halicarnassus', 'Zalera']);
+});

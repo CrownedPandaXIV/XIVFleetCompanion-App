@@ -10,6 +10,7 @@ const SETTING_KEY = 'universalis_enabled';
 const DEFAULT_URL = 'https://universalis.app';
 const USER_AGENT = 'XIVFleetCompanion';
 const BATCH = 50; // item ids per request
+const PARALLEL = 4; // requests at once
 const LISTINGS = 20; // listings per item, cheapest first
 const KEEP_MS = 30 * 60 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
@@ -117,10 +118,23 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     return places;
   }
 
-  // Map itemId -> listings for one world, data center or region, from the cache or Universalis. When
-  // Universalis does not answer (busy, unreachable, a server error), items already asked for before keep their
-  // last listings and `stale` (an object) gets the time they are from and why; an item never asked for before
-  // makes it fail.
+  // Requests to Universalis at once (it allows several): the rest wait their turn.
+  let running = 0;
+  const waiting = [];
+  async function limited(task) {
+    if (running >= PARALLEL) await new Promise((resolve) => waiting.push(resolve));
+    running++;
+    try { return await task(); } finally {
+      running--;
+      const next = waiting.shift();
+      if (next) next();
+    }
+  }
+
+  // Map itemId -> listings for one world, data center or region, from the cache or Universalis, a few batches at
+  // a time. When Universalis does not answer (busy, unreachable, a server error), items already asked for before
+  // keep their last listings and `stale` (an object) gets the time they are from and why; an item never asked for
+  // before makes it fail.
   async function listingsFor(scope, ids, stale) {
     const out = new Map();
     const missing = [];
@@ -129,39 +143,58 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
       if (hit && now() - hit.at < KEEP_MS) out.set(id, hit.listings);
       else missing.push(id);
     }
-    for (let i = 0; i < missing.length; i += BATCH) {
-      const batch = missing.slice(i, i + BATCH);
+    const batches = [];
+    for (let i = 0; i < missing.length; i += BATCH) batches.push(missing.slice(i, i + BATCH));
+    await Promise.all(batches.map(async (batch) => {
       let items;
       try {
-        items = parseItems(await getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=0`, { missingOk: true }));
+        items = parseItems(await limited(() => getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=0`, { missingOk: true })));
       } catch (err) {
         const old = batch.map((id) => cache.get(`${scope}|${id}`));
         if (old.some((o) => !o)) throw err;
         batch.forEach((id, k) => out.set(id, old[k].listings));
         stale.problem = err.message;
         stale.since = Math.min(stale.since || Infinity, ...old.map((o) => o.at));
-        continue;
+        return;
       }
       for (const id of batch) {
         const listings = items.get(id) || [];
         cache.set(`${scope}|${id}`, { at: now(), listings });
         out.set(id, listings);
       }
-    }
-    return out;
+    }));
+    // In the order asked, whichever batch answered first.
+    return new Map(ids.filter((id) => out.has(id)).map((id) => [id, out.get(id)]));
   }
 
-  // For each world: its data center and region, and Map itemId -> { world, dc, region } listings.
+  // For each world: its data center and region, and Map itemId -> { world, dc, region } listings. Each world, data
+  // center and region is asked once (worlds on the same data center share its answer), a few requests at a time.
   async function marketFor(worlds, ids) {
     const where = await placesOf();
     const itemIds = [...new Set(ids.map(Number).filter((id) => id > 0))];
-    const result = new Map();
+    const scopesOf = new Map();
     for (const world of new Set(worlds.filter(Boolean))) {
       const place = where.get(String(world).toLowerCase()) || null;
-      const scopes = { world, dc: place ? place.dc : null, region: place ? place.region : null };
+      scopesOf.set(world, { world, dc: place ? place.dc : null, region: place ? place.region : null });
+    }
+    const names = [...new Set([...scopesOf.values()].flatMap((scopes) => SCOPES.map((s) => scopes[s]).filter(Boolean)))];
+    const answers = new Map(await Promise.all(names.map(async (name) => {
+      const stale = {};
+      const listings = itemIds.length ? await listingsFor(name, itemIds, stale) : new Map();
+      return [name, { listings, stale }];
+    })));
+    const result = new Map();
+    for (const [world, scopes] of scopesOf) {
       const byScope = {};
       const stale = {};
-      for (const s of SCOPES) byScope[s] = scopes[s] && itemIds.length ? await listingsFor(scopes[s], itemIds, stale) : new Map();
+      for (const s of SCOPES) {
+        const answer = scopes[s] ? answers.get(scopes[s]) : null;
+        byScope[s] = answer ? answer.listings : new Map();
+        if (answer && answer.stale.problem) {
+          stale.problem = answer.stale.problem;
+          stale.since = Math.min(stale.since || Infinity, answer.stale.since);
+        }
+      }
       result.set(world, {
         names: { world, dc: scopes.dc, region: scopes.region ? (REGION_LABELS[scopes.region] || scopes.region) : null },
         listings: byScope,

@@ -85,6 +85,8 @@ do by hand.
   can price them apart as the Income tab does. The plugin asks Universalis itself when Live Market Prices is on, the
   same way as the app; tests/market-fixture.js runs the app's own Universalis code on canned listings and writes its
   answers for the plugin's tests to check against.
+- **Live prices come in faster.** Universalis is asked up to 4 requests at a time instead of one after another, and
+  each world, data center and region once (worlds on the same data center share its answer).
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
