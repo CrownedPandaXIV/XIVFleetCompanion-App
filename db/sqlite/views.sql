@@ -12,6 +12,8 @@
 --   no ceil/floor (not always built in): CAST to an integer, which cuts towards zero; PostgreSQL's ::int rounds, so
 --     round() first where it does
 --   booleans are 0 or 1
+--   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
+--     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
 DROP VIEW IF EXISTS fleet_pcs_view;
 DROP VIEW IF EXISTS fleet_retainer_gear_view;

@@ -204,7 +204,13 @@ const SETTINGS = [
   const admin = new Client();
   await admin.connect();
   await admin.query(`DROP DATABASE IF EXISTS ${NAME}`);
-  await admin.query(`CREATE DATABASE ${NAME}`);
+  // Sorting text like a person would, ignoring spaces and brackets (as GitHub's PostgreSQL does), not letter by letter, so an order that depends on
+  // the database's language setting shows up here: PostgreSQL 15 and later can be told to, where ICU is built in.
+  try {
+    await admin.query(`CREATE DATABASE ${NAME} TEMPLATE template0 LOCALE_PROVIDER icu ICU_LOCALE 'en-US-u-ka-shifted' LOCALE 'C.UTF-8'`);
+  } catch {
+    await admin.query(`CREATE DATABASE ${NAME}`);
+  }
   const pg = new Client({ host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: NAME });
   await pg.connect();
   try {

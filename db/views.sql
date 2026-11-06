@@ -239,6 +239,7 @@ supplies AS (
   WHERE EXISTS (SELECT 1 FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0)
     AND c.cid NOT IN (SELECT cid FROM fleet_not_synced_view)
 )
+SELECT * FROM (
 SELECT CASE WHEN days IS NULL OR days < 30 THEN 'warn' ELSE 'danger' END AS level, 'house' AS kind, fc_name AS subject,
        CASE WHEN days IS NULL THEN 'house: no date yet for when it was last entered'
             WHEN days >= 45 THEN 'house not entered for ' || days || ' days: past 45, the game can demolish it any time'
@@ -260,7 +261,10 @@ UNION ALL
 SELECT 'warn', 'autoretainer', pc_name || CASE WHEN account_label <> '' THEN ' (' || account_label || ')' ELSE '' END,
        'AutoRetainer was not running at its last sync, so nothing syncs from there', 0
 FROM companion_pc_status WHERE autoretainer_ready = false AND last_sync_at > now() - interval '1 day'
-ORDER BY 1, 2, 5 DESC, 3;
+) alerts
+-- Ties by who, letter by letter (COLLATE "C"), so the order is the same whatever the database's language setting, and
+-- the same as SQLite's.
+ORDER BY level, kind, weight DESC, subject COLLATE "C";
 
 
 -- 2.x, the rest of the tabs.
