@@ -34,6 +34,7 @@ require('../../ipc/income');
 require('../../ipc/shopping');
 require('../../ipc/settings');
 require('../../ipc/universalis');
+require('../../ipc/supplies');
 const { loadPlayStyle } = require('../../ipc/play-style');
 Module._load = original;
 
@@ -94,6 +95,12 @@ const EDITS = [
   ['save-market-settings', { minDays: 2.5 }],
   ['save-income-settings', { windowDays: 30 }],
   ['save-income-settings', { windowDays: 5 }],
+  ['save-supply-settings', { windowDays: 7, targetDays: 21 }],
+  ['save-supply-settings', { windowDays: 5, targetDays: 21 }],
+  ['save-supply-settings', { windowDays: 30, targetDays: 91 }],
+  ['save-supply-settings', { windowDays: 30, targetDays: 2.5 }],
+  ['save-supply-settings', { windowDays: 3, targetDays: 1 }],
+  ['save-supply-settings', { windowDays: 14, targetDays: 90 }],
   ['remove-pc', 'LAPTOP', ''],
   ['remove-pc', 'NOWHERE', 'A'],
   ['save-shopping-progress', { itemId: 24348, made: 3, crafts: 3, aheadDays: 0 }],
