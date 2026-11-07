@@ -324,7 +324,8 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
 
 ### Changing the database
 
-Add the change as the next numbered file in `db/updates/`, and make the same change in `db/schema.sql`.
+Add the change as the next numbered file in `db/updates/`, and make the same change in `db/schema.sql`. The views plugin 2.0 reads are in `db/views.sql`
+instead, which the app applies again whenever it changes.
 [db/updates/README.md](db/updates/README.md) has the details. The app applies it on every database the next time it connects.
 
 ### Releasing a new version

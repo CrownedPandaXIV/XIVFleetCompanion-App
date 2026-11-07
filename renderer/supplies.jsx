@@ -15,7 +15,7 @@ function supplyDaysClass(days) {
   if (typeof days !== 'number') return '';
   if (days < 3) return 'supply-danger';
   if (days < 7) return 'supply-warn';
-  return '';
+  return 'tone-good';
 }
 
 const supplyPerDayText = (perDay) => (perDay === null || perDay === undefined ? '—' : perDay < 100 ? perDay.toFixed(1) : Math.round(perDay).toLocaleString());
@@ -24,7 +24,7 @@ const supplyRunsOut = (at) => (at ? `Runs out about ${new Date(at).toLocaleStrin
 // Four columns per supply: held, used per day, days left (amber/red, the date on hover) and how many to buy.
 function supplyColumnDefs(metric, label) {
   return [
-    { key: `${metric}_have`, label, cell: (r) => r[metric].have.toLocaleString(), sort: (r) => r[metric].have },
+    { key: `${metric}_have`, label, td: (r) => <td className="num">{r[metric].have.toLocaleString()}</td>, sort: (r) => r[metric].have },
     { key: `${metric}_per_day`, label: `${label} / day`, cell: (r) => supplyPerDayText(r[metric].perDay), sort: (r) => r[metric].perDay },
     {
       key: `${metric}_days`, label: `${label}: days left`,
@@ -37,8 +37,7 @@ function supplyColumnDefs(metric, label) {
 
 // The Supplies table's own columns (rows are characters with subs).
 const SUPPLY_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
   ...supplyColumnDefs('ceruleum', 'Ceruleum'),
   ...supplyColumnDefs('repair_kits', 'Repair kits'),
 ];
@@ -62,8 +61,7 @@ const FC_CREDIT_ACCOUNT_COLUMN_DEFS = [
   { key: 'days', label: 'Tanks last', cell: (a) => creditDaysText(a.days), sort: (a) => creditDaysSort(a.days) },
 ];
 const FC_CREDIT_FC_COLUMN_DEFS = [
-  { key: 'fc', label: 'Free Company', locked: true, cell: (fc) => fc.fc_name || '—', sort: (fc) => fc.fc_name },
-  { key: 'world', label: 'World', cell: (fc) => fc.fc_world || '—', sort: (fc) => fc.fc_world },
+  { key: 'fc', label: 'Free Company', locked: true, cell: (fc) => <>{fc.fc_name ? <span className="fc-name">{fc.fc_name}</span> : '—'}<WorldAfter world={fc.fc_world} /></>, sort: (fc) => fc.fc_name },
   { key: 'account', label: 'Account', cell: (fc) => fc.account_label, sort: (fc) => fc.account_label },
   { key: 'credits', label: 'Credits', cell: (fc) => creditNumber(fc.credits), sort: (fc) => fc.credits },
   { key: 'tanks', label: 'Tanks they buy', cell: (fc) => creditNumber(fc.tanks), sort: (fc) => fc.tanks },
@@ -211,7 +209,7 @@ function SuppliesView({ refreshKey }) {
             {t.ceruleumRestock.toLocaleString()} ceruleum · {t.repairKitsRestock.toLocaleString()} repair kits
           </div>
           <div className="supply-card-note">
-            {kitGil !== null ? `Repair kits ≈ ${kitGil.toLocaleString()} gil. ` : ''}
+            {kitGil !== null ? <>Repair kits ≈ <span className="gil">{kitGil.toLocaleString()} gil</span>. </> : ''}
             FC chests hold {t.fcChestCeruleum.toLocaleString()} ceruleum.
           </div>
         </div>

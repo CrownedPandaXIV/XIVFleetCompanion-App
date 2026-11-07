@@ -3,6 +3,69 @@
 
 const { useState, useEffect, useRef } = React;
 
+// Every search box: matches when the text has every word typed, in any order, ignoring case ("diadochos healing"
+// finds "Diadochos Bottoms of Healing"). Nothing typed matches everything.
+function matchesWords(text, query) {
+  const haystack = String(text || '').toLowerCase();
+  return String(query || '').toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
+// ---- The tables' colours, as the plugin's (MainWindow.Lists.cs): green when fine, amber getting low, red well
+// below a warning; gil in gold, addresses in blue, Free Company names in lavender (index.html :root). ----
+
+// The class for a tone from the data ('good', 'warn', 'danger'), or none.
+const toneClass = (tone) => (tone ? `tone-${tone}` : undefined);
+
+// Gil in gold; a million or more as "5.86M", the full amount on hover.
+function GilText({ gil }) {
+  if (gil === null || gil === undefined || gil === '' || Number.isNaN(Number(gil))) return <span className="dim">—</span>;
+  const g = Number(gil);
+  if (Math.abs(g) >= 1e6) {
+    return <span className="gil" title={`${g.toLocaleString()} gil`}>{(g / 1e6).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M</span>;
+  }
+  return <span className="gil">{g.toLocaleString()}</span>;
+}
+
+// A character's world after its name, softer (as the plugin's): "Wa'kana Gojo  Cuchulainn".
+function WorldAfter({ world }) {
+  // The brackets aren't shown, but a copied or exported table reads "Wa'kana Gojo (Cuchulainn)".
+  return world ? <span className="world-after"><span className="copy-only"> (</span>{world}<span className="copy-only">)</span></span> : null;
+}
+function CharacterName({ name, world }) {
+  return <>{name || '—'}<WorldAfter world={world} /></>;
+}
+
+// A class's role for its colour, as the plugin's (FleetReader.JobRole): tanks blue, healers green, damage red, a
+// base class (Gladiator, Conjurer, ...) a lighter shade of its job's; none for gatherers and crafters.
+const JOB_ROLES = {
+  tank: ['PLD', 'WAR', 'DRK', 'GNB'], tankBase: ['GLA', 'MRD'],
+  healer: ['WHM', 'SCH', 'AST', 'SGE'], healerBase: ['CNJ'],
+  dps: ['MNK', 'DRG', 'NIN', 'SAM', 'RPR', 'VPR', 'BRD', 'MCH', 'DNC', 'BLM', 'SMN', 'RDM', 'PCT', 'BLU'],
+  dpsBase: ['PGL', 'LNC', 'ROG', 'ARC', 'THM', 'ACN'],
+};
+function roleClass(abbreviation) {
+  const role = Object.keys(JOB_ROLES).find((key) => JOB_ROLES[key].includes(abbreviation));
+  return role ? `role-${role.replace('Base', '-base').toLowerCase()}` : undefined;
+}
+
+// When something is done, for after its countdown: "5:12 PM" today, "Thu 5:12 PM" later (as the plugin's).
+function finishClock(endsAtUnix, now = new Date()) {
+  const at = new Date(Number(endsAtUnix) * 1000);
+  const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return at.toDateString() === now.toDateString() ? clock : `${at.toLocaleDateString([], { weekday: 'short' })} ${clock}`;
+}
+
+// Dots, filled out of total (subs out of the sub slots unlocked): green when every one is filled, amber otherwise.
+function Pips({ filled, total, title }) {
+  const tone = filled >= total ? 'good' : 'warn';
+  return (
+    <span className="pips" title={title}>
+      {Array.from({ length: total }, (_, i) => <span key={i} className={`pip ${i < filled ? `on ${tone}` : 'off'}`} />)}
+      <span className="pips-count">{filled}</span>
+    </span>
+  );
+}
+
 // Shared resizable-column mechanism, used by every table in the app.
 // Widths persist per-machine (localStorage), keyed by a stable
 // per-table id so different tables' column sets never collide.
@@ -238,7 +301,7 @@ function ColumnPicker({ cols }) {
   }, [open]);
 
   const term = search.trim().toLowerCase();
-  const matching = cols.available.filter((d) => !term || d.label.toLowerCase().includes(term) || (d.group || '').toLowerCase().includes(term));
+  const matching = cols.available.filter((d) => matchesWords(`${d.label} ${d.group || ''}`, term));
   const groups = [];
   for (const d of matching) {
     const name = d.group || 'This table';
@@ -250,7 +313,7 @@ function ColumnPicker({ cols }) {
   return (
     <span ref={boxRef} className="column-chooser-wrap">
       <button onClick={() => setOpen(!open)}>Columns</button>
-      {cols.extrasFailed && !open && <span style={{ color: '#e57373', marginLeft: 8 }}>Some added columns could not load</span>}
+      {cols.extrasFailed && !open && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>Some added columns could not load</span>}
       {open && (
         <div className="column-chooser">
           <div className="column-chooser-title">Shown</div>
@@ -283,7 +346,7 @@ function ColumnPicker({ cols }) {
               </div>
             ))}
           </div>
-          {cols.extrasFailed && <div className="status" style={{ color: '#e57373' }}>Could not load the added columns: {cols.extrasFailed}</div>}
+          {cols.extrasFailed && <div className="status" style={{ color: 'var(--danger)' }}>Could not load the added columns: {cols.extrasFailed}</div>}
           <button style={{ marginTop: 10 }} onClick={cols.reset} disabled={!cols.isCustom}>Reset columns</button>
         </div>
       )}
@@ -301,7 +364,8 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
   const COLUMN_DRAG = 'text/x-fleet-column';
   return (
     <th
-      style={{ width: `${widths[columnKey] || 150}px`, position: 'relative', boxShadow: dropTarget ? 'inset 3px 0 0 #5b8def' : undefined }}
+      className="resizable"
+      style={{ width: `${widths[columnKey] || 150}px`, position: 'relative', boxShadow: dropTarget ? 'inset 3px 0 0 var(--accent)' : undefined }}
       onDragOver={onMoveColumn ? (e) => {
         if (!Array.from(e.dataTransfer.types).includes(COLUMN_DRAG)) return;
         e.preventDefault();
@@ -339,7 +403,7 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
           bottom: 0,
           width: '6px',
           cursor: 'col-resize',
-          borderRight: hovering ? '2px solid #5b8def' : '1px solid #3a3f4a'
+          borderRight: hovering ? '2px solid var(--accent)' : '1px solid var(--border-strong)'
         }}
       />
     </th>

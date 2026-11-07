@@ -3,37 +3,47 @@
 // Central list of every view in the sidebar - one place to add a new
 // view later rather than touching multiple spots. `built: false` views
 // render the ComingSoonView placeholder instead of real content.
+// The pages, in sidebar order, by group (the same groups as the plugin's sidebar).
 const VIEWS = [
-  { key: 'summary', label: 'Summary', built: true },
-  { key: 'roster', label: 'Character Roster', built: true },
-  { key: 'fcDirectory', label: 'Free Companies', built: true },
-  { key: 'salvage', label: 'Salvage', built: true },
-  { key: 'subs', label: 'Subs', built: true },
-  { key: 'supplies', label: 'Supplies', built: true },
-  { key: 'income', label: 'Income', built: true },
-  { key: 'parts', label: 'Parts', built: true },
-  { key: 'routeOpt', label: 'Route Optimization', built: true },
-  { key: 'inventory', label: 'Inventory', built: true },
-  { key: 'retainers', label: 'Retainers', built: true },
-  { key: 'market', label: 'Gil & Market', built: true },
-  { key: 'trends', label: 'Trends', built: true },
-  { key: 'pcs', label: 'PCs', built: true }
+  { key: 'summary', label: 'Summary', group: 'Overview', built: true },
+  { key: 'trends', label: 'Trends', group: 'Overview', built: true },
+  { key: 'subs', label: 'Subs', group: 'Submarines', built: true },
+  { key: 'routeOpt', label: 'Route Optimization', group: 'Submarines', built: true },
+  { key: 'parts', label: 'Parts', group: 'Submarines', built: true },
+  { key: 'supplies', label: 'Supplies', group: 'Submarines', built: true },
+  { key: 'salvage', label: 'Salvage', group: 'Submarines', built: true },
+  { key: 'roster', label: 'Character Roster', group: 'Characters', built: true },
+  { key: 'retainers', label: 'Retainers', group: 'Characters', built: true },
+  { key: 'fcDirectory', label: 'Free Companies', group: 'Characters', built: true },
+  { key: 'inventory', label: 'Inventory', group: 'Characters', built: true },
+  { key: 'income', label: 'Income', group: 'Gil', built: true },
+  { key: 'market', label: 'Gil & Market', group: 'Gil', built: true },
+  { key: 'pcs', label: 'PCs', group: 'System', built: true },
 ];
 
 // hidden: the views left out for what the player does not run (Settings → What do you run?).
 function SidebarNav({ currentView, onSelect, hidden = [] }) {
   return (
     <div className="sidebar">
-      {VIEWS.filter((v) => !hidden.includes(v.key)).map((v) => (
-        <button
-          key={v.key}
-          className={`sidebar-button${currentView === v.key ? ' active' : ''}`}
-          onClick={() => onSelect(v.key)}
-        >
-          <div>{v.label}</div>
-          {!v.built && <div className="coming-soon-tag">Coming soon</div>}
-        </button>
-      ))}
+      {[...new Set(VIEWS.map((v) => v.group))].map((group) => {
+        const views = VIEWS.filter((v) => v.group === group && !hidden.includes(v.key));
+        if (views.length === 0) return null;
+        return (
+          <div className="sidebar-group" key={group}>
+            <div className="sidebar-group-title">{group}</div>
+            {views.map((v) => (
+              <button
+                key={v.key}
+                className={`sidebar-button${currentView === v.key ? ' active' : ''}`}
+                onClick={() => onSelect(v.key)}
+              >
+                <div>{v.label}</div>
+                {!v.built && <div className="coming-soon-tag">Coming soon</div>}
+              </button>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -391,6 +401,13 @@ function App() {
   // false, or which Settings tab to open on (true: the last one used).
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState('summary');
+  // A new look (Settings → General → Look) redraws the page, so charts pick up its colours too.
+  const [lookKey, setLookKey] = useState(0);
+  useEffect(() => {
+    const changed = () => setLookKey((k) => k + 1);
+    window.addEventListener('look-changed', changed);
+    return () => window.removeEventListener('look-changed', changed);
+  }, []);
   // The setup screen opens by itself the first time, while no connection is saved, until it has been finished
   // or skipped once on this PC (a PC that only plays never saves a connection here).
   const [showSetup, setShowSetup] = useState(false);
@@ -521,7 +538,7 @@ function App() {
     <div className="app-shell">
       <SidebarNav currentView={currentView} onSelect={setCurrentView} hidden={playStyle.hidden} />
 
-      <div className="main-pane">
+      <div className="main-pane" key={lookKey}>
         <div className="header-row">
           <div>
             <h1>{activeViewLabel}</h1>
@@ -597,7 +614,7 @@ function App() {
                   </button>
                 )}
                 <span style={{ marginLeft: '16px' }}><ColumnPicker cols={rosterCols} /></span>
-                {saveStatus && <span style={{ marginLeft: '16px', color: '#8a8f9a' }}>{saveStatus}</span>}
+                {saveStatus && <span style={{ marginLeft: '16px', color: 'var(--dim)' }}>{saveStatus}</span>}
               </div>
             )}
 

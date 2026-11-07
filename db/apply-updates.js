@@ -4,10 +4,13 @@
 //  - on a database made before this existed, adds whatever database versions 1 to 9 would add
 //    that is still missing (db/catch-up.sql), then records it as version 9;
 //  - then applies each file of db/updates/ newer than the recorded version, in number order, each in
-//    its own transaction together with its row in companion_schema_version.
+//    its own transaction together with its row in companion_schema_version;
+//  - then, when db/views.sql has changed since the database last got it, replaces the views (ensureViews).
 // An advisory lock makes two copies of the app connecting at once take turns.
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { compareVersions } = require('../shared/changelog');
 
 // The layout db/schema.sql and db/catch-up.sql lead to: database versions 1 to 9.
 const BASELINE = 9;
@@ -80,11 +83,43 @@ function noRightsError(user, cause) {
   return err;
 }
 
+// The views (db/views.sql) are applied again whenever that file changes: its checksum is recorded in
+// companion_views (database update 15) with the app version that applied it. Replaced in one transaction when the
+// checksum differs, unless a newer app applied the ones there (two app versions on two PCs would otherwise keep
+// swapping them). Returns what changed ('views updated') or null. Called with the advisory lock held.
+async function ensureViews(client, { viewsFile, appVersion, tracked }) {
+  if (!viewsFile || !fs.existsSync(viewsFile)) return null;
+  const sql = fs.readFileSync(viewsFile, 'utf8');
+  const checksum = crypto.createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
+  const hasTable = (await client.query(`SELECT to_regclass('companion_views') IS NOT NULL AS t`)).rows[0].t;
+  if (!hasTable) return null; // before database update 15 (a login that could not apply it)
+  const { rows: [saved] } = await client.query('SELECT checksum, app_version FROM companion_views WHERE id = 1');
+  if (saved && saved.checksum === checksum) return null;
+  if (saved && saved.app_version && appVersion && compareVersions(saved.app_version, appVersion) > 0) return null;
+  // A login that may only read keeps working with the views it has; the plugin says when they're missing.
+  if (!tracked) return null;
+  await client.query('BEGIN');
+  try {
+    await client.query(sql);
+    await client.query(
+      `INSERT INTO companion_views (id, checksum, app_version, applied_at) VALUES (1, $1, $2, now())
+       ON CONFLICT (id) DO UPDATE SET checksum = EXCLUDED.checksum, app_version = EXCLUDED.app_version, applied_at = now()`,
+      [checksum, appVersion || null]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '42501') return null; // as above: may not change the database
+    err.message = `The fleet views (db/views.sql) could not be updated, so nothing of them was changed: ${err.message}`;
+    throw err;
+  }
+  return 'views updated';
+}
+
 // Brings the database up to date. Returns { version, latest, created, applied: [what changed],
 // tracked: false when the login cannot create the version table (only allowed while nothing needs
 // changing), newer: true when a newer app already updated it further }. Throws with a plain message
 // when it cannot.
-async function ensureDatabase(client, { appVersion, user, updatesDir, dbDir = DB_DIR } = {}) {
+async function ensureDatabase(client, { appVersion, user, updatesDir, viewsFile, dbDir = DB_DIR } = {}) {
   const updates = listUpdates(updatesDir || path.join(dbDir, 'updates'));
   const latest = Math.max(BASELINE, ...updates.map((u) => u.version));
   const result = { version: null, latest, created: false, applied: [], tracked: true, newer: false };
@@ -150,6 +185,11 @@ async function ensureDatabase(client, { appVersion, user, updatesDir, dbDir = DB
     }
 
     Object.assign(result, { version, tracked, newer: version > latest });
+    // A newer app's database may expect its own views; leave them to it.
+    if (!result.newer) {
+      const views = await ensureViews(client, { viewsFile: viewsFile || path.join(dbDir, 'views.sql'), appVersion, tracked });
+      if (views) result.applied.push(views);
+    }
     return result;
   } catch (err) {
     if (err.code === '42501' && !/not allowed to change/.test(err.message)) throw noRightsError(user, err);
@@ -159,4 +199,4 @@ async function ensureDatabase(client, { appVersion, user, updatesDir, dbDir = DB
   }
 }
 
-module.exports = { ensureDatabase, listUpdates, schemaTables, BASELINE };
+module.exports = { ensureDatabase, ensureViews, listUpdates, schemaTables, BASELINE };

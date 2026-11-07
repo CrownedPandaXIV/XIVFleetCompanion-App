@@ -23,7 +23,7 @@ module.exports = async (t) => {
   check(true, 'Show chart brings it back');
 
   // ---- character detail panel
-  const first = await ev(`document.querySelector('tbody tr[data-cid]').children[1].innerText.trim()`);
+  const first = await ev(`document.querySelector('tbody tr[data-cid]').children[1].innerText.trim().replace(/ \\([^()]*\\)$/, '')`);
   await ev(`document.querySelector('tbody tr[data-cid] .trend-link').click()`);
   await waitFor(`!!document.querySelector('.trend-detail')`, 'detail panel'); await cardsReady(6);
   const head = await ev(`document.querySelector('.trend-detail h2').innerText`);

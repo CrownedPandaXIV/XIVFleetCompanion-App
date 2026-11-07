@@ -17,6 +17,7 @@ const EQUIP_SLOT_DISPLAY_ORDER = [
   'Weapon', 'Off-hand', 'Head', 'Chest', 'Gloves', 'Legs', 'Feet',
   'Earrings', 'Necklace', 'Bracelet', 'Ring 1', 'Ring 2',
 ];
+const OFF_HAND_CLASSES = new Set(['GLA', 'PLD', 'MIN', 'BTN']);
 const EQUIP_SLOT_CATEGORY_TO_LABEL = {
   1: 'Weapon', 13: 'Weapon', 14: 'Weapon',
   2: 'Off-hand',
@@ -158,9 +159,12 @@ ipcMain.handle('get-retainer-targets', async () => {
       // If a target is set, show every canonical slot even if nothing's
       // equipped there - an empty slot can't be hitting the target, so
       // it needs to be visible as a real gap, not silently absent.
+      // The off-hand only for the classes that have one (a shield, a gathering tool): every other class's weapon fills
+      // both hands, so an empty off-hand isn't a gap (as the plugin's FleetReader.HasOffHand).
       if (retainer.target_mode) {
         const present = new Set(slots.map((s) => s.label));
         for (const label of EQUIP_SLOT_DISPLAY_ORDER) {
+          if (label === 'Off-hand' && !OFF_HAND_CLASSES.has(retainer.job_abbreviation)) continue;
           if (!present.has(label)) {
             slots.push({ label, itemName: null, levelItem: null, status: 'Empty' });
           }

@@ -2,15 +2,21 @@
 // Data comes from the plugin's metric history via the get-metric-* calls (see metric-series.js).
 // Loaded after tables.js and before app.js; TrendsView is used by App.
 
-const TREND_SURFACE = '#12141a';
-const TREND_TEXT = '#e6e6e6';
-const TREND_MUTED = '#8a8f9a';
-const TREND_GRID = 'rgba(138, 143, 154, 0.16)';
+// The look's colours (shared/themes.js), read when a chart is drawn: the canvas can't use CSS variables itself.
+const trendCss = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const TREND_SURFACE = () => trendCss('--bg');
+const TREND_MUTED = () => trendCss('--dim');
+// A canvas takes plain colours: the less important colour, faint.
+const TREND_GRID = () => {
+  const hex = trendCss('--dim').replace('#', '');
+  const n = parseInt(hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex, 16) || 0x8a8f9a;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.16)`;
+};
 
 // Categorical colors in fixed slot order (validated for the dark surface: lightness band,
 // chroma, adjacent color-blind separation and contrast). A series keeps the slot it was given
 // when others are removed, so colors follow the entity, never its position.
-const TREND_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+const TREND_COLORS = ['var(--accent-strong)', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 const TREND_MAX_SERIES = TREND_COLORS.length;
 
 const TREND_DAY = 86400000;
@@ -72,6 +78,60 @@ function trendFormatTime(ms) {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// A line over its span (as the plugin's TrendsMath.Stats): now, at the start (its first recorded point), the change and
+// its share of the start, the change a day on average (between the first and last points with a value), lowest and highest.
+function trendStats(values, timestamps) {
+  let first = -1;
+  let last = -1;
+  values.forEach((v, i) => { if (v !== null) { if (first < 0) first = i; last = i; } });
+  if (first < 0) return { current: null, start: null, change: null, percent: null, perDay: null, low: null, high: null };
+  const current = values[last];
+  const start = values[first];
+  const change = current - start;
+  const known = values.filter((v) => v !== null);
+  const days = (timestamps[last] - timestamps[first]) / TREND_DAY;
+  return {
+    current, start, change,
+    percent: start !== 0 ? (change / Math.abs(start)) * 100 : null,
+    perDay: days > 0 ? change / days : null,
+    low: Math.min(...known), high: Math.max(...known),
+  };
+}
+
+// Values that are gil (gil, salvage value) show in gil's gold, as everywhere else.
+const trendIsGil = (key) => key === 'gil' || key === 'salvage_value';
+
+const trendSigned = (n) => (n === null || n === undefined ? '—' : `${n > 0 ? '+' : ''}${trendFullNumber(n)}`);
+const trendTone = (n) => (n > 0 ? 'tone-good' : n < 0 ? 'tone-warn' : undefined);
+
+// Under a chart of several lines: each one's value now, its change over the span (and its share of the start), a day on
+// average, and its lowest and highest (as the plugin's).
+function TrendStatsTable({ timestamps, series }) {
+  return (
+    <table className="trend-stats">
+      <thead>
+        <tr><th>Line</th><th>Now</th><th>Change</th><th>Change %</th><th title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</th><th>Lowest</th><th>Highest</th></tr>
+      </thead>
+      <tbody>
+        {series.map((s, i) => {
+          const st = trendStats(s.values, timestamps);
+          return (
+            <tr key={i}>
+              <td><span className="trend-key" style={{ background: s.color }} /> {s.name}</td>
+              <td>{trendFullNumber(st.current)}</td>
+              <td className={trendTone(st.change)}>{trendSigned(st.change)}</td>
+              <td className={trendTone(st.change)}>{st.percent === null ? '—' : `${st.percent > 0 ? '+' : ''}${st.percent.toFixed(1)}%`}</td>
+              <td>{trendSigned(st.perDay)}</td>
+              <td>{trendFullNumber(st.low)}</td>
+              <td>{trendFullNumber(st.high)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function trendHexToRgba(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -97,9 +157,9 @@ function TrendChart({ timestamps, series, dimmed, onZoom, height = 360 }) {
     const single = series.length === 1;
 
     const axisBase = {
-      stroke: TREND_MUTED,
+      stroke: TREND_MUTED(),
       font: '12px -apple-system, Segoe UI, Roboto, sans-serif',
-      grid: { stroke: TREND_GRID, width: 1 },
+      grid: { stroke: TREND_GRID(), width: 1 },
       ticks: { show: false },
     };
 
@@ -127,7 +187,7 @@ function TrendChart({ timestamps, series, dimmed, onZoom, height = 360 }) {
         x: true,
         y: false,
         drag: { x: true, y: false, setScale: false },
-        points: { size: 8, width: 2, stroke: () => TREND_SURFACE, fill: (u, i) => series[i - 1].color },
+        points: { size: 8, width: 2, stroke: () => TREND_SURFACE(), fill: (u, i) => series[i - 1].color },
       },
       select: { show: true, left: 0, top: 0, width: 0, height: 0 },
       series: [
@@ -214,7 +274,7 @@ function TrendSubjectPicker({ items, selection, onAdd, onRemove, noun, latest })
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const chosen = new Set(selection.map((s) => s.id));
-  const matches = items.filter((it) => !chosen.has(it.id) && it.label.toLowerCase().includes(query.toLowerCase())).slice(0, 60);
+  const matches = items.filter((it) => !chosen.has(it.id) && matchesWords(it.label, query)).slice(0, 60);
   const full = selection.length >= TREND_MAX_SERIES;
 
   return (
@@ -444,7 +504,6 @@ function TrendsView({ refreshKey, preset }) {
 
   const hasData = chartSeries.some((s) => s.values.some((v) => v !== null));
   const latest = (values) => { for (let i = values.length - 1; i >= 0; i--) if (values[i] !== null) return values[i]; return null; };
-  const firstValue = (values) => { for (let i = 0; i < values.length; i++) if (values[i] !== null) return values[i]; return null; };
   const latestById = {};
   if (scope !== 'fleet') selection.forEach((sel, i) => { if (chartSeries[i]) latestById[sel.id] = latest(chartSeries[i].values); });
   const scopeHint = scope === 'characters' && metric && metric.key.startsWith('salvage')
@@ -517,14 +576,15 @@ function TrendsView({ refreshKey, preset }) {
       {result && (
         <div>
           {chartSeries.length === 1 && hasData && (() => {
-            const now = latest(chartSeries[0].values);
-            const start = firstValue(chartSeries[0].values);
-            const change = now !== null && start !== null ? now - start : null;
+            const st = trendStats(chartSeries[0].values, result.timestamps);
+            const now = st.current;
+            const start = st.start;
+            const change = st.change;
             return (
               <div className="trend-summary">
                 <div>
                   <div className="trend-summary-label">Current</div>
-                  <div className="trend-summary-value">{trendFullNumber(now)}</div>
+                  <div className={`trend-summary-value ${trendIsGil(metric.key) ? 'gil' : ''}`}>{trendFullNumber(now)}</div>
                 </div>
                 <div>
                   <div className="trend-summary-label">Change over this span</div>
@@ -534,6 +594,10 @@ function TrendsView({ refreshKey, preset }) {
                       <span className="trend-summary-sub"> ({change > 0 ? '+' : ''}{((change / Math.abs(start)) * 100).toFixed(1)}%)</span>
                     )}
                   </div>
+                </div>
+                <div>
+                  <div className="trend-summary-label" title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</div>
+                  <div className="trend-summary-value">{trendSigned(st.perDay)}</div>
                 </div>
               </div>
             );
@@ -573,6 +637,7 @@ function TrendsView({ refreshKey, preset }) {
           )}
           {mode === 'table' && hasData && <div className="trend-note" style={{ marginTop: '4px' }}>Drag the bottom-right corner of the table to make it taller or shorter.</div>}
           {hasData && mode === 'chart' && <div className="trend-note" style={{ marginTop: '6px' }}>Drag across the chart to zoom into that span.</div>}
+          {hasData && chartSeries.length > 1 && <TrendStatsTable timestamps={result.timestamps} series={chartSeries} />}
         </div>
       )}
     </div>
@@ -606,7 +671,7 @@ function TrendSparkline({ values, height = 44 }) {
   return (
     <div style={{ position: 'relative', height }} aria-hidden="true">
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-        <path d={path} fill="none" stroke="#3987e5" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <path d={path} fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       </svg>
       <span
         style={{
@@ -618,8 +683,8 @@ function TrendSparkline({ values, height = 44 }) {
           marginLeft: -4,
           marginTop: -4,
           borderRadius: '50%',
-          background: '#3987e5',
-          boxShadow: `0 0 0 2px ${TREND_SURFACE}`,
+          background: 'var(--accent-strong)',
+          boxShadow: '0 0 0 2px var(--bg)',
         }}
       />
     </div>
@@ -677,11 +742,11 @@ function SummaryTrendTiles({ refreshKey, onOpenTrend, uses = { subs: true, retai
           const pct = change !== null && start !== 0 ? (change / Math.abs(start)) * 100 : null;
           return (
             <div key={t.key} className="account-group" style={{ padding: '16px', opacity: tiles ? 1 : 0.5 }}>
-              <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{t.label || '\u00a0'}</div>
-              <div style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
-              <div style={{ color: '#8a8f9a', fontSize: '12px', minHeight: '16px' }}>
+              <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{t.label || '\u00a0'}</div>
+              <div className={trendIsGil(t.key) ? 'gil' : undefined} style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
+              <div style={{ color: 'var(--dim)', fontSize: '12px', minHeight: '16px' }}>
                 {change === null ? (tiles ? 'No history yet' : '') : (
-                  <span>
+                  <span className={trendTone(change)}>
                     {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}
                   </span>
                 )}
@@ -807,9 +872,9 @@ function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, re
           <div className="trend-card-title">{title}</div>
           {open && (
             <div className="trend-card-value">
-              <strong>{trendFullNumber(current)}</strong>
+              <strong className={trendIsGil(metricKey) ? 'gil' : undefined}>{trendFullNumber(current)}</strong>
               {change !== null && (
-                <span className="trend-summary-sub"> {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}</span>
+                <span className={`trend-summary-sub ${trendTone(change) || ''}`}> {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}</span>
               )}
             </div>
           )}

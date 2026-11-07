@@ -11,7 +11,9 @@ function IncomeExpectedCell({ row }) {
   const unmatched = row.subs_unmatched > 0
     ? `${row.subs_unmatched} of ${row.subs} sub${row.subs === 1 ? ' is' : 's are'} on a route Fight Club does not list, so ${row.subs_unmatched === 1 ? 'it is' : 'they are'} left out of expected.`
     : '';
-  return <td title={unmatched}>{incomeGil(row.expectedPerDay)}{unmatched ? ' *' : ''}</td>;
+  // Gold, as gil everywhere.
+  return <td title={unmatched}>{row.expectedPerDay === null || row.expectedPerDay === undefined ? <span className="dim">—</span>
+    : <span className="gil">{incomeGil(row.expectedPerDay)}</span>}{unmatched ? ' *' : ''}</td>;
 }
 
 const incomeIf = (r, value) => (r.enough ? value : null);
@@ -19,26 +21,25 @@ const incomeIf = (r, value) => (r.enough ? value : null);
 // The Income table's own columns (rows are characters with subs). A character with less than a day of
 // salvage history says so in the Salvage column and leaves the other real-income columns blank.
 const INCOME_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
-  { key: 'subs', label: 'Subs', cell: (r) => r.subs, sort: (r) => r.subs },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
+  { key: 'subs', label: 'Subs', td: (r) => <td className="num">{r.subs}</td>, sort: (r) => r.subs },
   {
     key: 'salvage', label: 'Salvage / day',
     td: (r) => (r.enough
       ? <td title={`${r.pieces.toLocaleString()} salvage pieces came in over ${r.spanDays.toFixed(1)} days`
           + (r.fromChest ? `; ${r.fromChest.toLocaleString()} taken out of the FC chest are not counted` : '')
-          + (r.firstStored ? `; ${r.firstStored.toLocaleString()} seen for the first time (a retainer first opened on a PC) are not counted` : '')}>{incomeGil(r.salvagePerDay)}</td>
+          + (r.firstStored ? `; ${r.firstStored.toLocaleString()} seen for the first time (a retainer first opened on a PC) are not counted` : '')} className="num tone-good">{incomeGil(r.salvagePerDay)}</td>
       : <td className="income-none">Not enough history</td>),
     sort: (r) => incomeIf(r, r.salvagePerDay),
   },
   {
     key: 'repairs', label: 'Repairs / day',
     td: (r) => (r.enough
-      ? <td title={`${r.kitsUsed.toLocaleString()} repair kits used over ${r.spanDays.toFixed(1)} days`}>{r.kitPerDay ? `−${incomeGil(r.kitPerDay)}` : '0'}</td>
+      ? <td className={`num ${r.kitPerDay ? 'tone-warn' : ''}`} title={`${r.kitsUsed.toLocaleString()} repair kits used over ${r.spanDays.toFixed(1)} days`}>{r.kitPerDay ? `−${incomeGil(r.kitPerDay)}` : '0'}</td>
       : <td></td>),
     sort: (r) => incomeIf(r, r.kitPerDay),
   },
-  { key: 'real', label: 'Real net / day', td: (r) => <td className="income-real">{r.enough ? incomeGil(r.perDay) : ''}</td>, sort: (r) => incomeIf(r, r.perDay) },
+  { key: 'real', label: 'Real net / day', td: (r) => <td className={`income-real num ${r.enough ? (r.perDay > 0 ? 'tone-good' : 'tone-danger') : ''}`}>{r.enough ? incomeGil(r.perDay) : ''}</td>, sort: (r) => incomeIf(r, r.perDay) },
   { key: 'expected', label: 'Expected / day', td: (r) => <IncomeExpectedCell row={r} />, sort: (r) => r.expectedPerDay },
   { key: 'difference', label: 'Difference / day', td: (r) => <td className={r.status}>{r.enough ? incomeSigned(r.differencePerDay) : ''}</td>, sort: (r) => incomeIf(r, r.differencePerDay) },
   { key: 'share', label: 'Of expected', td: (r) => <td className={r.status}>{r.enough ? incomeShare(r.share) : ''}</td>, sort: (r) => incomeIf(r, r.share) },
@@ -50,22 +51,22 @@ const LOOT_SUB_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', cell: (s) => s.subName || '—', sort: (s) => s.subName },
   { key: 'route', label: 'Route', cell: (s) => s.route, sort: (s) => s.route },
   { key: 'voyages', label: 'Voyages', cell: (s) => s.voyages, sort: (s) => s.voyages },
-  { key: 'per_voyage', label: 'Vendor gil / voyage', cell: (s) => incomeGil(s.perVoyage), sort: (s) => s.perVoyage },
-  { key: 'real', label: 'Vendor value / day', td: (s) => <td className="income-real">{incomeGil(s.perDay)}</td>, sort: (s) => s.perDay },
-  { key: 'expected', label: 'Expected / day', cell: (s) => incomeGil(s.expectedPerDay), sort: (s) => s.expectedPerDay },
+  // As the plugin: gil a voyage and expected in gold, value a day in green.
+  { key: 'per_voyage', label: 'Vendor gil / voyage', td: (s) => <td className="num"><GilText gil={Math.round(s.perVoyage)} /></td>, sort: (s) => s.perVoyage },
+  { key: 'real', label: 'Vendor value / day', td: (s) => <td className="income-real num tone-good">{incomeGil(s.perDay)}</td>, sort: (s) => s.perDay },
+  { key: 'expected', label: 'Expected / day', td: (s) => <td className="num">{s.expectedPerDay === null || s.expectedPerDay === undefined ? <span className="dim">—</span> : <GilText gil={Math.round(s.expectedPerDay)} />}</td>, sort: (s) => s.expectedPerDay },
 ];
 const LOOT_ROUTE_COLUMN_DEFS = [
   { key: 'route', label: 'Route', locked: true, cell: (r) => r.route, sort: (r) => r.route },
   { key: 'subs', label: 'Subs', cell: (r) => r.subs, sort: (r) => r.subs },
   { key: 'voyages', label: 'Voyages', cell: (r) => r.voyages, sort: (r) => r.voyages },
-  { key: 'per_voyage', label: 'Vendor gil / voyage', cell: (r) => incomeGil(r.perVoyage), sort: (r) => r.perVoyage },
+  { key: 'per_voyage', label: 'Vendor gil / voyage', td: (r) => <td className="num"><GilText gil={Math.round(r.perVoyage)} /></td>, sort: (r) => r.perVoyage },
 ];
 const VENTURE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.name, sort: (r) => r.name },
-  { key: 'world', label: 'World', cell: (r) => r.world || '—', sort: (r) => r.world },
-  { key: 'retainers', label: 'Retainers', cell: (r) => r.retainers, sort: (r) => r.retainers },
-  { key: 'rewards', label: 'Rewards', cell: (r) => r.rewards, sort: (r) => r.rewards },
-  { key: 'per_day', label: 'Vendor value / day', td: (r) => <td className="income-real">{incomeGil(r.perDay)}</td>, sort: (r) => r.perDay },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.name} world={r.world} />, sort: (r) => r.name },
+  { key: 'retainers', label: 'Retainers', td: (r) => <td className="num">{r.retainers}</td>, sort: (r) => r.retainers },
+  { key: 'rewards', label: 'Rewards', td: (r) => <td className="num">{r.rewards}</td>, sort: (r) => r.rewards },
+  { key: 'per_day', label: 'Vendor value / day', td: (r) => <td className="income-real num tone-good">{incomeGil(r.perDay)}</td>, sort: (r) => r.perDay },
   { key: 'top', label: 'Most valuable', cell: (r) => r.top.map((t) => `${t.name} ×${t.n.toLocaleString()}`).join(', '), sortable: false },
 ];
 
@@ -78,7 +79,9 @@ function marketColumnDefs(field, unit) {
     label: `${MARKET_SCOPE_LABELS[scope]} market ${unit}`,
     td: (r) => {
       const m = r.market && r.market[scope];
-      return <td className={`income-market market-${scope}`} title={`At the cheapest listing on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis); items not on the market board at what a vendor pays.`}>{m ? incomeGil(m[field]) : '—'}</td>;
+      // As the plugin: a day's value in green, a voyage's gil in gold.
+      const value = !m ? <span className="dim">—</span> : field === 'perDay' ? <span className="tone-good">{incomeGil(m[field])}</span> : <GilText gil={Math.round(m[field])} />;
+      return <td className={`income-market market-${scope} num`} title={`At the cheapest listing on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis); items not on the market board at what a vendor pays.`}>{value}</td>;
     },
     sort: (r) => (r.market && r.market[scope] ? r.market[scope][field] : null),
   }));
@@ -153,8 +156,8 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
       <div className="supplies-note">
         What each voyage really brought back over the last {data.windowDays} days, from Submarine Tracker (items at what a vendor pays;
         salvage at the Salvage tab's prices). {data.totals.voyages.toLocaleString()} voyage{data.totals.voyages === 1 ? '' : 's'},
-        {' '}{incomeGil(data.totals.gil)} gil, {incomeGil(data.totals.perDay)} gil a day.
-        {live && ` At market prices: ${['world', 'dc', 'region'].map((sc) => `${incomeGil(data.market.loot[sc].perDay)} a day (${MARKET_SCOPE_LABELS[sc]})`).join(', ')}.`}
+        {' '}<span className="gil">{incomeGil(data.totals.gil)} gil</span>, <span className="gil">{incomeGil(data.totals.perDay)} gil</span> a day.
+        {live && <> At market prices: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{incomeGil(data.market.loot[sc].perDay)}</span> a day ({MARKET_SCOPE_LABELS[sc]})</React.Fragment>)}.</>}
       </div>
       {subs.length === 0 && <div className="status">No voyages recorded in this time. Submarine Tracker records a voyage when its loot is collected on a PC running it.</div>}
       {subs.length > 0 && (
@@ -175,8 +178,8 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
       <h2 style={{ padding: '16px 24px 0' }}>Retainer Ventures</h2>
       <div className="supplies-note">
         Venture rewards AutoRetainer recorded over the last {data.windowDays} days, at what a vendor pays (items are often worth more on
-        the market board). {v.rewards.toLocaleString()} reward{v.rewards === 1 ? '' : 's'}, {incomeGil(v.gil)} gil, {incomeGil(v.perDay)} gil a day.
-        {live && ` At market prices: ${['world', 'dc', 'region'].map((sc) => `${incomeGil(data.market.ventures[sc].perDay)} a day (${MARKET_SCOPE_LABELS[sc]})`).join(', ')}.`}
+        the market board). {v.rewards.toLocaleString()} reward{v.rewards === 1 ? '' : 's'}, <span className="gil">{incomeGil(v.gil)} gil</span>, <span className="gil">{incomeGil(v.perDay)} gil</span> a day.
+        {live && <> At market prices: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{incomeGil(data.market.ventures[sc].perDay)}</span> a day ({MARKET_SCOPE_LABELS[sc]})</React.Fragment>)}.</>}
       </div>
       {data.ventures.length === 0 && <div className="status">No venture rewards recorded in this time (AutoRetainer: "Record statistics").</div>}
       {data.ventures.length > 0 && (
@@ -268,16 +271,16 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-summary">
         <div className="account-group supply-card">
           <div className="supply-card-label">Fleet real net per day</div>
-          <div className="supply-card-value">{incomeGil(t.perDay)} gil</div>
-          <div className="supply-card-note">{incomeGil(t.salvagePerDay)} salvage − {incomeGil(t.kitPerDay)} repairs</div>
+          <div className="supply-card-value gil">{incomeGil(t.perDay)} gil</div>
+          <div className="supply-card-note"><span className="gil">{incomeGil(t.salvagePerDay)}</span> salvage − <span className="gil">{incomeGil(t.kitPerDay)}</span> repairs</div>
         </div>
         <div className="account-group supply-card">
           <div className="supply-card-label">Against expected</div>
           <div className="supply-card-value">
-            {t.share === null ? '—' : `${incomeShare(t.share)} of ${incomeGil(t.expectedPerDay)} gil a day`}
+            {t.share === null ? '—' : <>{incomeShare(t.share)} of <span className="gil">{incomeGil(t.expectedPerDay)} gil</span> a day</>}
           </div>
           <div className="supply-card-note">
-            {t.compared} character{t.compared === 1 ? '' : 's'} compared{t.share === null ? '' : `: ${incomeSigned(t.comparedPerDay - t.expectedPerDay)} gil a day`}
+            {t.compared} character{t.compared === 1 ? '' : 's'} compared{t.share === null ? '' : <>: <span className="gil">{incomeSigned(t.comparedPerDay - t.expectedPerDay)} gil</span> a day</>}
           </div>
         </div>
         <div className="account-group supply-card">
@@ -290,7 +293,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-note">
         Salvage: every piece that came into a character's bags or retainers over the last {data.windowDays} days, at its
         vendor price (selling or moving it is not counted). Repairs: repair kits used
-        {data.kitCost ? ` at ${data.kitCost.toLocaleString()} gil each` : ' (set the repair kit cost in Settings to count them)'}.
+        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit cost in Settings to count them)'}.
         Expected: the subs' Current Gil/Day from the Subs tab, for the routes they are on now.
         {t.notEnough ? ` ${t.notEnough} character${t.notEnough === 1 ? ' has' : 's have'} less than a day of salvage history.` : ''}
         {data.withoutSubs ? ` ${data.withoutSubs} character${data.withoutSubs === 1 ? '' : 's'} with no subs built ${data.withoutSubs === 1 ? 'is' : 'are'} left out.` : ''}

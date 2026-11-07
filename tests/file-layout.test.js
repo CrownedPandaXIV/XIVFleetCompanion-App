@@ -29,9 +29,11 @@ test('every call the window can make has exactly one handler', () => {
 // The window's files are plain scripts sharing one scope, so the page must load every one of them,
 // tables.js (shared pieces and the React hooks) first and app.js (which starts the app) last, and
 // no two may declare the same top-level name (the page would stop with an error).
-test('index.html loads every renderer file, tables first and app last', () => {
+test('index.html loads every renderer file, the looks first (before anything is drawn), then tables, and app last', () => {
   const html = read('renderer/index.html');
   const loaded = [...html.matchAll(/<script src="([\w-]+)\.js"><\/script>/g)].map((m) => m[1]);
+  // The looks (shared/themes.js, shared with the plugin's tests) before every screen.
+  assert.ok(html.indexOf('<script src="../shared/themes.js"></script>') > 0 && html.indexOf('<script src="../shared/themes.js"></script>') < html.indexOf('<script src="tables.js"></script>'));
   const files = fs.readdirSync(path.join(root, 'renderer')).filter((f) => f.endsWith('.jsx')).map((f) => f.replace(/\.jsx$/, ''));
   assert.deepStrictEqual(loaded.slice().sort(), files.sort());
   assert.strictEqual(loaded[0], 'tables');

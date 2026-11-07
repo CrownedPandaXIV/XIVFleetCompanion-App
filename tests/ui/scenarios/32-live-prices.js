@@ -36,7 +36,7 @@ module.exports = async (t) => {
   const perDay = (price) => Math.round(10 * price / 7).toLocaleString();
   check(JSON.stringify(sub) === JSON.stringify([perDay(8500), perDay(8000), perDay(7000)]),
     `a sub's loot a day at the cheapest listing on its world, data center and region: ${JSON.stringify(sub)}`);
-  const venture = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim() === ${JSON.stringify(pick.name)});
+  const venture = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim().replace(/ \\([^()]*\\)$/, '') === ${JSON.stringify(pick.name)});
     return tr ? [...tr.querySelectorAll('.income-market')].map(td => td.innerText.trim()) : null; })()`);
   const vDay = (price) => Math.round(4 * price / 7).toLocaleString();
   check(JSON.stringify(venture) === JSON.stringify([vDay(8500), vDay(8000), vDay(7000)]), `venture rewards at market prices: ${JSON.stringify(venture)}`);

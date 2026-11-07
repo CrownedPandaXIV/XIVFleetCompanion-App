@@ -20,7 +20,7 @@ module.exports = async (t) => {
   await sleep(300);
   await shot('income');
   const rowOf = (name) => ev(`(() => {
-    const tr = [...document.querySelectorAll('.income-table tbody tr')].find(r => r.children[0].innerText.trim() === ${JSON.stringify(name)});
+    const tr = [...document.querySelectorAll('.income-table tbody tr')].find(r => r.children[0].innerText.trim().replace(/ \\([^()]*\\)$/, '') === ${JSON.stringify(name)});
     return tr ? [...tr.children].map(td => ({ text: td.innerText.trim(), cls: td.className, title: td.title })) : null;
   })()`);
   let row = await rowOf('Bex Kitteh 1');
@@ -30,17 +30,17 @@ module.exports = async (t) => {
     return Number.isFinite(n) && Math.abs(n - expected) <= Math.abs(expected) * 0.001 + 1;
   };
   const texts = (r) => (r ? r.map((c) => c.text).join(' | ') : 'missing');
-  check(row && row[2].text === '4' && near(row[3].text, 32571) && near(row[4].text, -1286) && near(row[5].text, 31286),
+  check(row && row[1].text === '4' && near(row[2].text, 32571) && near(row[3].text, -1286) && near(row[4].text, 31286),
     'over 7 days: 32,571 salvage less 1,286 repairs = 31,286 a day: ' + texts(row));
-  check(row && row[3].title.startsWith('19 salvage pieces came in'),
-    'salvage pieces on hover: ' + (row && row[3].title));
-  check(row && row[6].text === '246,100 *' && /3 of 4 subs are on a route Fight Club does not list/.test(row[6].title),
-    'expected from the one matched sub, the others explained on hover: ' + (row && row[6].text + ' / ' + row[6].title));
-  check(row && near(row[7].text, 31286 - 246100) && row[8].text === '13%' && row[8].cls.includes('income-danger'),
+  check(row && row[2].title.startsWith('19 salvage pieces came in'),
+    'salvage pieces on hover: ' + (row && row[2].title));
+  check(row && row[5].text === '246,100 *' && /3 of 4 subs are on a route Fight Club does not list/.test(row[5].title),
+    'expected from the one matched sub, the others explained on hover: ' + (row && row[5].text + ' / ' + row[5].title));
+  check(row && near(row[6].text, 31286 - 246100) && row[7].text === '13%' && row[7].cls.includes('income-danger'),
     'far below expected shows red: ' + texts(row));
 
   const cal = await rowOf('Cal Kitteh 2');
-  check(cal && cal[3].text === 'Not enough history', 'no salvage history: not enough to say: ' + texts(cal));
+  check(cal && cal[2].text === 'Not enough history', 'no salvage history: not enough to say: ' + texts(cal));
   const groups = await ev(`[...document.querySelectorAll('.income .account-group > h1')].map(h => h.innerText.trim())`);
   check(groups.length > 1 && groups[0] === 'acct0', 'grouped by account: ' + groups.join(', '));
   check(/1,500 gil each/.test(await ev(`document.querySelector('.supplies-note').innerText`)), 'the note names the repair kit cost');
@@ -50,7 +50,7 @@ module.exports = async (t) => {
   await waitFor(`(() => { const s = document.querySelector('.income-controls select'); return s && s.value === '3'; })()`, 'the 3-day window');
   await sleep(800);
   row = await rowOf('Bex Kitteh 1');
-  check(row && row[4].text === '0' && near(row[5].text, 49333), 'over 3 days: no kits used, 49,333 a day: ' + texts(row));
+  check(row && row[3].text === '0' && near(row[4].text, 49333), 'over 3 days: no kits used, 49,333 a day: ' + texts(row));
   const saved = await t.query(`SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'income_window_days'`);
   check(saved.length === 1 && Number(saved[0].setting_value) === 3, 'the window is saved: ' + JSON.stringify(saved));
 

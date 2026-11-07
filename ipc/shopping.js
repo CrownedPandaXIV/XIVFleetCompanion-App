@@ -197,7 +197,8 @@ async function loadHeld(client, itemIds) {
   [ids, FC_CONTAINERS]);
   for (const row of fc.rows) add(row.base_id, row.fc_name || `Free Company ${row.fc_id}`, 'FC chest', row.qty);
 
-  for (const entry of held.values()) entry.places.sort((a, b) => b.qty - a.qty || a.who.localeCompare(b.who));
+  // Most first, then by who and where (so places holding as many always come in the same order).
+  for (const entry of held.values()) entry.places.sort((a, b) => b.qty - a.qty || a.who.localeCompare(b.who) || a.where.localeCompare(b.where));
   return held;
 }
 

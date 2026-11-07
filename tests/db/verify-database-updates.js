@@ -34,7 +34,8 @@ const updatesDir = (files) => {
 const versions = async (c) => (await c.query('SELECT version, name FROM companion_schema_version ORDER BY version')).rows;
 const columns = async (c) => (await c.query(
   `SELECT table_name || '.' || column_name || ' ' || data_type AS col FROM information_schema.columns
-   WHERE table_schema = 'public' AND table_name <> 'companion_schema_version' ORDER BY 1`)).rows.map((r) => r.col);
+   WHERE table_schema = 'public' AND table_name <> 'companion_schema_version'
+     AND table_name NOT IN (SELECT table_name FROM information_schema.views WHERE table_schema = 'public') ORDER BY 1`)).rows.map((r) => r.col);
 const indexes = async (c) => (await c.query(
   `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' ORDER BY 1`)).rows.map((r) => r.indexname);
 
@@ -64,7 +65,7 @@ const indexes = async (c) => (await c.query(
     const c = await freshDatabase('dbupd_current');
     await c.query(SCHEMA);
     const r = await ensureDatabase(c, { updatesDir: NO_UPDATES });
-    assert.deepStrictEqual(r.applied, []);
+    assert.deepStrictEqual(r.applied, ['views updated'], 'only the views (db/views.sql) were missing');
     assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }]);
     assert.deepStrictEqual(await columns(c), refColumns);
     await c.end();
@@ -83,13 +84,13 @@ const indexes = async (c) => (await c.query(
                    ALTER TABLE companion_retainer_lookup DROP COLUMN items_seen_at;
                    ALTER TABLE companion_submarine_snapshot DROP COLUMN slot;
                    ALTER TABLE companion_metric_latest DROP COLUMN label;
-                   DROP TABLE companion_database_move, companion_rankup_forecast, companion_character_login, companion_game_data_check;`);
+                   DROP TABLE companion_database_move, companion_rankup_forecast, companion_character_login, companion_game_data_check, companion_views;`);
     const r = await ensureDatabase(c);
     assert.deepStrictEqual(r.applied.slice().sort(), [
       'added companion_market_listing', 'added companion_metric_history_metric_idx', 'added companion_metric_latest.label',
       'added companion_pc_status', 'added companion_retainer_lookup.items_seen_at', 'added companion_submarine_snapshot.slot',
       'added companion_venture_result', 'added companion_venture_result_received_idx', 'added companion_voyage_loot.leg',
-      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check', 'update 13: remove_discord_alerts']);
+      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check', 'update 13: remove_discord_alerts', 'update 14: fleet_views', 'update 15: views_checksum', 'update 16: pc_last_read', 'views updated']);
     assert.deepStrictEqual((await columns(c)).slice().sort(), refColumns.slice().sort());
     const settings = (await c.query('SELECT setting_key, setting_value::int AS v FROM fleet_economics_settings ORDER BY 1')).rows;
     assert.deepStrictEqual(settings, [{ setting_key: 'house_warn_days', v: 30 }, { setting_key: 'not_synced_after_minutes', v: 45 }],
@@ -97,7 +98,7 @@ const indexes = async (c) => (await c.query(
     assert.deepStrictEqual(await indexes(c), refIndexes);
     const slots = (await c.query('SELECT sub_name, slot FROM companion_submarine_snapshot ORDER BY sub_name')).rows;
     assert.deepStrictEqual(slots, [{ sub_name: 'Renamed', slot: null }, { sub_name: 'Submersible-2', slot: 2 }]);
-    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }, { version: 13, name: 'remove_discord_alerts' }]);
+    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }, { version: 13, name: 'remove_discord_alerts' }, { version: 14, name: 'fleet_views' }, { version: 15, name: 'views_checksum' }, { version: 16, name: 'pc_last_read' }]);
     await c.end();
   });
 
@@ -109,7 +110,7 @@ const indexes = async (c) => (await c.query(
       '010_add_table.sql': 'CREATE TABLE upd_test (id int);',
     });
     const r = await ensureDatabase(c, { updatesDir: dir });
-    assert.deepStrictEqual([r.version, r.latest, r.applied], [11, 11, ['update 10: add_table', 'update 11: add_note']]);
+    assert.deepStrictEqual([r.version, r.latest, r.applied], [11, 11, ['update 10: add_table', 'update 11: add_note', 'views updated']]);
     assert.deepStrictEqual((await versions(c)).map((v) => v.version), [9, 10, 11]);
     const again = await ensureDatabase(c, { updatesDir: dir });
     assert.deepStrictEqual(again.applied, []);
@@ -139,6 +140,31 @@ const indexes = async (c) => (await c.query(
     await c.query(`INSERT INTO companion_schema_version (version, name) VALUES (9, 'catch-up'), (14, 'from the future')`);
     const r = await ensureDatabase(c, { updatesDir: NO_UPDATES });
     assert.deepStrictEqual([r.version, r.newer, r.applied], [14, true, []]);
+    await c.end();
+  });
+
+  await scenario('the views (db/views.sql) are replaced when that file changes, never by an older app, and not when nothing changed', async () => {
+    const c = await freshDatabase('dbupd_views');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dbupd-views-'));
+    const file = path.join(dir, 'views.sql');
+    const view = (n) => `DROP VIEW IF EXISTS upd_view; CREATE VIEW upd_view AS SELECT ${n} AS n;`;
+    const seen = async () => (await c.query('SELECT n FROM upd_view')).rows[0].n;
+    fs.writeFileSync(file, view(1));
+    const first = await ensureDatabase(c, { updatesDir: NO_UPDATES, viewsFile: file, appVersion: '1.8.0' });
+    assert.ok(first.created && first.applied.includes('views updated'));
+    assert.strictEqual(await seen(), 1);
+    assert.deepStrictEqual((await ensureDatabase(c, { updatesDir: NO_UPDATES, viewsFile: file, appVersion: '1.8.0' })).applied, [], 'unchanged: left alone');
+    fs.writeFileSync(file, view(2));
+    assert.deepStrictEqual((await ensureDatabase(c, { updatesDir: NO_UPDATES, viewsFile: file, appVersion: '1.9.0' })).applied, ['views updated'], 'changed: replaced');
+    assert.strictEqual(await seen(), 2);
+    fs.writeFileSync(file, view(3));
+    assert.deepStrictEqual((await ensureDatabase(c, { updatesDir: NO_UPDATES, viewsFile: file, appVersion: '1.8.0' })).applied, [], 'an older app leaves a newer one\'s views');
+    assert.strictEqual(await seen(), 2);
+    const { rows: [saved] } = await c.query('SELECT app_version FROM companion_views');
+    assert.strictEqual(saved.app_version, '1.9.0');
+    fs.writeFileSync(file, 'CREATE VIEW upd_view AS SELECT 1/0 AS n; SELECT * FROM upd_view;');
+    await assert.rejects(ensureDatabase(c, { updatesDir: NO_UPDATES, viewsFile: file, appVersion: '1.9.1' }), /The fleet views \(db\/views.sql\) could not be updated, so nothing of them was changed/);
+    assert.strictEqual(await seen(), 2, 'a broken file changes nothing');
     await c.end();
   });
 

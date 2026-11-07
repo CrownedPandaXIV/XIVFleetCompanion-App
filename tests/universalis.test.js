@@ -67,7 +67,7 @@ test('prices for a world, its data center and its region, asked once and kept fo
   assert.strictEqual(cheapestListing(maduin.listings.world.get(5111)).price, 30);
   assert.deepStrictEqual(cheapestListing(maduin.listings.dc.get(5111)), { price: 20, world: 'Golem' });
   assert.deepStrictEqual(cheapestListing(maduin.listings.region.get(5111)), { price: 10, world: 'Siren' });
-  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=20&entries=0')), calls.join(' '));
+  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=100&entries=0')), calls.join(' '));
   const asked = calls.length;
   await u.marketFor(['Maduin'], [5111]);
   assert.strictEqual(calls.length, asked, 'kept: not asked again');
@@ -173,4 +173,32 @@ test('the Shopping List asks for one world, data center or region at a time, kep
   await u.listingsIn('North-America', [22528]);
   assert.strictEqual(calls.length, 2, 'another scope is asked for');
   assert.deepStrictEqual((await u.listingsIn('Dynamis', [])).listings.size, 0);
+});
+
+test('each world, data center and region asked once, a few requests at a time (never more than 4)', async () => {
+  const asked = [];
+  let at = 0;
+  let most = 0;
+  const u = createUniversalis({
+    baseUrl: 'http://stub',
+    fetchImpl: async (url) => {
+      if (url.includes('/data-centers') || url.includes('/worlds')) return { ok: false, status: 500, json: async () => ({}) };
+      asked.push(decodeURIComponent(url));
+      at++;
+      most = Math.max(most, at);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      at--;
+      return { ok: false, status: 404, json: async () => ({}) };
+    },
+  });
+  // Maduin and Halicarnassus share Dynamis, Zalera is on Crystal; all in North America. 120 items: 3 requests each.
+  const ids = Array.from({ length: 120 }, (_, i) => i + 1);
+  const m = await u.marketFor(['Maduin', 'Halicarnassus', 'Zalera'], ids);
+  const places = asked.map((url) => url.split('/api/v2/')[1].split('/')[0]);
+  for (const place of ['Maduin', 'Halicarnassus', 'Zalera', 'Dynamis', 'Crystal', 'North-America'])
+    assert.strictEqual(places.filter((p) => p === place).length, 3, `${place} asked once (3 batches)`);
+  assert.strictEqual(asked.length, 18);
+  assert.ok(most > 1 && most <= 4, `${most} at once`);
+  assert.strictEqual(m.get('Halicarnassus').names.dc, 'Dynamis');
+  assert.deepStrictEqual([...m.keys()], ['Maduin', 'Halicarnassus', 'Zalera']);
 });

@@ -9,7 +9,7 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster rows');
   await sleep(500);
 
-  const DEFAULT = ['name', 'world', 'fc', 'fc points', 'house', 'gil', 'ceruleum', 'repair kits', 'retainers', 'submarines', 'last synced', 'synced by'];
+  const DEFAULT = ['name', 'fc', 'fc points', 'house', 'gil', 'ceruleum', 'repair kits', 'retainers', 'submarines', 'last synced', 'synced by'];
   const clean = `.innerText.trim().toLowerCase().replace(/[\\u25B2\\u25BC]/g,'').trim()`;
   // The first cell of each row holds the drag handle and the Remove ×; it is not a column.
   const headers = () => ev(`[...document.querySelector('thead').querySelectorAll('th')].slice(1).map(th=>th${clean})`);
@@ -44,17 +44,17 @@ module.exports = async (t) => {
   check(JSON.stringify(await headers()) === JSON.stringify(DEFAULT), 'columns start in the default order');
   const before = await firstRow();
 
-  // drag Gil onto World: Gil takes World's place
-  await drag('gil', 'world'); await sleep(300);
+  // drag Gil onto FC: Gil takes FC's place
+  await drag('gil', 'fc'); await sleep(300);
   const moved = await headers();
-  check(moved[1] === 'gil' && moved[2] === 'world' && moved.length === DEFAULT.length, 'dragging Gil onto World moves it there: ' + moved.slice(0, 4).join(', '));
+  check(moved[1] === 'gil' && moved[2] === 'fc' && moved.length === DEFAULT.length, 'dragging Gil onto FC moves it there: ' + moved.slice(0, 4).join(', '));
   const afterRow = await firstRow();
-  check(afterRow[1] === before[5] && afterRow[2] === before[1], 'each cell moves with its header: ' + afterRow.slice(0, 3).join(' | '));
+  check(afterRow[1] === before[DEFAULT.indexOf('gil')] && afterRow[2] === before[DEFAULT.indexOf('fc')], 'each cell moves with its header: ' + afterRow.slice(0, 3).join(' | '));
   check(await cellCountsMatch(), 'rows and headers have the same number of columns');
 
   await reload();
   const reloaded = await headers();
-  check(reloaded[1] === 'gil' && reloaded[2] === 'world', 'the new order is remembered after a restart');
+  check(reloaded[1] === 'gil' && reloaded[2] === 'fc', 'the new order is remembered after a restart');
 
   // sorting still works on a moved column
   await ev(`[...document.querySelector('thead').querySelectorAll('th')].find(th=>th${clean}.startsWith('fc points')).querySelector('span').click()`);
@@ -95,7 +95,7 @@ module.exports = async (t) => {
   check(accounts.length === 80 && accounts.every((v) => /^acct[0-2]$/.test(v)), "the Account column shows each character's account: " + accounts.slice(0, 3).join(', '));
   const leaders = await column('fc leader');
   const names = await column('name');
-  check(leaders.every((v, i) => v === names[i]), 'FC Leader shows the right value for each row (each test FC is led by its only member)');
+  check(leaders.every((v, i) => v === names[i].replace(/ \([^()]*\)$/, '')), 'FC Leader shows the right value for each row (each test FC is led by its only member)');
   const chest = await column('ceruleum in fc chest');
   check(chest.length === 80 && chest.every((v) => v === '—' || /^[\d,]+$/.test(v)), 'a number-or-dash column formats correctly: ' + [...new Set(chest)].slice(0, 3).join(', '));
   await shot('added-columns');

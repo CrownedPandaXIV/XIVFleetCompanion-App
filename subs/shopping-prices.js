@@ -115,7 +115,8 @@ function buyingCost(listings, wanted) {
 // Adds the prices to a shopping list (as get-shopping-list sends it): each part gets `market` ({ price,
 // world, listings } or null), `makeCost` with `makeBreakdown` (where each ingredient comes from), `cheaper` ('buy',
 // 'make' or null) and `buying` (what buying the ones not made yet costs, from buyingCost, with `wanted`); each
-// material `market`, `cheapest` (its cheapest way: 'vendor', 'market' or 'make') and `buying` for what is short.
+// material `market`, `cheapest` (its cheapest way: 'vendor', 'market' or 'make') and `buying` for what is short (an
+// in-between item's for what is still to make; the totals leave those out).
 // Totals: those parts, and every material short, bought on the market board going up the listings, with how
 // many of each have no listing and how many have too few listed (those count only what is listed).
 function priceList(list, { market, vendor, recipes, nameOf = (id) => `Item ${id}` }) {
@@ -130,9 +131,10 @@ function priceList(list, { market, vendor, recipes, nameOf = (id) => `Item ${id}
     const breakdown = makeBreakdown(p.itemId, { source, recipes, nameOf });
     return { ...p, market: listed, makeCost: make, makeBreakdown: breakdown, cheaper, buying };
   });
+  // What buying instead costs: for a material, those still short; for an in-between item, those still to make.
   const withMarket = (rows) => rows.map((r) => {
     const listed = market.get(r.itemId) || null;
-    const wanted = r.short || 0;
+    const wanted = (r.short !== undefined ? r.short : r.make) || 0;
     const best = source(r.itemId);
     return { ...r, market: listed, cheapest: best ? best.how : null, buying: listed && wanted > 0 ? { ...buyingCost(listed.listings, wanted), wanted } : null };
   });

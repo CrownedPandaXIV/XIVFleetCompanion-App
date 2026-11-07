@@ -22,3 +22,21 @@ The `companion_schema_version` table lists every update a database has. On an em
 missing (`db/catch-up.sql`) and records version 9. Then it applies any newer files from this folder, in order.
 
 If two copies of the app connect at the same moment, they take turns.
+
+## Views: db/views.sql, not here
+
+The ready-made views plugin 2.0 reads (`fleet_*_view`) live in `db/views.sql`, not in this folder, because they change
+often as more of the app's numbers move into the database. After the numbered updates, the app compares that file's
+checksum with the one recorded in `companion_views` and, when they differ, replaces the views in one transaction. So
+edit `db/views.sql` freely, and don't add a numbered update for a view. An older app never replaces a newer app's views,
+and a login that may only read keeps the views it has. Tables and data still change only through numbered updates.
+
+
+Two rules for the views:
+
+- **No game data tables (`ffxiv_*`).** A new database gets its game data only after the views are made, and a view
+  that reads a game data column couldn't be made there, which would stop the app's database check. Give the game's
+  numbers (a class, a venture, an item) and let the plugin name them from the game's own files.
+- **Change `db/sqlite/views.sql` too.** Every view has a SQLite twin there for the plugin-only one-file version
+  planned for later in 2.x; `tests/db/verify-sqlite-views.js` fills both with the same made-up fleet and fails unless
+  every row matches. Keep to plain SQL where it gives the same answer, so the twin stays a close translation.

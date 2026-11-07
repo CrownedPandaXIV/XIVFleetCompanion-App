@@ -5,6 +5,7 @@ function SalvageBreakdownCell({ total, breakdown }) {
 
   return (
     <td
+      className="num"
       style={{ position: 'relative', cursor: breakdown.length > 0 ? 'help' : 'default' }}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -15,10 +16,11 @@ function SalvageBreakdownCell({ total, breakdown }) {
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
+            right: 0,
             zIndex: 20,
-            background: '#1a1d24',
-            border: '1px solid #333',
+            textAlign: 'left',
+            background: 'var(--panel)',
+            border: '1px solid var(--border-strong)',
             padding: '8px',
             minWidth: '260px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
@@ -42,7 +44,7 @@ function SalvageBreakdownCell({ total, breakdown }) {
                   <td style={{ padding: '2px 6px' }}>{item.subtotal.toLocaleString()}</td>
                 </tr>
               ))}
-              <tr style={{ borderTop: '1px solid #333' }}>
+              <tr style={{ borderTop: '1px solid var(--border-strong)' }}>
                 <td style={{ padding: '4px 6px', fontWeight: 600 }} colSpan={3}>Total</td>
                 <td style={{ padding: '4px 6px', fontWeight: 600 }}>
                   {breakdown.reduce((sum, item) => sum + item.subtotal, 0).toLocaleString()}
@@ -58,11 +60,10 @@ function SalvageBreakdownCell({ total, breakdown }) {
 
 // The Salvage tab's own columns (rows are characters).
 const SALVAGE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => <>{r.character_name}<TrendDetailLink kind="character" id={r.cid} name={r.character_name} /></>, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <>{r.character_name}<WorldAfter world={r.world} /><TrendDetailLink kind="character" id={r.cid} name={r.character_name} /></>, sort: (r) => r.character_name },
   { key: 'standard', label: 'Standard Salvage', td: (r) => <SalvageBreakdownCell total={r.standard_total} breakdown={r.standard_breakdown} />, sort: (r) => r.standard_total },
   { key: 'extravagant', label: 'Extravagant Salvage', td: (r) => <SalvageBreakdownCell total={r.extravagant_total} breakdown={r.extravagant_breakdown} />, sort: (r) => r.extravagant_total },
-  { key: 'value', label: 'Value', cell: (r) => Number(r.calculated_gil).toLocaleString(), sort: (r) => Number(r.calculated_gil) }
+  { key: 'value', label: 'Value', td: (r) => <td className="num"><GilText gil={r.calculated_gil} /></td>, sort: (r) => Number(r.calculated_gil) }
 ];
 // Master-list columns the Salvage tab already has of its own.
 const SALVAGE_DUPLICATE_EXTRAS = ['x_world'];
@@ -135,7 +136,7 @@ function SalvageView({ refreshKey }) {
         <span style={{ marginLeft: '16px' }}><ColumnPicker cols={salvageCols} /></span>
       </div>
 
-      <h2 style={{ padding: '8px 24px' }}>Fleet Total: {fleetTotal.toLocaleString()} gil</h2>
+      <h2 style={{ padding: '8px 24px' }}>Fleet Total: <span className="gil">{fleetTotal.toLocaleString()} gil</span></h2>
 
       <TrendCard title="Salvage value, whole fleet (gil)" metricKey="salvage_value" collapsible storageKey="trendCard:salvage" refreshKey={refreshKey} />
 

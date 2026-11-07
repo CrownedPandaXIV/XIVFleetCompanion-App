@@ -6,6 +6,9 @@ module.exports = async (t) => {
   await chartReady(); await sleep(400);
   check(await ev(`document.querySelector('h1').innerText`) === 'Trends', 'Trends tab opens');
   check((await ev(`document.querySelector('.trend-summary-value').innerText`)).length > 0, 'summary shows a current value: ' + await ev(`document.querySelector('.trend-summary-value').innerText`));
+  const perDay = await ev(`[...document.querySelectorAll('.trend-summary-label')].map(l => l.innerText.trim() + ': ' + l.nextElementSibling.innerText.trim())`);
+  check(perDay.some((t) => /^A day on average: [+-]?[\d,]+$/.test(t)) && await ev(`!document.querySelector('table.trend-stats')`),
+    'one line: now, its change and a day on average (no table of lines): ' + JSON.stringify(perDay));
   await shot('01-default-gil-fleet-30d');
 
   // hover tooltip
@@ -39,6 +42,9 @@ module.exports = async (t) => {
   await chartReady(); await sleep(300);
   check(await ev(`document.querySelectorAll('.trend-chip').length`) === 4, 'four characters chosen');
   check(await ev(`document.querySelectorAll('.trend-chip strong').length`) === 4, 'each chosen character shows its current value (the chips are the legend)');
+  const stats = await ev(`[...document.querySelectorAll('table.trend-stats tbody tr')].map(r => [...r.children].map(c => c.innerText.trim()))`);
+  check(stats.length === 4 && stats.every((r) => r.length === 7 && /^[\d,]+$/.test(r[1]) && /^([+-]?[\d,]+|—)$/.test(r[4])),
+    'under the chart, each character has its now, change, change %, a day on average, lowest and highest: ' + JSON.stringify(stats[0]));
   await shot('05-compare-4-characters');
   // remove the second, add another: colors keep their slots
   const before = await ev(`[...document.querySelectorAll('.trend-chip .trend-key')].map(k=>k.style.background)`);

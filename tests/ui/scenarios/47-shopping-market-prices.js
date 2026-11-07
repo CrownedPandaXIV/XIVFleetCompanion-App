@@ -37,13 +37,13 @@ module.exports = async (t) => {
   const hull = await part('Whale-class Hull');
   // One hull is listed and 320 are wanted: the total counts that one, and the cell says so. Each part's
   // listings (1 hull at 600,000, 1 bridge at 1, 99 of Bridge 2 at 100) add up to 609,901.
-  check(hull && hull['market board'] === '600,000 gil (Halicarnassus) · only 1 of 320 listed', 'the cheapest on the data center, its world, and too few listed: ' + JSON.stringify(hull));
+  check(hull && hull['market board'] === '600,000 gil (Halicarnassus) · only 1 of 320 for sale', 'the cheapest on the data center, its world, and too few listed: ' + JSON.stringify(hull));
   check(hull && /^[\d,]+ gil$/.test(hull['to make']) && hull.cheaper === 'Make', 'cheaper to make: ' + JSON.stringify(hull));
   const bridge = await part('Whale-class Bridge');
   check(bridge && bridge['market board'].startsWith('1 gil (Maduin)') && bridge.cheaper === 'Buy', 'cheaper to buy: ' + JSON.stringify(bridge));
   const note = await ev(`[...document.querySelectorAll('.shopping-list .shopping-note')].map(e => e.innerText).find(t => t.startsWith('Market board prices')) || ''`);
   check(/^Market board prices from Dynamis/.test(note) && /Totals go up the listings from the cheapest/.test(note)
-    && /Buying the parts not made yet: 609,901 gil \(3 with too few listed\)/.test(note) && /Buying every material still short: [\d,]+ gil/.test(note),
+    && /Buying the parts not made yet: 609,901 gil \(3 with too few for sale\)/.test(note) && /Buying every material still short: [\d,]+ gil/.test(note),
     'where the prices are from and the totals: ' + note);
   // To make: hover lists each ingredient and where it comes from. In the test data a vendor sells Test Ingot (100,
   // the same as its listing, so the vendor) and Test Log (5); Test Lumber is cheapest made from Logs.

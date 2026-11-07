@@ -81,12 +81,19 @@ async function incomeWindowDays(client) {
 
 // ---- PCs ----
 
+// When a PC's plugin was last heard from: its last sync, or its last read for one that only reads (plugin 2.0).
+const lastSeen = (p) => {
+  const times = [p.last_sync_at, p.last_read_at].filter(Boolean).map((t) => new Date(t));
+  return times.length ? new Date(Math.max(...times)) : null;
+};
+
 ipcMain.handle('get-pcs', () => withDetails(async (client) => {
   const pcs = (await client.query(`
     SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready,
            fctracker_found, submarinetracker_found, venture_stats_found, characters_synced, characters_left_out,
            problems, check_text, check_to_fix, check_at,
-           (to_jsonb(companion_pc_status) ->> 'characters_elsewhere')::int AS characters_elsewhere -- update 12
+           (to_jsonb(companion_pc_status) ->> 'characters_elsewhere')::int AS characters_elsewhere, -- update 12
+           (to_jsonb(companion_pc_status) ->> 'last_read_at')::timestamptz AS last_read_at -- update 16
     FROM companion_pc_status
     ORDER BY account_label, pc_name`)).rows;
   // Accounts whose characters sync but no PC has reported for (a plugin older than 0.10.0).
@@ -100,7 +107,7 @@ ipcMain.handle('get-pcs', () => withDetails(async (client) => {
   const moved = note && note.state === 'arrived' && note.moved_at ? {
     from: note.from_host,
     at: note.moved_at,
-    waiting: pcs.filter((p) => !p.last_sync_at || new Date(p.last_sync_at) < new Date(note.moved_at)).map((p) => p.account_label ? `${p.pc_name} (${p.account_label})` : p.pc_name),
+    waiting: pcs.filter((p) => !lastSeen(p) || lastSeen(p) < new Date(note.moved_at)).map((p) => p.account_label ? `${p.pc_name} (${p.account_label})` : p.pc_name),
   } : null;
   return {
     success: true,
@@ -200,7 +207,7 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
   const { latestCharacter } = await snapshotFragments(client);
   const characters = (await client.query(`
     SELECT c.cid::text AS cid, c.name, c.world, c.account_label, c.fc_id::text AS fc_id, so.sort_index
-    FROM ${latestCharacter} c LEFT JOIN character_sort_order so ON so.cid = c.cid`)).rows;
+    FROM ${latestCharacter} c LEFT JOIN character_sort_order so ON so.cid = c.cid ORDER BY c.cid`)).rows;
   const byCid = new Map(characters.map((c) => [c.cid, c]));
   const subs = await loadSubmarines(client);
   const subFor = new Map();
@@ -221,9 +228,11 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
     };
   });
 
-  const ventureList = universalis
+  // Characters no longer in the Roster are left out (as on Trends); their recorded rewards stay in the database, so
+  // adding one back brings its history back.
+  const ventureList = (universalis
     ? ventureSummary(ventureRows, { prices, windowDays }).map((v) => ({ ...v, top: topItems(v.items, prices) }))
-    : await ventureValues(client, since, windowDays);
+    : await ventureValues(client, since, windowDays)).filter((v) => byCid.has(v.ownerCid));
 
   // Live prices (Settings → Live Market Prices): the same loot and rewards at the cheapest listing on each
   // character's world, data center and region; items not on the market board at what a vendor pays.

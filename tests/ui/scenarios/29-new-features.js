@@ -17,10 +17,11 @@ module.exports = async (t) => {
   await sleep(500);
   const expectedReady = await ev(`Promise.all([window.api.getPartsNeeded(), window.api.getFleetWarnings()]).then(([p, w]) => {
     const skip = new Set((w.notSynced || []).map(c => String(c.cid)));
-    return new Set(p.rows.filter(x => x.rank > 0 && !skip.has(String(x.cid))).map(x => x.cid + '|' + x.sub_name)).size;
+    return new Set(p.rows.filter(x => !skip.has(String(x.cid))).map(x => x.cid + '|' + x.sub_name)).size;
   })`);
   const shownReady = await ev(`document.querySelectorAll('.ready-subs tbody tr').length`);
-  check(expectedReady > 0 && shownReady === expectedReady, `Summary lists each sub ready for new parts once (${shownReady} of ${expectedReady})`);
+  check(expectedReady > 0 && shownReady === expectedReady, `Summary lists each sub ready for new parts, and each new sub to build, once (${shownReady} of ${expectedReady})`);
+  check(/sub(s are| is) ready for new parts|new subs? to build/.test(await ev(`document.querySelector('.ready-subs-count').innerText`)), 'with how many of each: ' + await ev(`document.querySelector('.ready-subs-count').innerText`));
   check(/\((spare in .+|to craft)\)/.test(await ev(`(document.querySelector('.ready-subs tbody tr') || {}).innerText || ''`)), 'each part says where a spare is or that it is to craft');
 
   // ---- Supplies: ceruleum from FC credits, per FC, per account and for the fleet ----
@@ -49,9 +50,9 @@ module.exports = async (t) => {
   check(lootRow && lootRow[0] === pick.name && lootRow[3] === '2' && lootRow[4] === (121500 / 2).toLocaleString(),
     'a sub\'s voyages, with its character and gil per voyage: ' + JSON.stringify(lootRow));
   check(await ev(`[...document.querySelectorAll('.loot-routes tbody tr')].some(r => r.children[0].innerText.trim() !== '')`), 'the routes taken are listed');
-  const ventureRow = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim() === ${JSON.stringify(pick.name)});
+  const ventureRow = await ev(`(() => { const tr = [...document.querySelectorAll('.venture-income tbody tr')].find(r => r.children[0].innerText.trim().replace(/ \\([^()]*\\)$/, '') === ${JSON.stringify(pick.name)});
     return tr ? [...tr.children].map(td => td.innerText.trim()) : null; })()`);
-  check(ventureRow && ventureRow[2] === '2' && ventureRow[3] === '3', 'venture rewards per character: 2 retainers, 3 rewards: ' + JSON.stringify(ventureRow));
+  check(ventureRow && ventureRow[1] === '2' && ventureRow[2] === '3', 'venture rewards per character: 2 retainers, 3 rewards: ' + JSON.stringify(ventureRow));
   await shot('loot');
 
   // ---- Gil & Market ----
@@ -95,8 +96,8 @@ module.exports = async (t) => {
   check(/^Update the plugin on DESKTOP-1 \(acct1\)\. This version of the app needs plugin 0\.14\.0 or newer/.test(await ev(`document.querySelector('.pcs-update-plugin').innerText`)),
     'and a note above the table says which PC to update and how');
   check(pcs[0][10].text.startsWith('2 things') && pcs[1][10].text === 'Nothing', 'what each PC could not see');
-  check(pcs[0][5].text === 'Yes' && pcs[1][5].text === 'No' && pcs[1][5].cls.includes('supply-warn') && !pcs[0][5].cls.includes('supply-warn'),
-    'AutoRetainer comes first of the other plugins, amber when it is not running: ' + JSON.stringify(pcs.map((r) => r[5])));
+  check(pcs[0][5].text === 'Yes' && pcs[1][5].text === 'No' && pcs[1][5].cls.includes('tone-warn') && pcs[0][5].cls.includes('tone-good'),
+    'AutoRetainer comes first of the other plugins, green when running, amber when it is not: ' + JSON.stringify(pcs.map((r) => r[5])));
   check(await ev(`[...document.querySelectorAll('.pcs-table thead th')].map(th => th.textContent.replace(/[▲▼]/g, '').trim()).slice(5, 10).join('|')`) ===
     'AutoRetainer|Allagan Tools|FC Tracker|Submarine Tracker|Venture Log', 'the other plugins, AutoRetainer first');
   check(await ev(`document.querySelectorAll('.pcs-check').length`) === 1 && /Check what I can see: DESKTOP-1 \(acct1\), .*, 1 thing to fix/.test(await ev(`document.querySelector('.pcs-check summary').innerText`)),

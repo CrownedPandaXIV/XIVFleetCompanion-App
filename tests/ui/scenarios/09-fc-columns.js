@@ -20,7 +20,7 @@ module.exports = async (t) => {
   };
   const addFromMenu = (key) => ev(`document.querySelector('.column-chooser-row[data-add=${JSON.stringify(key)}] button').click()`);
 
-  const DEFAULT = ['fc name', 'leader', 'world', 'fc points', 'members', 'house', 'last entered'];
+  const DEFAULT = ['fc name', 'leader', 'fc points', 'members', 'house', 'last entered'];
   check(JSON.stringify(await headers()) === JSON.stringify(DEFAULT), 'the tab starts with its usual columns');
   const rowCount = (await column('fc name')).length;
   check(rowCount === 80, 'all 80 Free Companies are listed: ' + rowCount);
@@ -87,5 +87,5 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster');
   await sleep(400);
   const roster = await headers();
-  check(!roster.includes('tracked members') && roster.includes('house') && roster.indexOf('name') < roster.indexOf('world'), 'each tab keeps its own layout');
+  check(!roster.includes('tracked members') && roster.includes('house') && roster.indexOf('name') < roster.indexOf('fc'), 'each tab keeps its own layout');
 };

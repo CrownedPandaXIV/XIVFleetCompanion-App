@@ -6,23 +6,22 @@
 // "needs attention" categories already built elsewhere in the app.
 // No LLM involved - everything here is real Postgres data, same as
 // every other view.
-// The Parts tab's rows grouped per built sub: subs whose rank now calls for different parts.
+// The Parts tab's rows grouped per sub: built subs whose rank now calls for different parts, and new subs to build in
+// an open slot (rank 0, isNew), as the plugin's Summary.
 function subsReadyForParts(partRows) {
   const subs = new Map();
   for (const r of partRows) {
-    if (!(Number(r.rank) > 0)) continue;
     const key = `${r.cid}|${r.sub_name}`;
-    if (!subs.has(key)) subs.set(key, { cid: r.cid, sub_name: r.sub_name, rank: r.rank, character_name: r.character_name, world: r.world, sort_index: r.sort_index, parts: [] });
+    if (!subs.has(key)) subs.set(key, { cid: r.cid, sub_name: r.sub_name, rank: r.rank, isNew: !(Number(r.rank) > 0), character_name: r.character_name, world: r.world, sort_index: r.sort_index, parts: [] });
     subs.get(key).parts.push({ slot: r.slot, part: `${r.needed_modified ? 'Modified ' : ''}${r.needed_class}`, spare: r.spare_location || null });
   }
   return [...subs.values()].sort((a, b) => (a.sort_index ?? 1e9) - (b.sort_index ?? 1e9) || String(a.sub_name).localeCompare(String(b.sub_name)));
 }
 
 const HOUSE_WARNING_COLUMN_DEFS = [
-  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => h.fc_name || '—', sort: (h) => h.fc_name },
-  { key: 'world', label: 'World', cell: (h) => h.fc_world || '—', sort: (h) => h.fc_world },
+  { key: 'fc', label: 'Free Company', locked: true, cell: (h) => <>{h.fc_name ? <span className="fc-name">{h.fc_name}</span> : '—'}<WorldAfter world={h.fc_world} /></>, sort: (h) => h.fc_name },
   { key: 'account', label: 'Account', cell: (h) => h.account_label || '—', sort: (h) => h.account_label },
-  { key: 'house', label: 'House', cell: (h) => formatHouse(h), sort: (h) => formatHouse(h) },
+  { key: 'house', label: 'House', cell: (h) => <span className="address">{formatHouse(h)}</span>, sort: (h) => formatHouse(h) },
   { key: 'last_entered', label: 'Last Entered', td: (h) => <td><HouseAge row={h} /></td>, sort: (h) => h.house_days },
   {
     key: 'demolition', label: 'Demolition Possible In',
@@ -36,28 +35,36 @@ const HOUSE_WARNING_COLUMN_DEFS = [
     sort: (h) => h.demolition_in_days,
   },
 ];
+// "7 subs are ready for new parts, 1 new sub to build" (as the plugin's PartsPlanner.ReadyText).
+function readyCountText(subs) {
+  const built = subs.filter((s) => !s.isNew).length;
+  const fresh = subs.length - built;
+  return [built > 0 ? `${built} sub${built === 1 ? ' is' : 's are'} ready for new parts` : null, fresh > 0 ? `${fresh} new sub${fresh === 1 ? '' : 's'} to build` : null]
+    .filter(Boolean).join(', ');
+}
+
 const HOUSE_WARNING_DUPLICATE_EXTRAS = ['x_account'];
 
 const READY_SUB_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.character_name, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
-  { key: 'rank', label: 'Rank', cell: (r) => r.rank, sort: (r) => Number(r.rank) },
-  { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p) => `${p.slot} ${p.part} (${p.spare ? `spare in ${p.spare}` : 'to craft'})`).join(', '), sortable: false },
+  { key: 'rank', label: 'Rank', cell: (r) => (r.isNew ? <span className="dim" title="A sub not built yet: its first build">new</span> : r.rank), sort: (r) => Number(r.rank) },
+  // One part to a line, the class then the slot ("Shark Hull (to craft)"); a long one wraps.
+  { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p, i) => (
+    <div key={i} className="summary-part">{`${p.part} ${p.slot}`} <span className={p.spare ? 'dim' : 'tone-warn'}>({p.spare ? `spare in ${p.spare}` : 'to craft'})</span></div>
+  )), sortable: false },
 ];
 
 const LOW_SUPPLY_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (w) => w.character_name, sort: (w) => w.character_name },
-  { key: 'world', label: 'World', cell: (w) => w.world, sort: (w) => w.world },
+  { key: 'character', label: 'Character', locked: true, cell: (w) => <CharacterName name={w.character_name} world={w.world} />, sort: (w) => w.character_name },
   { key: 'account', label: 'Account', cell: (w) => w.account_label, sort: (w) => w.account_label },
-  { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? '#e57373' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
-  { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? '#e57373' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
+  { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? 'var(--danger)' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
+  { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? 'var(--danger)' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
 ];
 const SUMMARY_CHARACTER_DUPLICATE_EXTRAS = ['x_world', 'x_account', 'x_ceruleum', 'x_repair_kits'];
 
 const RETAINER_IDLE_COLUMN_DEFS = [
-  { key: 'character', label: 'Character', locked: true, cell: (r) => r.owner_name, sort: (r) => r.owner_name },
-  { key: 'world', label: 'World', cell: (r) => r.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.owner_name} world={r.world} />, sort: (r) => r.owner_name },
   { key: 'account', label: 'Account', cell: (r) => r.account_label || '—', sort: (r) => r.account_label },
   { key: 'retainer', label: 'Retainer', cell: (r) => r.retainer_name, sort: (r) => r.retainer_name },
   { key: 'class', label: 'Class', cell: (r) => r.job_abbreviation || '—', sort: (r) => r.job_abbreviation },
@@ -68,9 +75,9 @@ const summaryGil = (n) => Math.round(Number(n) || 0).toLocaleString();
 function SummaryTile({ label, value, note, className = '', children }) {
   return (
     <div className={`account-group ${className}`} style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-      <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{label}</div>
+      <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{label}</div>
       <div style={{ fontSize: '22px', fontWeight: 600 }}>{value}</div>
-      {note && <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{note}</div>}
+      {note && <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{note}</div>}
       {children}
     </div>
   );
@@ -110,14 +117,14 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
         <SummaryTile className="retainers-ventures-tile" label="Ventures" value={data ? `${data.ready} ready to collect` : '—'}
           note={data ? `${data.away} out, ${data.soon} back within an hour` : ''} />
         <SummaryTile className="retainers-income-tile" label="Venture Income"
-          value={ventures ? `${summaryGil(ventures.ventureTotals.perDay)} gil a day` : '—'}
-          note={ventures ? `last ${ventures.windowDays} days, at what a vendor pays${ventures.market && ventures.market.ventures
-            ? ` · market: ${['world', 'dc', 'region'].map((sc) => `${summaryGil(ventures.market.ventures[sc].perDay)} (${{ world: 'World', dc: 'DC', region: 'Region' }[sc]})`).join(', ')}` : ''}`
+          value={ventures ? <><span className="gil">{summaryGil(ventures.ventureTotals.perDay)} gil</span> a day</> : '—'}
+          note={ventures ? <>last {ventures.windowDays} days, at what a vendor pays{ventures.market && ventures.market.ventures
+            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(ventures.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}</>
             : ventures === false ? needs008 : ''}>
           <button onClick={() => onNavigate('income')} style={{ marginTop: '8px' }}>View Income</button>
         </SummaryTile>
         <SummaryTile className="retainers-listings-tile" label="Listings Unsold for a While" value={m ? m.totals.stale.toLocaleString() : '—'}
-          note={m ? `up for ${market.minDays}+ days, ${summaryGil(m.totals.staleValue)} gil${m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}` : market ? needs008 : ''}>
+          note={m ? <>up for {market.minDays}+ days, <span className="gil">{summaryGil(m.totals.staleValue)} gil</span>{m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}</> : market ? needs008 : ''}>
           <button onClick={() => onNavigate('market')} style={{ marginTop: '8px' }}>View Gil & Market</button>
         </SummaryTile>
       </div>
@@ -242,18 +249,18 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
       {uses.subs && (<React.Fragment>
       <div style={{ display: 'flex', gap: '16px', padding: '8px 24px 16px', flexWrap: 'wrap' }}>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Fleet-Wide Salvage Total</div>
-          <div style={{ fontSize: '22px', fontWeight: 600 }}>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Fleet-Wide Salvage Total</div>
+          <div className="gil" style={{ fontSize: '22px', fontWeight: 600 }}>
             {salvageTotal === null ? '—' : `${salvageTotal.toLocaleString()} gil`}
           </div>
         </div>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Parts That Need Crafting</div>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Parts That Need Crafting</div>
           <div style={{ fontSize: '22px', fontWeight: 600 }}>{partsNeededCount === null ? '—' : partsNeededCount}</div>
           <button onClick={() => onNavigate('parts')} style={{ marginTop: '8px' }}>View Parts</button>
         </div>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Route Optimizations Possible</div>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Route Optimizations Possible</div>
           <div style={{ fontSize: '22px', fontWeight: 600 }}>{routeOptCount === null ? '—' : routeOptCount}</div>
           <button onClick={() => onNavigate('routeOpt')} style={{ marginTop: '8px' }}>View Route Optimization</button>
         </div>
@@ -264,9 +271,10 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
         <button onClick={() => onNavigate('parts')} style={{ fontSize: '13px', fontWeight: 400 }}>View Parts</button>
       </h2>
       {readySubs === null && <div className="status">Loading...</div>}
-      {readyShown !== null && readyShown.length === 0 && <div className="status">No sub has reached the rank of its next build.</div>}
+      {readyShown !== null && readyShown.length === 0 && <div className="status">No sub has reached the rank of its next build, and no new sub to build.</div>}
       {readyShown !== null && readyShown.length > 0 && (
         <React.Fragment>
+          <div className="status ready-subs-count">{readyCountText(readyShown)}</div>
           <div className="controls"><ColumnPicker cols={readyCols} /></div>
           <ColumnTable cols={readyCols} sort={readySort} rows={readyShown} rowKey={(sub) => `${sub.cid}|${sub.sub_name}`} className="ready-subs" />
         </React.Fragment>

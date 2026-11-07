@@ -3,6 +3,152 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.8.0 - 2026-11-07
+
+For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (updates 14 to 16); nothing to
+do by hand.
+
+- **Ready-made views of the fleet in the database**, so the plugin can show the Summary, Subs and Supplies in the game
+  without the app running: every built sub with its build and whether it's out, back or in port; each character's
+  ceruleum and repair kits, how many it uses a day, days left and how many to buy; and the fleet at a glance. The
+  database works out the use per day itself (the same way as the Supplies tab), so the plugin reads a few dozen rows
+  instead of weeks of history. Nothing in the app changes.
+- **What needs attention**, for the plugin's in-game Summary and its line in the game's info bar: Free Company houses
+  not entered for the house warning's days (or with no date yet), characters below the low-supply warnings,
+  characters no longer synced, and setups where AutoRetainer wasn't running. The same rules as the app's Summary;
+  characters no longer synced are left out of the low-supply counts there too.
+- **A new submarine icon** for the app's window, taskbar and installer: steel blue with amber portholes, drawn clear at
+  every size from 16 to 256 pixels. It matches the plugin's new picture.
+- **The Roster, Retainers and PCs for the game** (plugin 2.0's next pages): every character with its Free Company,
+  house, supplies (and whether they're below the warnings, by the Roster's own rules), retainers, subs and the setup
+  that syncs it; every retainer with its class, venture, gear target and what it wears; and every setup of the
+  plugin. The views give the game's numbers for classes, ventures and items, never names, so they work on a database
+  that has no game data yet; the plugin names them from the game's own files.
+- **Free Companies and Inventory for the game** (plugin 2.0's next pages): every Free Company with its house, how long
+  since a member entered it and when it can bid; every stack of every item held (bags, retainers, Free Company chests),
+  with the same place names as Where is it?; and the fleet's totals per item. The Free Companies tab's own working out
+  moved into characters/fc-directory-rows.js so the game's is checked against it; a Free Company whose rank isn't a
+  number now reads "Rank too low (?/6)" instead of "NaN/6".
+- **Retainer counts for the game's Summary, the same as the app's:** retainers of characters no longer synced, and of
+  characters not in the Roster, are left out, and a venture with no end time counts as away. The game reads them every
+  30 seconds instead of every 5 minutes, so a retainer caught between two ventures while AutoRetainer sends it out
+  again clears within a minute.
+- **Salvage and Income for the game** (plugin 2.0's next pages): the salvage each character holds (with its Free
+  Company chest's, on the same member as the Salvage tab), each character's real net income from its subs over the
+  Income window (salvage that came in, less repair kits used, the same way as the Income tab), and the venture rewards
+  over that window. Fight Club's expected figures come later in 2.x, with routes.
+- The Roster's view also gives each character's sub slots and the low-supply warnings themselves, so the game can show
+  subs as dots out of the slots and colour supplies by how close they are to the warnings.
+- **Retainer Ventures leaves out characters no longer in the Roster** (on the Income tab and the Summary's venture
+  income), as Trends does. A removed character showed as a long number with its old rewards; its rewards stay recorded,
+  so adding it back brings them back.
+- **Searching word by word**: every search box (Where is it?, the inventory item searches, the character and Free
+  Company pickers, Parts, Trends and the Columns list) now finds names with every word typed, in any order:
+  "diadochos healing" finds every piece of Diadochos healing gear.
+- **Hide equipped gear** on the Inventory tab's Characters, Fleet totals and Where is it?: leaves out gear being worn by
+  the characters and their retainers. One choice for all three, remembered.
+- **The same colours as the plugin's tables**: green when fine, amber getting low, red well below a warning (the
+  Roster's ceruleum and repair kits, Last Synced, Supplies' days left, Income, the PCs' plugins and what they could
+  not see, retainers' ventures, houses), subs as dots out of the slots unlocked on the Roster, gil in gold (large
+  amounts as "5.86M", the full amount on hover), house addresses in blue, Free Company names in lavender, worlds
+  softer, and numbers on the right. The warning colour is now orange rather than gold, so it's never mistaken for gil.
+- **Every column can be resized, the last one too**: a table keeps each column at the width it's given instead of
+  stretching them all to fill the page, so dragging the last column's edge works, the room left over sits after it,
+  and a wider table scrolls sideways.
+- **Character and world together**: every table with characters (Roster, Retainers, Subs, Supplies, Salvage, Income,
+  Route Optimization, Parts, Where is it?, the Summary's lists) names each with its world after it, softer, instead of
+  a separate World column, as the plugin does. A copied or exported table gives it as "Wa'kana Gojo (Cuchulainn)".
+  Free Companies the same (the Free Companies tab, the Summary's house warnings and Supplies' FC credits): the FC's
+  name with its world after it.
+- **Livelier Subs and Retainers**: a thin bar beside each sub's rank for how far to the next, softer dashes in builds,
+  subs back in green and in port softer; each retainer's owner named once, its class in its role's colour (tanks
+  blue, healers green, damage red, a base class such as Gladiator or Conjurer a lighter shade) with the level softer,
+  Avg ilvl green when the gear meets the gear target and amber when it falls short, and the time a venture is done
+  after its countdown.
+- FC points in aqua, and ceruleum and repair kits that don't count toward the warnings (no sub built, or not synced)
+  dim rather than plain.
+- **The Parts tab's inputs for the game** (plugin 2.0's Parts page): every character's sub slots and FC, every built
+  sub's parts and Craft? tick, the Sub Rules, Fight Club's recommended builds with the repair kit price, and every spare
+  sub part in bags, retainers and FC chests. The plugin works the parts out itself, the same way as the Parts tab (a
+  shared FC chest can't give one part twice, which a view does badly); tests/db/parts-fixture.js writes made-up fleets
+  and the Parts tab's answers for the plugin's tests to check against. The one-file (SQLite) version gets the Sub
+  Rules, Craft? and Fight Club tables too.
+- The Parts tab reads everything in a fixed order (a character's own spares before its retainers', Sub Rules and Fight
+  Club routes as they were made), so the same fleet always gets the same answers: before, which of two identical spares
+  it named could depend on the database.
+- **Subs Ready for New Parts lists new subs to build too** (on the Summary): a sub not built yet in an open slot gets
+  its own row with its first build's parts, its rank shown as "new", and a line above says how many of each ("7 subs
+  are ready for new parts, 1 new sub to build"), as the plugin's Summary.
+- **Gil and the market for the game** (plugin 2.0's Gil & Market page): gil per account, every listing with how long
+  it has been up and whether that's unsold for a while (the Gil & Market tab's days), and the Gil & Market settings
+  (those days, and whether Live Market Prices is on). Venture rewards now say how many were high quality, so the game
+  can price them apart as the Income tab does. The plugin asks Universalis itself when Live Market Prices is on, the
+  same way as the app; tests/market-fixture.js runs the app's own Universalis code on canned listings and writes its
+  answers for the plugin's tests to check against.
+- **Live prices come in faster.** Universalis is asked up to 4 requests at a time instead of one after another, and
+  each world, data center and region once (worlds on the same data center share its answer).
+- **Routes for the plugin.** New views (fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view,
+  fleet_voyage_sectors_view, with SQLite twins) give the plugin what the Subs tab's routes, gil a day and rank-up dates are
+  worked out from; tests/db/routes-fixture.js writes made-up fleets and the app's answers for the plugin's tests. The Subs
+  tab now reads Fight Club and the Sub Rules in a fixed order, so the same fleet always gets the same answers.
+- **Route colours, as in the plugin:** Current and Target Gil/Day in gold, Target Route green when a sub is on it and
+  amber when it isn't, a Next Build it can switch to now in green, Route Optimization's gain green (red for less), and
+  Income's Expected / day in gold.
+- **Loot per Voyage and the Next Rank forecasts for the plugin:** fleet_voyage_loot_view, fleet_rankup_forecast_view,
+  fleet_rankup_history_view and fleet_voyage_returns_view (with SQLite twins). Loot per Voyage picks a sub's character in
+  a fixed order. Its gil a voyage and Expected / day are now gold and its value a day green, as in the plugin.
+- **The Shopping List for the plugin:** fleet_shopping_held_view (what's held where, as the Shopping List counts it)
+  and fleet_shopping_progress_view (the ticks), with SQLite twins; the plugin works the list out itself from the game's
+  own recipes. Places holding as many of an item now always list in the same order. The Shopping List's gil is gold,
+  what's still to craft, make, gather or buy amber, and the cheaper of buying or making green, as in the plugin.
+- **The Shopping List's market prices look at the 100 cheapest listings of each item** (was 20), so buying a material
+  needed in the thousands isn't shown as short when plenty more is for sale. "Only 1,639 of 2,277 for sale" now means
+  just that, and its hover says what those cost and that the rest can't be bought there right now.
+- **Craft first's market board prices have the same hover** as the other sections: what buying the ones still to make
+  costs, from the cheapest listing up (with "only X of Y for sale" when there aren't enough). The totals stay for
+  parts and raw materials.
+- **Trends: a day on average, and a table of lines.** Beside a single line's now and change, its change a day on
+  average; under a chart comparing characters or Free Companies, each one's now, change, change %, a day on average,
+  lowest and highest (as the plugin's new Trends page). Rises are green and falls amber on the Summary's tiles and the
+  tab charts, as in the plugin. The plugin's Trends page is checked against the app's answers for a made-up history
+  (tests/db/trends-fixture.js).
+- **The plugin can now make the app's edits from the game** (Sub Rules, Craft?, gear targets, the Roster order, unsold
+  days, the Income window, removing a PC, Shopping List ticks), checked against the app's own: tests/db/edits-fixture.js
+  makes each edit through the app's calls and records the database after it.
+- **Summary's subs ready for new parts: one part to a line**, the class then the slot ("Shark Hull (to craft)"), "to
+  craft" in amber, as the plugin's. The Parts tab's tables show Needed before Slot by default.
+- **Gil in gil's gold everywhere:** Income's and Gil & Market's cards and notes, Supplies' repair kit cost, the Summary's
+  venture income, unsold listings and salvage total, and the Gil and Salvage value trends.
+- **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
+  Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
+- **The shared settings for the plugin:** fleet_settings_view gives the Warnings, the repair kit cost, Live Market
+  Prices and What do you run? (with what "work it out" decides from), so the plugin's Settings can show and change them.
+- **The Warnings and the repair kit cost check what's typed:** whole numbers, 0 or more (a blank box, a fraction or a
+  negative number is refused with a reason instead of being saved).
+- **Fight Club data from the plugin:** the plugin can import Fight Club's route spreadsheet too, read the same way as
+  here; the SQLite twin of the routes table now has every column. Its tests check it against this app's own reading of
+  some awkward spreadsheets (tests/db/fight-club-fixture.js). An import that can't reach the database now says so
+  instead of failing silently.
+- **PCs that only read** (plugin 2.0, database update 16): a PC whose plugin syncs no characters checks in while the
+  game runs. The PCs tab lists it ("Only reads", seen when), and **Move the database to this PC** checks it like the
+  others (its plugin version and login) instead of skipping it.
+- **Looks, as in the plugin** (Settings → General → Look): XIV Fleet Companion (as before), High contrast, Princess,
+  Deep Sea, Sunset Harbor, Parchment (a light look) and Evergreen, with a strip of each look's colours. Kept on this PC.
+  **Colour-blind friendly status colors** too: blue, yellow and orange-red for fine, a look and urgent, shaded for each
+  look; gil, addresses, Free Companies and classes are then plain text. Every look is measured by the tests
+  (tests/themes.test.js): text contrast, every colour that means something readable on its background, and the
+  colour-blind colours apart with each common kind of colour blindness. The plugin's tests check it has the same
+  colours (tests/themes-fixture.js).
+- **The sidebar in groups, as the plugin's:** Overview (Summary, Trends), Submarines (Subs, Route Optimization, Parts,
+  Supplies, Salvage), Characters (Character Roster, Retainers, Free Companies, Inventory), Gil (Income, Gil & Market)
+  and System (PCs). A group with nothing to show (Submarines with retainers only) is left out.
+- **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
+  for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
+  whatever the database's language setting.
+- The views live in one file the app applies again whenever it changes, so later versions can improve them without a
+  database update each time (update 15 records which version a database has). An older copy of the app never
+  replaces a newer one's views.
+
 ## 1.7.0 - 2026-11-05
 
 Goes with plugin 1.0.3. The app updates the database by itself (update 13); nothing to do by hand.

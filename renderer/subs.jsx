@@ -39,8 +39,9 @@ function SubStatusCell({ returnTime }) {
   const nowEpoch = React.useSyncExternalStore(ticking ? subscribeSubsClock : noSubscription, () => Math.max(openedAt, subsClock.now));
   const isDeployed = returnEpoch > 0 && returnEpoch > nowEpoch;
 
-  if (!returnEpoch) return 'In Port';
-  if (!isDeployed) return 'Returned / Awaiting Collection';
+  // Back in green, in port softer (as the plugin's).
+  if (!returnEpoch) return <span className="dim">In Port</span>;
+  if (!isDeployed) return <span className="tone-good">Returned / Awaiting Collection</span>;
   return formatCountdown(returnEpoch - nowEpoch);
 }
 
@@ -71,8 +72,31 @@ function formatRank(rank, progressPct) {
   return `${rank}.${String(progressPct).padStart(2, '0')}`;
 }
 
+// A thin bar for how far a sub is to its next rank (none at the top rank or when unknown).
+function RankBar({ pct, rank }) {
+  if (pct === null || pct === undefined) return null;
+  return (
+    <span className="rank-bar" title={`${pct}% of the way to rank ${Number(rank) + 1}`}>
+      <span style={{ width: `${Math.max(0, Math.min(100, Number(pct)))}%` }} />
+    </span>
+  );
+}
+
+// "W-S-U-C" with the dashes softer, so the four parts stand out.
+function BuildText({ build }) {
+  if (!build) return '—';
+  return String(build).split('-').map((part, i) => (
+    <React.Fragment key={i}>{i > 0 && <span className="dim">-</span>}{part}</React.Fragment>
+  ));
+}
+
 function formatGilDay(value) {
   return value === '' || value === null || value === undefined ? '—' : Number(value).toLocaleString();
+}
+
+// Gil a day in gold (large amounts as "5.86M"), a softer dash when unknown: as the plugin.
+function GilDay({ value }) {
+  return value === '' || value === null || value === undefined ? <span className="dim">—</span> : <GilText gil={Number(value)} />;
 }
 
 // "in 2d 5h" / "in 7h" / "in 40 min" until a time; "now" once it is past.
@@ -151,7 +175,7 @@ function NextBuildCell({ sub }) {
     : undefined;
   return (
     <span>
-      <span className="next-build" title={why}>{b.build} at {b.rank}</span>
+      <span className={`next-build${b.rank <= sub.rank ? ' tone-good' : ''}`} title={why}>{b.build} at {b.rank}</span>
       {b.rank <= sub.rank
         ? <span className="subs-dim"> · now</span>
         : b.at ? <span className="subs-dim"> · <RankUpWhen rankUp={r} at={b.at} voyages={b.voyages} label={`Rank ${b.rank}`} /></span> : null}
@@ -163,19 +187,22 @@ function NextBuildCell({ sub }) {
 // sorted (one flat table), and available to add in the per-character view.
 const SUB_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', locked: true, cell: (s) => s.sub_name, sort: (r) => r.sub_name },
-  { key: 'character', label: 'Character', default: false, cell: (s) => s.character_name, sort: (r) => r.character_name },
-  { key: 'world', label: 'World', default: false, cell: (s) => s.world, sort: (r) => r.world },
+  { key: 'character', label: 'Character', default: false, cell: (s) => <CharacterName name={s.character_name} world={s.world} />, sort: (r) => r.character_name },
   { key: 'status', label: 'Status', cell: (s) => <SubStatusCell returnTime={s.return_time} />, sort: (r) => (Number(r.return_time) > 0 ? Number(r.return_time) : null) },
-  { key: 'rank', label: 'Rank', cell: (s) => formatRank(s.rank, s.rank_progress_pct), sort: (r) => r.rank + (Number(r.rank_progress_pct) || 0) / 100 },
+  // The rank, with a thin bar for how far to the next.
+  { key: 'rank', label: 'Rank', cell: (s) => <><RankBar pct={s.rank_progress_pct} rank={s.rank} />{formatRank(s.rank, s.rank_progress_pct)}</>, sort: (r) => r.rank + (Number(r.rank_progress_pct) || 0) / 100 },
   { key: 'nextRank', label: 'Next Rank', cell: (s) => <NextRankCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextRankAt) || null },
   { key: 'nextBuild', label: 'Next Build', cell: (s) => <NextBuildCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextBuild && r.rank_up.nextBuild.at) || null },
-  { key: 'currentSetup', label: 'Current Setup', cell: (s) => s.current_setup, sort: (r) => r.current_setup },
+  { key: 'currentSetup', label: 'Current Setup', cell: (s) => <BuildText build={s.current_setup} />, sort: (r) => r.current_setup },
   { key: 'speed', label: 'Speed', cell: (s) => (s.speed === '' ? '—' : s.speed), sort: (r) => (r.speed === '' ? null : r.speed) },
   { key: 'range', label: 'Range', cell: (s) => (s.range === '' ? '—' : s.range), sort: (r) => (r.range === '' ? null : r.range) },
   { key: 'currentRoute', label: 'Current Route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },
-  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => formatGilDay(s.current_gil_day), sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
-  { key: 'targetRoute', label: 'Target Route', cell: (s) => s.target_route || '—', sort: (r) => r.target_route || null },
-  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => formatGilDay(s.target_gil_day), sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
+  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
+  // Green when it's on it, amber when it isn't (Route Optimization lists those).
+  { key: 'targetRoute', label: 'Target Route', cell: (s) => (s.target_route
+    ? <span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span>
+    : <span className="dim">—</span>), sort: (r) => r.target_route || null },
+  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   { key: 'craft', label: 'Craft?', cell: (s, ctx) => (
       <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)} />
     ), sort: (r) => (r.craft_enabled ? 1 : 0) }
@@ -265,7 +292,7 @@ function SubmarinesView({ refreshKey }) {
     rows,
     idOf: (r) => r.cid,
     refreshKey,
-    contextKeys: ['character', 'world'],
+    contextKeys: ['character'],
     contextActive: !!subSort.sortColumn
   });
   const subRows = subCols.rows;

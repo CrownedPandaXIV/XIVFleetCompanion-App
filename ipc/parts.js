@@ -87,6 +87,9 @@ function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, re
   return SLOT_KEYS.map((slotKey) => String(activeRule[SLOT_COLUMN[slotKey]] || '').trim());
 }
 
+// Everything is read in a fixed order (a character's own stacks before its retainers', rules and Fight Club routes as
+// they were made), so the same fleet always gets the same answers, and the plugin, which works this out the same way
+// from the fleet_parts_* views (PartsPlanner.cs), gets them too (tests/db/parts-fixture.js checks the two).
 // Computes crafting needs for every character (used by get-parts-needed and the shopping list): current build vs target
 // (Target Route if Craft?+rank85 and a valid match exists, else the
 // sub_build_rules ladder), checked against each character's own spare
@@ -114,18 +117,20 @@ async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
            coalesce((to_jsonb(s)->>'slot')::int, substring(sub_name FROM '^Submersible-([1-4])$')::int) AS slot
     FROM companion_submarine_snapshot s
     WHERE level > 0
+    ORDER BY cid, sub_name COLLATE "C"
   `);
 
   const rulesResult = await client.query(`
     SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge
     FROM sub_build_rules
+    ORDER BY id
   `);
 
   const craftResult = await client.query(`
     SELECT cid, sub_name, craft_enabled FROM sub_craft_toggle
   `);
 
-  const fightClubResult = await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes`);
+  const fightClubResult = await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`);
   const repairKitCost = await repairKitCostFrom(client);
 
   // Personal + retainer spares, with real retainer names resolved
@@ -137,11 +142,13 @@ async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
     LEFT JOIN companion_retainer_lookup rl ON rl.retainer_id = inv.retainer_id
     WHERE inv.sorted_container BETWEEN 0 AND 3
        OR inv.sorted_container BETWEEN 10000 AND 10004
+    ORDER BY inv.owner_cid, (inv.retainer_id <> inv.owner_cid), inv.retainer_id, inv.sorted_container, inv.sorted_slot_index
   `);
 
   const fcChestResult = await client.query(`
     SELECT fc_id, sorted_container, item_id, quantity
     FROM companion_fc_inventory_snapshot
+    ORDER BY fc_id, sorted_container, sorted_slot_index
   `);
 
   const housingResult = await client.query(`

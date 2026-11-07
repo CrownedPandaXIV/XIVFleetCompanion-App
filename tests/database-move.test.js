@@ -50,6 +50,21 @@ test('every PC that syncs needs a plugin that follows the move, logging in as th
   assert.match(notes[0], /^RETIRED \(Old\) hasn't synced since .*It follows the move when it next syncs/);
 });
 
+test('a PC whose plugin only reads (no characters synced) is checked by when it last read', () => {
+  const now = new Date('2026-11-07T12:00:00Z');
+  const pcs = [
+    { pc_name: 'DESKTOP-1', account_label: 'Account 1', plugin_version: '2.0.0', last_sync_at: null, last_read_at: '2026-11-07T11:58:00Z', db_user: 'fleet_app' },
+    { pc_name: 'DESKTOP-5', account_label: '', plugin_version: '2.0.0', last_sync_at: null, last_read_at: '2026-11-07T11:58:00Z', db_user: 'someone_else' },
+    { pc_name: 'DESKTOP-6', account_label: '', plugin_version: '2.0.0', last_sync_at: '2026-09-01T00:00:00Z', last_read_at: '2026-11-07T11:00:00Z', db_user: 'fleet_app' },
+    { pc_name: 'DESKTOP-7', account_label: '', plugin_version: '2.0.0', last_sync_at: null, last_read_at: '2026-09-01T00:00:00Z', db_user: 'fleet_app' },
+  ];
+  const { blocking, notes } = checkPcs(pcs, 'fleet_app', now);
+  assert.deepStrictEqual(blocking.length, 1);
+  assert.match(blocking[0], /^DESKTOP-5's plugin logs in as "someone_else"/);
+  assert.strictEqual(notes.length, 1);
+  assert.match(notes[0], /^DESKTOP-7 hasn't synced since/);
+});
+
 test('versions, names and counts', () => {
   assert.strictEqual(toolMajor('pg_dump (PostgreSQL) 18.6'), 18);
   assert.strictEqual(toolMajor('pg_dump (PostgreSQL) 16.4 (Ubuntu 16.4-1.pgdg24.04+1)'), 16);
