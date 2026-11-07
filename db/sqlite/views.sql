@@ -330,7 +330,7 @@ SELECT retainer_id, item_id FROM companion_inventory_snapshot WHERE sorted_conta
 CREATE VIEW fleet_pcs_view AS
 SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready, fctracker_found,
        submarinetracker_found, venture_stats_found, characters_synced, characters_left_out, characters_elsewhere,
-       problems, check_text, check_to_fix, check_at
+       problems, check_text, check_to_fix, check_at, last_read_at
 FROM companion_pc_status;
 
 -- Every Free Company, as the Free Companies tab (characters/fc-directory-rows.js): its newest details (from whichever

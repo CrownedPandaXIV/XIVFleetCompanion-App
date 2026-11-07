@@ -63,7 +63,7 @@ async function scenario(name, fn) {
 // 0/1) and lists (text[], one per line).
 const TIMES = new Set(['first_seen_at', 'last_synced_at', 'updated_at', 'recorded_at', 'items_seen_at', 'house_last_visited',
   'fc_founding_date', 'fc_eligibility_override', 'eligible_at',
-  'logged_in_at', 'last_sync_at', 'check_at', 'received_at', 'first_seen_at', 'returned_at', 'made_at', 'predicted_at']);
+  'logged_in_at', 'last_sync_at', 'last_read_at', 'check_at', 'received_at', 'first_seen_at', 'returned_at', 'made_at', 'predicted_at']);
 const BOOLS = new Set(['has_venture', 'has_house', 'only_crafted', 'autoretainer_ready', 'allagantools_ready', 'fctracker_found',
   'submarinetracker_found', 'venture_stats_found', 'hq', 'craft_enabled', 'is_retainer', 'stale', 'live_prices',
   'primary_hq', 'additional_hq', 'valid']);
@@ -333,7 +333,7 @@ function fleet(seed, now) {
   t.tier3_settings.push({ setting_key: 'play_style', setting_value: pick(['auto', 'subs', 'retainers', 'both', 'Subs', 'none']), updated_at: ago(1) });
   for (const [pc, label] of [['DESKTOP-1', 'A'], ['DESKTOP-1', 'B'], ['LAPTOP', ''], ['DESKTOP-2', 'A'], ['OLD', 'C']]) {
     t.companion_pc_status.push({ pc_name: pc, account_label: label, plugin_version: pick(['2.0.0.11', '1.0.3.4', null]),
-      last_sync_at: pick([ago(0.05), ago(30), ago(90), null]), autoretainer_ready: pick([true, false, null]), allagantools_ready: pick([true, false, null]),
+      last_sync_at: pick([ago(0.05), ago(30), ago(90), null]), last_read_at: pick([ago(0.01), ago(40), null]), autoretainer_ready: pick([true, false, null]), allagantools_ready: pick([true, false, null]),
       fctracker_found: pick([true, false, null]), submarinetracker_found: pick([true, false, null]), venture_stats_found: pick([true, false, null]),
       characters_synced: chance(0.2) ? null : Math.floor(random() * 30), characters_left_out: Math.floor(random() * 3), characters_elsewhere: chance(0.3) ? null : Math.floor(random() * 4),
       problems: pick([[], ['Char1: no FC chest', 'Char2: no retainers'], null, ['One thing']]), check_text: pick([null, 'All good\nNothing to fix']),

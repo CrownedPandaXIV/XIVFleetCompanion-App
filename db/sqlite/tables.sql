@@ -134,6 +134,7 @@ CREATE TABLE companion_pc_status (
     check_text             TEXT,
     check_to_fix           INTEGER,
     check_at               REAL,
+    last_read_at           REAL,
     PRIMARY KEY (pc_name, account_label)
 );
 

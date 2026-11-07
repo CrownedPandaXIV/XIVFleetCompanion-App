@@ -5,7 +5,7 @@ All notable changes to the app are recorded here. Versions follow
 
 ## 1.8.0 - unreleased
 
-For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (update 14); nothing to
+For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (updates 14 to 16); nothing to
 do by hand.
 
 - **Ready-made views of the fleet in the database**, so the plugin can show the Summary, Subs and Supplies in the game
@@ -121,6 +121,17 @@ do by hand.
   venture income, unsold listings and salvage total, and the Gil and Salvage value trends.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
+- **The shared settings for the plugin:** fleet_settings_view gives the Warnings, the repair kit cost, Live Market
+  Prices and What do you run? (with what "work it out" decides from), so the plugin's Settings can show and change them.
+- **The Warnings and the repair kit cost check what's typed:** whole numbers, 0 or more (a blank box, a fraction or a
+  negative number is refused with a reason instead of being saved).
+- **Fight Club data from the plugin:** the plugin can import Fight Club's route spreadsheet too, read the same way as
+  here; the SQLite twin of the routes table now has every column. Its tests check it against this app's own reading of
+  some awkward spreadsheets (tests/db/fight-club-fixture.js). An import that can't reach the database now says so
+  instead of failing silently.
+- **PCs that only read** (plugin 2.0, database update 16): a PC whose plugin syncs no characters checks in while the
+  game runs. The PCs tab lists it ("Only reads", seen when), and **Move the database to this PC** checks it like the
+  others (its plugin version and login) instead of skipping it.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.

@@ -40,6 +40,9 @@ function PcProblemsCell({ problems }) {
 // those it left to the setup they last logged in on (plugin 1.0.2).
 const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another setup)` : ''}`;
 
+// Its last sync; a PC that has never synced but reads says so.
+const pcLastSync = (p) => (!p.last_sync_at && p.last_read_at ? `Only reads (seen ${pcAgo(p.last_read_at)})` : pcAgo(p.last_sync_at));
+
 const PC_COLUMN_DEFS = [
   {
     key: 'pc', label: 'PC', locked: true, sort: (p) => p.pc_name,
@@ -65,7 +68,12 @@ const PC_COLUMN_DEFS = [
     },
     sort: (p) => String(p.plugin_version || '').split('.').map((n) => n.padStart(5, '0')).join('.'),
   },
-  { key: 'last_sync', label: 'Last sync', cell: (p) => pcAgo(p.last_sync_at), sort: (p) => (p.last_sync_at ? -Date.parse(p.last_sync_at) : null) },
+  {
+    key: 'last_sync', label: 'Last sync', sort: (p) => (p.last_sync_at ? -Date.parse(p.last_sync_at) : null),
+    cell: (p) => pcLastSync(p),
+    // A PC whose plugin only reads (it syncs no characters) checks in too (plugin 2.0).
+    td: (p) => <td title={p.last_read_at ? `Its plugin last read the database ${pcAgo(p.last_read_at)}.` : undefined}>{pcLastSync(p)}</td>,
+  },
   { key: 'characters', label: 'Characters', sort: (p) => p.characters_synced,
     cell: (p) => pcCharacters(p),
     td: (p) => (

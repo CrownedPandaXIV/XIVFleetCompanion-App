@@ -90,7 +90,7 @@ const indexes = async (c) => (await c.query(
       'added companion_market_listing', 'added companion_metric_history_metric_idx', 'added companion_metric_latest.label',
       'added companion_pc_status', 'added companion_retainer_lookup.items_seen_at', 'added companion_submarine_snapshot.slot',
       'added companion_venture_result', 'added companion_venture_result_received_idx', 'added companion_voyage_loot.leg',
-      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check', 'update 13: remove_discord_alerts', 'update 14: fleet_views', 'update 15: views_checksum', 'views updated']);
+      'update 10: database_move', 'update 11: rankup_forecasts', 'update 12: logins_and_game_data_check', 'update 13: remove_discord_alerts', 'update 14: fleet_views', 'update 15: views_checksum', 'update 16: pc_last_read', 'views updated']);
     assert.deepStrictEqual((await columns(c)).slice().sort(), refColumns.slice().sort());
     const settings = (await c.query('SELECT setting_key, setting_value::int AS v FROM fleet_economics_settings ORDER BY 1')).rows;
     assert.deepStrictEqual(settings, [{ setting_key: 'house_warn_days', v: 30 }, { setting_key: 'not_synced_after_minutes', v: 45 }],
@@ -98,7 +98,7 @@ const indexes = async (c) => (await c.query(
     assert.deepStrictEqual(await indexes(c), refIndexes);
     const slots = (await c.query('SELECT sub_name, slot FROM companion_submarine_snapshot ORDER BY sub_name')).rows;
     assert.deepStrictEqual(slots, [{ sub_name: 'Renamed', slot: null }, { sub_name: 'Submersible-2', slot: 2 }]);
-    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }, { version: 13, name: 'remove_discord_alerts' }, { version: 14, name: 'fleet_views' }, { version: 15, name: 'views_checksum' }]);
+    assert.deepStrictEqual(await versions(c), [{ version: 9, name: 'catch-up' }, { version: 10, name: 'database_move' }, { version: 11, name: 'rankup_forecasts' }, { version: 12, name: 'logins_and_game_data_check' }, { version: 13, name: 'remove_discord_alerts' }, { version: 14, name: 'fleet_views' }, { version: 15, name: 'views_checksum' }, { version: 16, name: 'pc_last_read' }]);
     await c.end();
   });
 

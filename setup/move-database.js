@@ -44,7 +44,9 @@ function checkPcs(pcs, user, now = new Date()) {
   const since = now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000;
   for (const pc of pcs || []) {
     const name = pc.account_label ? `${pc.pc_name} (${pc.account_label})` : pc.pc_name;
-    const last = pc.last_sync_at ? new Date(pc.last_sync_at) : null;
+    // A PC that only reads (plugin 2.0: it syncs no characters) follows a move too, when it next reads.
+    const times = [pc.last_sync_at, pc.last_read_at].filter(Boolean).map((t) => new Date(t));
+    const last = times.length ? new Date(Math.max(...times)) : null;
     if (!last || last.getTime() < since) {
       notes.push(`${name} hasn't synced since ${last ? last.toLocaleDateString() : 'it was set up'}. It follows the move when it next syncs, as long as its plugin is updated by then and the old database PC is still on.`);
       continue;
@@ -132,7 +134,9 @@ async function checkOld(input, deps) {
     const note = await readMoveNote(old);
     if (note && note.state === 'moved') return fail(`This database has already moved to ${note.host}:${note.port}. The app switches to it by itself within a minute.`);
     if (note && note.state === 'pausing' && note.fresh) return fail('Another move of this database is running right now. Wait for it to finish.');
-    const pcs = (await old.query('SELECT pc_name, account_label, plugin_version, last_sync_at, db_user FROM companion_pc_status ORDER BY pc_name, account_label')).rows;
+    const pcs = (await old.query(`SELECT pc_name, account_label, plugin_version, last_sync_at, db_user,
+      (to_jsonb(companion_pc_status) ->> 'last_read_at')::timestamptz AS last_read_at
+      FROM companion_pc_status ORDER BY pc_name, account_label`)).rows;
     const { blocking, notes } = checkPcs(pcs, config.user, deps.now ? deps.now() : new Date());
     const serverVersion = Number((await old.query('SHOW server_version_num')).rows[0].server_version_num);
     return { ok: blocking.length === 0, error: blocking.length ? 'Some PCs need something first (listed below).' : null, blocking, notes, serverVersion };

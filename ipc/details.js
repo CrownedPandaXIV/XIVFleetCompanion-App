@@ -81,12 +81,19 @@ async function incomeWindowDays(client) {
 
 // ---- PCs ----
 
+// When a PC's plugin was last heard from: its last sync, or its last read for one that only reads (plugin 2.0).
+const lastSeen = (p) => {
+  const times = [p.last_sync_at, p.last_read_at].filter(Boolean).map((t) => new Date(t));
+  return times.length ? new Date(Math.max(...times)) : null;
+};
+
 ipcMain.handle('get-pcs', () => withDetails(async (client) => {
   const pcs = (await client.query(`
     SELECT pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready,
            fctracker_found, submarinetracker_found, venture_stats_found, characters_synced, characters_left_out,
            problems, check_text, check_to_fix, check_at,
-           (to_jsonb(companion_pc_status) ->> 'characters_elsewhere')::int AS characters_elsewhere -- update 12
+           (to_jsonb(companion_pc_status) ->> 'characters_elsewhere')::int AS characters_elsewhere, -- update 12
+           (to_jsonb(companion_pc_status) ->> 'last_read_at')::timestamptz AS last_read_at -- update 16
     FROM companion_pc_status
     ORDER BY account_label, pc_name`)).rows;
   // Accounts whose characters sync but no PC has reported for (a plugin older than 0.10.0).
@@ -100,7 +107,7 @@ ipcMain.handle('get-pcs', () => withDetails(async (client) => {
   const moved = note && note.state === 'arrived' && note.moved_at ? {
     from: note.from_host,
     at: note.moved_at,
-    waiting: pcs.filter((p) => !p.last_sync_at || new Date(p.last_sync_at) < new Date(note.moved_at)).map((p) => p.account_label ? `${p.pc_name} (${p.account_label})` : p.pc_name),
+    waiting: pcs.filter((p) => !lastSeen(p) || lastSeen(p) < new Date(note.moved_at)).map((p) => p.account_label ? `${p.pc_name} (${p.account_label})` : p.pc_name),
   } : null;
   return {
     success: true,
