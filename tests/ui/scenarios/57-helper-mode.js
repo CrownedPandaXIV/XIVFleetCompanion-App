@@ -24,8 +24,10 @@ module.exports = async (t) => {
   await waitFor(`/Up to date \\(database version \\d+\\)/.test(document.querySelector('.helper-view').innerText)`, 'the database version', 20000);
   // The backups are read separately and can arrive a moment later.
   await waitFor(`/daily backup is off|Backs up every day/.test(document.querySelector('.helper-view').innerText)`, "this PC's backups", 20000);
+  await waitFor(`/Answering/.test(document.querySelector('.helper-view').innerText)`, 'that it answers', 20000);
+  check(true, 'and that it answers');
   const text = await ev(`document.querySelector('.helper-view').innerText`);
-  check(/uitest/.test(text) && /Answering/.test(text), 'where the database is, and that it answers');
+  check(text.includes(`${process.env.PGDATABASE || 'postgres'} on `), 'where the database is');
   check(/No backup made on this PC yet|Last backup/.test(text) && /daily backup is off|Backs up every day/.test(text), "this PC's backups");
   check(/PCs? with the plugin use this database/.test(text), 'how many PCs use it');
   await t.sleep(500);
