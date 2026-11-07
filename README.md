@@ -41,6 +41,19 @@ without them.
 
 No administrator rights are needed: it installs just for your Windows account.
 
+**One download, two ways to open it** (pick in the setup screen, or later in Settings → General → This PC shows):
+
+| | The full app | The Database Helper |
+| --- | --- | --- |
+| Your fleet's pages (Summary, Subs, Trends...) | Yes | No: your fleet is in the game, through the plugin |
+| Setup, connection, moving the database | Yes | Yes |
+| Backups and restore, Remove everything | Yes | Yes |
+| PCs list | Yes | Yes |
+| Keeps the database up to date | Yes | Yes |
+| Good for | A PC where you want to see your fleet | The PC that keeps the database, or one that only plays |
+
+Neither one is the database itself: that's PostgreSQL, which the setup screen installs on the PC you choose.
+
 ### Updates happen by themselves
 
 The app looks for a new version when it starts and every hour, and downloads it in the background. When it's ready,
@@ -175,6 +188,15 @@ Handy everywhere:
   to spot listings someone sells cheaper, and to see on the Shopping List whether each sub part is cheaper to buy or
   to make, from the world, data center or region you pick. Only item numbers and world, data center or region names
   are sent.
+
+### The Database Helper
+
+On a PC where you don't need your fleet's pages, such as the PC that keeps the database or one that only plays
+with the plugin, choose **Settings → General → This PC shows → The Database Helper**. It's the same app with only
+its database tools: where the database is and whether it's up to date, this PC's backups, and the PCs that use
+it, with setup, moving the database, backups and restore, and Remove everything a click away. It still keeps the
+database up to date and makes the nightly backup. The setup screen asks the same question the first time. It's for
+that PC only, and **Open the full app** switches back without losing anything.
 
 ## Backups
 
@@ -327,6 +349,11 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
 Add the change as the next numbered file in `db/updates/`, and make the same change in `db/schema.sql`. The views plugin 2.0 reads are in `db/views.sql`
 instead, which the app applies again whenever it changes.
 [db/updates/README.md](db/updates/README.md) has the details. The app applies it on every database the next time it connects.
+
+The plugin (2.1.0 and later) applies the same files itself, from a copy built into it. After changing anything in `db/`,
+copy it across and refresh the plugin's check of it (needs a scratch Postgres):
+`node tests/db/plugin-database-fixture.js ../XIVFleetCompanion`, then commit the plugin's `XIVFleetCompanion/Database/`
+and `tests/FleetWriterTests/database-fixture.json`.
 
 ### Releasing a new version
 

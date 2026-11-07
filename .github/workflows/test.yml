@@ -98,6 +98,8 @@ jobs:
       run: node tests/themes-fixture.js
     - name: Work out live market prices from canned Universalis listings (the answers the plugin's own Universalis code is checked against)
       run: node tests/market-fixture.js
+    - name: Update made-up databases each way (what the plugin's own database updating is checked against)
+      run: node tests/db/plugin-database-fixture.js "$RUNNER_TEMP/plugin"
     - name: Verify the venture reward totals
       run: node tests/db/verify-venture-totals.js
     - name: Verify moving the database to another PC (two servers, the runner's pg_dump and pg_restore)

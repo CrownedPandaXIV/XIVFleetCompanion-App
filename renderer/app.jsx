@@ -4,7 +4,9 @@
 // view later rather than touching multiple spots. `built: false` views
 // render the ComingSoonView placeholder instead of real content.
 // The pages, in sidebar order, by group (the same groups as the plugin's sidebar).
+// helper: also shown in the Database Helper (this PC shows only the database tools); helperOnly: only there.
 const VIEWS = [
+  { key: 'helper', label: 'Home', title: 'Database Helper', group: 'Database Helper', built: true, helper: true, helperOnly: true },
   { key: 'summary', label: 'Summary', group: 'Overview', built: true },
   { key: 'trends', label: 'Trends', group: 'Overview', built: true },
   { key: 'subs', label: 'Subs', group: 'Submarines', built: true },
@@ -18,7 +20,7 @@ const VIEWS = [
   { key: 'inventory', label: 'Inventory', group: 'Characters', built: true },
   { key: 'income', label: 'Income', group: 'Gil', built: true },
   { key: 'market', label: 'Gil & Market', group: 'Gil', built: true },
-  { key: 'pcs', label: 'PCs', group: 'System', built: true },
+  { key: 'pcs', label: 'PCs', group: 'System', built: true, helper: true },
 ];
 
 // hidden: the views left out for what the player does not run (Settings → What do you run?).
@@ -401,6 +403,18 @@ function App() {
   // false, or which Settings tab to open on (true: the last one used).
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState('summary');
+  // What this PC shows (shared/app-mode.js): 'fleet' (the full app) or 'tools' (the Database Helper). Nothing is
+  // drawn until it's known, so a Database Helper PC never starts loading the fleet's tabs.
+  const [appMode, setAppMode] = useState(null);
+  useEffect(() => {
+    const apply = (mode) => {
+      setAppMode(mode);
+      setCurrentView(mode === 'tools' ? 'helper' : 'summary');
+    };
+    window.api.getAppMode().then(apply).catch(() => apply('fleet'));
+    return window.api.onAppModeChanged(apply);
+  }, []);
+  const helperMode = appMode === 'tools';
   // A new look (Settings → General → Look) redraws the page, so charts pick up its colours too.
   const [lookKey, setLookKey] = useState(0);
   useEffect(() => {
@@ -437,10 +451,15 @@ function App() {
   useEffect(() => {
     window.api.getPlayStyle().then((r) => { if (r && r.uses) setPlayStyle(r); }).catch(() => {});
   }, [refreshKey]);
-  // A tab left out (after the choice changed) goes back to the Summary.
+  // The views left out: everything but the database tools in the Database Helper; otherwise the Helper's own home
+  // page and what the player doesn't run.
+  const hiddenViews = React.useMemo(() => (helperMode
+    ? VIEWS.filter((v) => !v.helper).map((v) => v.key)
+    : [...playStyle.hidden, ...VIEWS.filter((v) => v.helperOnly).map((v) => v.key)]), [helperMode, playStyle]);
+  // A tab left out (after the choice changed) goes back to the first page.
   useEffect(() => {
-    if (playStyle.hidden.includes(currentView)) setCurrentView('summary');
-  }, [playStyle, currentView]);
+    if (appMode && hiddenViews.includes(currentView)) setCurrentView(helperMode ? 'helper' : 'summary');
+  }, [appMode, helperMode, hiddenViews, currentView]);
   // Roster columns for what the player does not run start hidden (they can still be added in Columns).
   const rosterDefs = React.useMemo(() => ROSTER_COLUMN_DEFS.map((d) => (
     (!playStyle.uses.subs && ROSTER_SUB_COLUMNS.includes(d.key)) || (!playStyle.uses.retainers && ROSTER_RETAINER_COLUMNS.includes(d.key))
@@ -470,8 +489,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetchRoster();
-  }, [fetchRoster, refreshKey]);
+    if (appMode === 'fleet') fetchRoster();
+  }, [fetchRoster, refreshKey, appMode]);
 
   // Auto-refresh: triggers the same refresh the Refresh button does (bumps refreshKey, which every view
   // watches) every few minutes (Settings → Auto-Refresh). The interval is read again each time Settings
@@ -532,11 +551,14 @@ function App() {
     setSaveStatus(result.success ? 'Saved.' : `Failed to save: ${result.error}`);
   }
 
-  const activeViewLabel = VIEWS.find((v) => v.key === currentView)?.label || '';
+  const activeView = VIEWS.find((v) => v.key === currentView);
+  const activeViewLabel = activeView ? activeView.title || activeView.label : '';
+
+  if (!appMode) return <div className="app-shell"><div className="main-pane"><div className="status">Loading...</div></div></div>;
 
   return (
     <div className="app-shell">
-      <SidebarNav currentView={currentView} onSelect={setCurrentView} hidden={playStyle.hidden} />
+      <SidebarNav currentView={currentView} onSelect={setCurrentView} hidden={hiddenViews} />
 
       <div className="main-pane" key={lookKey}>
         <div className="header-row">
@@ -572,6 +594,7 @@ function App() {
         {showSettings && (
           <SettingsModal
             initialTab={typeof showSettings === 'string' ? showSettings : null}
+            appMode={appMode}
             // Settings can change what the views show (thresholds, the house warning): reload them.
             onClose={() => { setShowSettings(false); setRefreshKey((k) => k + 1); }}
           />
@@ -691,7 +714,9 @@ function App() {
 
         {currentView === 'pcs' && <PcsView refreshKey={refreshKey} />}
 
-        {currentView !== 'roster' && currentView !== 'subs' && currentView !== 'parts' && currentView !== 'salvage' && currentView !== 'routeOpt' && currentView !== 'summary' && currentView !== 'inventory' && currentView !== 'retainers' && currentView !== 'fcDirectory' && currentView !== 'trends' && currentView !== 'supplies' && currentView !== 'income' && currentView !== 'market' && currentView !== 'pcs' && (
+        {currentView === 'helper' && <HelperView refreshKey={refreshKey} onOpenSettings={(tab) => setShowSettings(tab)} onNavigate={setCurrentView} />}
+
+        {currentView !== 'roster' && currentView !== 'subs' && currentView !== 'parts' && currentView !== 'salvage' && currentView !== 'routeOpt' && currentView !== 'summary' && currentView !== 'inventory' && currentView !== 'retainers' && currentView !== 'fcDirectory' && currentView !== 'trends' && currentView !== 'supplies' && currentView !== 'income' && currentView !== 'market' && currentView !== 'pcs' && currentView !== 'helper' && (
           <ComingSoonView label={activeViewLabel} />
         )}
       </div>

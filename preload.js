@@ -151,6 +151,14 @@ contextBridge.exposeInMainWorld('api', {
   getRetainerSummary: () => invoke('get-retainer-summary'),
   getUniversalisSetting: () => invoke('get-universalis-setting'),
   saveUniversalisSetting: (enabled) => invoke('save-universalis-setting', enabled),
+  getAppMode: () => invoke('app-mode:get'),
+  setAppMode: (mode) => invoke('app-mode:set', mode),
+  onAppModeChanged: (callback) => {
+    const listener = (event, mode) => callback(mode);
+    ipcRenderer.on('app-mode-changed', listener);
+    return () => ipcRenderer.removeListener('app-mode-changed', listener);
+  },
+  getHelperOverview: () => invoke('helper:overview'),
   getPlayStyle: () => invoke('get-play-style'),
   savePlayStyle: (choice) => invoke('save-play-style', choice),
   getPcs: () => invoke('get-pcs'),

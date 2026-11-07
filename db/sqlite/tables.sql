@@ -1,6 +1,6 @@
--- A first draft of the tables the plugin-only one-file version (SQLite) will need, for now only those the fleet views
--- read, so the views can be checked on SQLite as well as PostgreSQL (tests/db/verify-sqlite-views.js). Nothing uses
--- this file yet; the one-file version itself comes near the end of 2.x.
+-- The tables of the plugin-only one-file version (SQLite, plugin 2.2 "Just this PC"): everything the plugin writes and
+-- reads, with the fleet views checked on SQLite as well as PostgreSQL (tests/db/verify-sqlite-views.js). The app's own
+-- tables (game data, backups, the database move) aren't here: the app doesn't open the file.
 --
 -- How PostgreSQL's types are kept here:
 --   character and retainer ids              INTEGER (they fit in a signed 64-bit number)
@@ -25,7 +25,7 @@ CREATE TABLE companion_character_current (
     submarine_count INTEGER,
     num_sub_slots   INTEGER,
     fc_id           TEXT,     -- see below: too big for INTEGER
-    first_seen_at   REAL NOT NULL,
+    first_seen_at   REAL NOT NULL DEFAULT ((julianday('now') - 2440587.5) * 86400.0),
     last_synced_at  REAL NOT NULL
 );
 
@@ -62,6 +62,17 @@ CREATE TABLE companion_metric_history (
 );
 CREATE INDEX companion_metric_history_subject_idx ON companion_metric_history (subject_type, subject_id, metric, recorded_at);
 
+-- The newest value of each metric for each subject (the Trends page's list of what can be charted).
+CREATE TABLE companion_metric_latest (
+    subject_type TEXT NOT NULL,
+    subject_id        NOT NULL,
+    metric       TEXT NOT NULL,
+    value        REAL NOT NULL,
+    recorded_at  REAL NOT NULL,
+    label        TEXT,
+    PRIMARY KEY (subject_type, subject_id, metric)
+);
+
 CREATE TABLE fleet_economics_settings (
     setting_key   TEXT PRIMARY KEY,
     setting_value REAL,
@@ -96,7 +107,7 @@ CREATE TABLE companion_character_housing (
     house_ward              INTEGER,
     house_plot              INTEGER,
     house_last_visited      REAL,
-    updated_at              REAL NOT NULL,
+    updated_at              REAL NOT NULL DEFAULT ((julianday('now') - 2440587.5) * 86400.0),
     fc_master               TEXT,
     fc_home_world_id        INTEGER,
     fc_founding_date        REAL,
@@ -145,7 +156,8 @@ CREATE TABLE companion_inventory_snapshot (
     sorted_slot_index INTEGER NOT NULL,
     item_id           INTEGER,
     quantity          INTEGER,
-    updated_at        REAL,
+    gear_set_ids      TEXT,     -- PostgreSQL's int[] as its text, e.g. {1,4}
+    updated_at        REAL DEFAULT ((julianday('now') - 2440587.5) * 86400.0),
     PRIMARY KEY (owner_cid, retainer_id, sorted_container, sorted_slot_index)
 );
 
@@ -163,7 +175,7 @@ CREATE TABLE companion_fc_inventory_snapshot (
     sorted_slot_index INTEGER NOT NULL,
     item_id           INTEGER NOT NULL,
     quantity          INTEGER NOT NULL,
-    updated_at        REAL,
+    updated_at        REAL DEFAULT ((julianday('now') - 2440587.5) * 86400.0),
     PRIMARY KEY (fc_id, sorted_container, sorted_slot_index)
 );
 
