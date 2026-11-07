@@ -3,6 +3,11 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.8.1 - 2026-11-07
+
+- **Trend charts draw their line again.** Since 1.8.0, every chart with one line (and the first line on charts that
+  compare several) drew almost black on the dark background. It's back to blue, with its shading.
+
 ## 1.8.0 - 2026-11-07
 
 For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (updates 14 to 16); nothing to
