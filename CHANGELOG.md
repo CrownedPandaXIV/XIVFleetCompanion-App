@@ -112,6 +112,9 @@ do by hand.
   lowest and highest (as the plugin's new Trends page). Rises are green and falls amber on the Summary's tiles and the
   tab charts, as in the plugin. The plugin's Trends page is checked against the app's answers for a made-up history
   (tests/db/trends-fixture.js).
+- **The plugin can now make the app's edits from the game** (Sub Rules, Craft?, gear targets, the Roster order, unsold
+  days, the Income window, removing a PC, Shopping List ticks), checked against the app's own: tests/db/edits-fixture.js
+  makes each edit through the app's calls and records the database after it.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
