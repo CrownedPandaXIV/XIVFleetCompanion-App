@@ -16,7 +16,7 @@ const TREND_GRID = () => {
 // Categorical colors in fixed slot order (validated for the dark surface: lightness band,
 // chroma, adjacent color-blind separation and contrast). A series keeps the slot it was given
 // when others are removed, so colors follow the entity, never its position.
-const TREND_COLORS = ['var(--accent-strong)', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+const TREND_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 const TREND_MAX_SERIES = TREND_COLORS.length;
 
 const TREND_DAY = 86400000;
