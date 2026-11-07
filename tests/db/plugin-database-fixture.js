@@ -1,5 +1,5 @@
 // The plugin updates the database itself (plugin 2.1.0, DatabaseUpkeep.cs), with a copy of this app's own files:
-// db/schema.sql, db/catch-up.sql, db/updates/*.sql and db/views.sql. This copies them into the plugin and works out,
+// db/schema.sql, db/catch-up.sql, db/updates/*.sql and db/views.sql (and db/sqlite/, the one-file version's). This copies them into the plugin and works out,
 // with the app's own ensureDatabase, what a database looks like after each way of updating it, for the plugin's
 // tests to check its own updating gives exactly the same: every table and column, index, view (its definition) and
 // version record.
@@ -84,6 +84,9 @@ function updatesUpTo(last) {
   for (const f of fs.readdirSync(path.join(DB_DIR, 'updates')).filter((x) => x.endsWith('.sql'))) {
     fs.copyFileSync(path.join(DB_DIR, 'updates', f), path.join(target, 'updates', f));
   }
+  // The one-file version's tables and views (Just this PC, SQLite).
+  fs.mkdirSync(path.join(target, 'sqlite'), { recursive: true });
+  for (const f of ['tables.sql', 'views.sql']) fs.copyFileSync(path.join(DB_DIR, 'sqlite', f), path.join(target, 'sqlite', f));
   // Which app version they're from: what the plugin records as the views' version, so the app and the plugin agree
   // which is newer.
   const appVersion = APP_VERSION.split('-')[0];
