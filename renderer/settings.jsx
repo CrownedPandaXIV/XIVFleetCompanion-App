@@ -482,6 +482,34 @@ function PlayStyleSection() {
 // Settings → General → Look (themes.js): the window's colours, kept on this PC; the same looks as the plugin's.
 // Colour-blind friendly: blue, yellow and orange-red (shaded for each look) for fine, a look and urgent, and the
 // colours that only say what a thing is (gil, addresses, Free Companies, classes) plain.
+// What this PC shows (shared/app-mode.js): the whole app, or only the database tools (the Database Helper). Kept on
+// this PC only; nothing in the database changes.
+function AppModeSection({ appMode }) {
+  const [status, setStatus] = useState('');
+  const choose = async (mode) => {
+    if (mode === appMode) return;
+    const r = await window.api.setAppMode(mode);
+    setStatus(r.success ? '' : `Failed: ${r.error}`);
+  };
+  return (
+    <section className="settings-section app-mode-section">
+      <h3>This PC shows</h3>
+      <div className="settings-row">
+        <label><input type="radio" name="app-mode" className="app-mode-fleet" checked={appMode !== 'tools'} onChange={() => choose('fleet')} /> My fleet (the whole app)</label>
+      </div>
+      <div className="settings-row">
+        <label><input type="radio" name="app-mode" className="app-mode-tools" checked={appMode === 'tools'} onChange={() => choose('tools')} /> Just the database tools (the Database Helper)</label>
+      </div>
+      <div className="alerts-help">
+        The Database Helper keeps setup, the database connection and moving it, backups and restore, Remove everything and
+        the PCs list, and still updates the database. Good for the PC that keeps the database, or one that only plays with
+        the plugin. For this PC only: switch back any time, nothing is lost.
+      </div>
+      {status && <span className="save-status">{status}</span>}
+    </section>
+  );
+}
+
 function LookSwatches({ theme }) {
   const t = window.Themes.themeByKey(theme).tokens;
   return (
@@ -683,7 +711,7 @@ function SpeedCheckSection() {
   );
 }
 
-function SettingsModal({ onClose, initialTab = null }) {
+function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [tab, setTab] = useState(() => {
     if (initialTab) return initialTab;
     try {
@@ -846,8 +874,11 @@ function SettingsModal({ onClose, initialTab = null }) {
         <div className="settings-body">
           {tab === 'general' && (
             <>
+        <AppModeSection appMode={appMode} />
+
         <LookSection />
 
+        {appMode !== 'tools' && (<>
         <PlayStyleSection />
 
         <LivePricesSection />
@@ -933,6 +964,7 @@ function SettingsModal({ onClose, initialTab = null }) {
             </div>
           )}
         </section>
+        </>)}
         <UpdatesSection />
         <CreditsSection />
             </>

@@ -47,6 +47,7 @@ require('./ipc/supplies');
 require('./ipc/income');
 require('./ipc/details');
 require('./ipc/play-style');
+require('./ipc/app-mode');
 require('./ipc/universalis');
 require('./ipc/csv');
 require('./ipc/retainers');

@@ -176,6 +176,15 @@ Handy everywhere:
   to make, from the world, data center or region you pick. Only item numbers and world, data center or region names
   are sent.
 
+### The Database Helper
+
+On a PC where you don't need your fleet in the app, such as the PC that keeps the database or one that only plays
+with the plugin, choose **Settings → General → This PC shows → Just the database tools**. The app then shows only
+the **Database Helper**: where the database is and whether it's up to date, this PC's backups, and the PCs that use
+it, with setup, moving the database, backups and restore, and Remove everything a click away. It still keeps the
+database up to date and makes the nightly backup. The setup screen asks the same question the first time. It's for
+that PC only, and switching back loses nothing.
+
 ## Backups
 
 On the PC with the database, open **Settings → Backups**:

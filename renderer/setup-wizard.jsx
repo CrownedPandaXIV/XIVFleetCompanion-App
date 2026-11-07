@@ -9,6 +9,8 @@ function SetupWizard({ onClose, firstRun = false }) {
   const [page, setPage] = useState('role');
   const [role, setRole] = useState('');
   const [sameNetwork, setSameNetwork] = useState(false);
+  // What the app shows on this PC afterwards (shared/app-mode.js): each kind of PC suggests one until it's picked.
+  const [appModeChoice, setAppModeChoice] = useState(null);
   const [planned, setPlanned] = useState(null);
   const [form, setForm] = useState({ master: '', master2: '', app: '', app2: '', database: 'fleet', user: 'fleet_app' });
   const [shown, setShown] = useState({});
@@ -28,7 +30,9 @@ function SetupWizard({ onClose, firstRun = false }) {
   };
   const afterRun = (plan) => setPage(plan.tailscale ? 'tailscale' : 'finish');
 
+  const shownMode = appModeChoice || (chosen ? chosen.appMode : 'fleet');
   const toDetails = async () => {
+    await window.api.setAppMode(shownMode);
     const p = await window.api.getSetupPlan({ role, sameNetwork });
     setPlanned(p);
     setProblem('');
@@ -82,6 +86,14 @@ function SetupWizard({ onClose, firstRun = false }) {
                 <input type="checkbox" checked={sameNetwork} onChange={(e) => setSameNetwork(e.target.checked)} />
                 {' '}All my PCs are in the same house, on one network (or the database is online), so Tailscale isn't needed
               </label>
+            )}
+            {chosen && (
+              <div className="setup-app-mode">
+                <p>Afterwards, this PC shows:</p>
+                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-fleet" checked={shownMode === 'fleet'} onChange={() => setAppModeChoice('fleet')} /> My fleet (the whole app)</label>
+                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-tools" checked={shownMode === 'tools'} onChange={() => setAppModeChoice('tools')} /> Just the database tools (the Database Helper: setup, backups, moving the database)</label>
+                <span className="alerts-help">Your fleet is in the game either way. This can be changed any time in Settings → General.</span>
+              </div>
             )}
             <p className="alerts-help">
               Already on this PC: {[info.installed.postgres && 'PostgreSQL', info.installed.tailscale && 'Tailscale'].filter(Boolean).join(' and ') || 'neither PostgreSQL nor Tailscale'}.

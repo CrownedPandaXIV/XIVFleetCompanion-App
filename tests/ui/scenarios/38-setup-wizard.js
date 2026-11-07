@@ -27,6 +27,11 @@ module.exports = async (t) => {
 
   await role('dbhost');
   check(/All my PCs are in the same house/.test(await text()), 'a database PC can skip Tailscale when every PC is at home');
+  // Afterwards, this PC shows: the whole app for a database PC, the Database Helper for one that only plays.
+  check(await ev(`${wiz}.querySelector('.setup-app-mode-fleet').checked`), 'a database PC shows the whole app afterwards');
+  await role('plugin');
+  check(await ev(`${wiz}.querySelector('.setup-app-mode-tools').checked`), 'a PC that only plays suggests the Database Helper');
+  await role('dbhost');
   await click('Next');
   await waitFor(`!!${wiz}.querySelector('.setup-master')`, 'the passwords page', 10000);
   const plan = await ev(`[...${wiz}.querySelectorAll('.setup-plan li')].map((li) => li.innerText)`);
@@ -56,6 +61,7 @@ module.exports = async (t) => {
   await click('Save and finish');
   await waitFor(`!${wiz}`, 'the setup screen to close', 10000);
   check(true, 'saving closes the setup screen');
+  check(await ev(`document.querySelector('h1').innerText !== 'Database Helper'`), 'a PC that uses a database elsewhere keeps the whole app');
   await ev(`[...document.querySelectorAll('.modal-actions button')].find((b) => b.innerText === 'Close').click()`);
 
   // First start: no connection saved yet.
