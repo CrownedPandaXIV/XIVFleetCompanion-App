@@ -38,6 +38,9 @@ appDb.withClient = async (fn, onError) => { try { return await fn(appClient); } 
 const { SALVAGE_PRICES } = require('../../ipc/inventory');
 const { loadIncome } = require('../../ipc/income');
 const { loadMarket } = require('../../ipc/details');
+require('../../ipc/settings');
+require('../../ipc/universalis');
+const { loadPlayStyle } = require('../../ipc/play-style');
 Module._load = original;
 
 let n = 0;
@@ -754,6 +757,34 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       }
       await client.query(`INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('universalis_enabled', 'true')`);
       assert.strictEqual((await client.query('SELECT live_prices FROM fleet_market_settings_view')).rows[0].live_prices, true, 'Live Market Prices on');
+    });
+
+    await scenario('shared settings: the Warnings, repair kit cost, Live Market Prices and What do you run? as the app\'s Settings reads them', async () => {
+      appClient = client;
+      const cases = [
+        { econ: {}, t3: {} },
+        { econ: { low_repair_kit_threshold: 30, low_ceruleum_threshold: 500, house_warn_days: 10, not_synced_after_minutes: 90, repair_kit_cost: 2500 }, t3: { universalis_enabled: 'true', play_style: 'subs' } },
+        { econ: { low_repair_kit_threshold: 0, low_ceruleum_threshold: 0, house_warn_days: 44, not_synced_after_minutes: 1440, repair_kit_cost: 0 }, t3: { universalis_enabled: 'yes', play_style: 'retainers' } },
+        { econ: { house_warn_days: 45, not_synced_after_minutes: 9 }, t3: { play_style: 'Subs' } },
+        { econ: { house_warn_days: 2.5, not_synced_after_minutes: 30.5, repair_kit_cost: 1999.5 }, t3: { play_style: 'both' } },
+      ];
+      for (const [i, c] of cases.entries()) {
+        await clear();
+        await character(client, 1, { subs: i % 2 === 0 });
+        await character(client, 2, { subs: false });
+        if (i > 1) await client.query(`INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name, job, updated_at) VALUES (501, 1, 'A', 3, now()), (502, 2, 'B', 0, now()), (503, 99, 'Gone', 5, now())`);
+        for (const [k, v] of Object.entries(c.econ)) await setting(client, k, v);
+        for (const [k, v] of Object.entries(c.t3)) await client.query('INSERT INTO tier3_settings (setting_key, setting_value) VALUES ($1, $2)', [k, v]);
+        const [v] = (await client.query('SELECT * FROM fleet_settings_view')).rows;
+        const warn = await handlers.get('settings:get-low-thresholds')();
+        const cost = await handlers.get('settings:get-repair-kit-cost')();
+        const live = await handlers.get('get-universalis-setting')();
+        const play = await loadPlayStyle(client);
+        assert.deepStrictEqual(
+          [Number(v.repair_kit_threshold), Number(v.ceruleum_threshold), v.house_warn_days, v.not_synced_minutes, v.repair_kit_cost === null ? null : Number(v.repair_kit_cost), v.live_prices, v.play_style_choice, v.subs_built, v.retainers_with_class],
+          [warn.repairKitThreshold, warn.ceruleumThreshold, warn.houseWarnDays, warn.notSyncedMinutes, cost.value, live.enabled, play.choice, play.counts.subs, play.counts.retainers],
+          `case ${i}`);
+      }
     });
   } finally {
     await client.end();

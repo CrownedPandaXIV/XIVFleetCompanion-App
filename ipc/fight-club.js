@@ -204,9 +204,12 @@ ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) =
     await client.query('COMMIT');
     return { success: true, imported: rows.length };
   } catch (err) {
-    await client.query('ROLLBACK');
+    // (Nothing to undo when the connection itself failed.)
+    await client.query('ROLLBACK').catch(() => {});
     return { success: false, error: err.message };
   } finally {
     await client.end();
   }
 });
+
+module.exports = { FIGHT_CLUB_COLUMNS, parseAndValidateFightClubFile };

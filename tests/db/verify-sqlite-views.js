@@ -39,6 +39,7 @@ const VIEWS = [
   ['fleet_parts_fight_club_view', ['id']],
   ['fleet_parts_spares_view', 'all'],
   ['fleet_market_settings_view', []],
+  ['fleet_settings_view', []],
   ['fleet_market_accounts_view', ['account_label']],
   ['fleet_market_listings_view', ['retainer_id', 'slot']],
   ['fleet_route_subs_view', ['cid', 'sub_name']],
@@ -329,6 +330,7 @@ function fleet(seed, now) {
   }
   if (chance(0.7)) t.tier3_settings.push({ setting_key: 'shopping_progress', setting_value: pick(['{}', '{"24348":{"made":1,"outOf":2}}', 'not json']), updated_at: ago(1) });
   t.tier3_settings.push({ setting_key: 'universalis_enabled', setting_value: pick(['true', 'false', 'yes']), updated_at: ago(1) });
+  t.tier3_settings.push({ setting_key: 'play_style', setting_value: pick(['auto', 'subs', 'retainers', 'both', 'Subs', 'none']), updated_at: ago(1) });
   for (const [pc, label] of [['DESKTOP-1', 'A'], ['DESKTOP-1', 'B'], ['LAPTOP', ''], ['DESKTOP-2', 'A'], ['OLD', 'C']]) {
     t.companion_pc_status.push({ pc_name: pc, account_label: label, plugin_version: pick(['2.0.0.11', '1.0.3.4', null]),
       last_sync_at: pick([ago(0.05), ago(30), ago(90), null]), autoretainer_ready: pick([true, false, null]), allagantools_ready: pick([true, false, null]),

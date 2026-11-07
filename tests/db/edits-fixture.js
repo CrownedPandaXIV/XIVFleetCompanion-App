@@ -32,6 +32,9 @@ require('../../ipc/roster');
 require('../../ipc/details');
 require('../../ipc/income');
 require('../../ipc/shopping');
+require('../../ipc/settings');
+require('../../ipc/universalis');
+const { loadPlayStyle } = require('../../ipc/play-style');
 Module._load = original;
 
 const DB = path.join(__dirname, '..', '..', 'db');
@@ -98,6 +101,24 @@ const EDITS = [
   ['save-shopping-progress', { itemId: 21794, made: 0, crafts: 2, aheadDays: 7 }],
   ['save-shopping-progress', { itemId: 22527, made: 9, crafts: 5, aheadDays: 5 }],
   ['save-shopping-progress', { itemId: 'x', made: 1, crafts: 1, aheadDays: 0 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 30, ceruleumThreshold: 500, houseWarnDays: 10, notSyncedMinutes: 90 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 0, ceruleumThreshold: 0, houseWarnDays: 44, notSyncedMinutes: 10 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 2.5, ceruleumThreshold: 0, houseWarnDays: 7, notSyncedMinutes: 60 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 5, ceruleumThreshold: -1, houseWarnDays: 7, notSyncedMinutes: 60 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 5, ceruleumThreshold: 5, houseWarnDays: 45, notSyncedMinutes: 60 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 5, ceruleumThreshold: 5, houseWarnDays: 0, notSyncedMinutes: 60 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 5, ceruleumThreshold: 5, houseWarnDays: 7, notSyncedMinutes: 9 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 5, ceruleumThreshold: 5, houseWarnDays: 7, notSyncedMinutes: 1441 }],
+  ['settings:save-low-thresholds', { repairKitThreshold: 100000, ceruleumThreshold: 5, houseWarnDays: 7, notSyncedMinutes: 60 }],
+  ['settings:save-repair-kit-cost', 2500],
+  ['settings:save-repair-kit-cost', 0],
+  ['settings:save-repair-kit-cost', 12.5],
+  ['settings:save-repair-kit-cost', -3],
+  ['save-universalis-setting', true],
+  ['save-universalis-setting', false],
+  ['save-play-style', 'subs'],
+  ['save-play-style', 'auto'],
+  ['save-play-style', 'everything'],
 ];
 
 async function tables(client) {
@@ -126,10 +147,23 @@ async function tables(client) {
       edits.push({ call, args, answer, after: await tables(client) });
       console.log(`${call} ${JSON.stringify(args)}: ${JSON.stringify(answer)}`);
     }
+    // What the app's Settings shows after them (the plugin reads the same through fleet_settings_view).
+    const views = fs.readFileSync(path.join(DB, 'views.sql'), 'utf8');
+    await client.query(views);
+    await client.query(`INSERT INTO companion_submarine_snapshot (cid, sub_name, level) VALUES (18014498578000001, 'Sub1', 50), (18014498578000002, 'Sub1', 0)`);
+    await client.query(`UPDATE companion_retainer_lookup SET job = 3 WHERE retainer_id = 33777097243660301`);
+    const warnings = await handlers.get('settings:get-low-thresholds')();
+    const play = await loadPlayStyle(client);
+    const settings = {
+      repairKitThreshold: warnings.repairKitThreshold, ceruleumThreshold: warnings.ceruleumThreshold, houseWarnDays: warnings.houseWarnDays,
+      notSyncedMinutes: warnings.notSyncedMinutes, repairKitCost: (await handlers.get('settings:get-repair-kit-cost')()).value,
+      livePrices: (await handlers.get('get-universalis-setting')()).enabled, playChoice: play.choice, playStyle: play.style, subs: play.counts.subs, retainers: play.counts.retainers,
+    };
+    console.log(`settings after: ${JSON.stringify(settings)}`);
     if (out) {
       fs.writeFileSync(out, `${JSON.stringify({
         about: 'Written by XIVFleetCompanion-App tests/db/edits-fixture.js: the app\'s edits, their answers and the tables after each.',
-        schema, seed: SEED, tables: TABLES, start, edits,
+        schema, seed: SEED, tables: TABLES, start, edits, views, settings,
       })}\n`);
       console.log(`written to ${out}`);
     }

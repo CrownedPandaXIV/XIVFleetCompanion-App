@@ -18,6 +18,7 @@
 --   text sorts letter by letter here, but by the database's language setting in PostgreSQL: any order that reaches the
 --     game (fleet_alerts_view's, and the plugin's own ORDER BY when it reads) sorts text with COLLATE "C" there
 
+DROP VIEW IF EXISTS fleet_settings_view;
 DROP VIEW IF EXISTS fleet_shopping_held_view;
 DROP VIEW IF EXISTS fleet_shopping_progress_view;
 DROP VIEW IF EXISTS fleet_voyage_returns_view;
@@ -857,3 +858,18 @@ GROUP BY item_id, who, place;
 
 CREATE VIEW fleet_shopping_progress_view AS
 SELECT setting_value AS progress FROM tier3_settings WHERE setting_key = 'shopping_progress';
+
+-- ---- The shared settings (db/views.sql has the details) ----
+
+CREATE VIEW fleet_settings_view AS
+SELECT coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_repair_kit_threshold'), 0) AS repair_kit_threshold,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_ceruleum_threshold'), 0) AS ceruleum_threshold,
+       coalesce((SELECT CAST(setting_value AS INTEGER) FROM fleet_economics_settings
+                 WHERE setting_key = 'house_warn_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 44), 7) AS house_warn_days,
+       coalesce((SELECT CAST(setting_value AS INTEGER) FROM fleet_economics_settings
+                 WHERE setting_key = 'not_synced_after_minutes' AND setting_value = round(setting_value) AND setting_value BETWEEN 10 AND 1440), 30) AS not_synced_minutes,
+       (SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost') AS repair_kit_cost,
+       coalesce((SELECT setting_value = 'true' FROM tier3_settings WHERE setting_key = 'universalis_enabled'), 0) AS live_prices,
+       coalesce((SELECT setting_value FROM tier3_settings WHERE setting_key = 'play_style' AND setting_value IN ('auto', 'both', 'subs', 'retainers')), 'auto') AS play_style_choice,
+       (SELECT count(*) FROM companion_submarine_snapshot s WHERE s.level > 0 AND s.cid IN (SELECT cid FROM companion_character_current)) AS subs_built,
+       (SELECT count(*) FROM companion_retainer_lookup r WHERE r.job > 0 AND r.owner_cid IN (SELECT cid FROM companion_character_current)) AS retainers_with_class;

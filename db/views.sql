@@ -14,7 +14,7 @@
 -- an older app's. Views and functions only, never tables or data: nothing is stored here, and nothing else depends
 -- on these views, so they are dropped and made again.
 
-DROP VIEW IF EXISTS fleet_shopping_held_view, fleet_shopping_progress_view, fleet_rankup_forecast_view, fleet_rankup_history_view, fleet_voyage_returns_view, fleet_voyage_loot_view, fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
+DROP VIEW IF EXISTS fleet_settings_view, fleet_shopping_held_view, fleet_shopping_progress_view, fleet_rankup_forecast_view, fleet_rankup_history_view, fleet_voyage_returns_view, fleet_voyage_loot_view, fleet_route_subs_view, fleet_route_fight_club_view, fleet_sub_history_view, fleet_voyage_sectors_view,
   fleet_market_settings_view, fleet_market_accounts_view, fleet_market_listings_view,
   fleet_parts_characters_view, fleet_parts_subs_view, fleet_parts_rules_view, fleet_parts_fight_club_view, fleet_parts_spares_view,
   fleet_venture_income_view, fleet_income_view, fleet_salvage_view, fleet_item_totals_view, fleet_holdings_view, fleet_fcs_view, fleet_pcs_view, fleet_retainer_gear_view, fleet_retainers_view, fleet_roster_view,
@@ -933,3 +933,20 @@ GROUP BY item_id, who, place;
 -- (subs/shopping-progress.js): one row, empty when nothing has been ticked.
 CREATE OR REPLACE VIEW fleet_shopping_progress_view AS
 SELECT setting_value AS progress FROM tier3_settings WHERE setting_key = 'shopping_progress';
+
+-- The settings the app and the plugin share (Settings → General): the Warnings (low repair kits and ceruleum, 0: off;
+-- the FC house warning, 1 to 44 days, 7 by default; not synced, 10 to 1440 minutes, 30 by default), the repair kit
+-- cost (null: not set), Live Market Prices, and "What do you run?" (the saved choice, auto when none or unknown, and
+-- what "auto" decides from: built subs and retainers with a class among the tracked characters, as ipc/play-style.js).
+CREATE OR REPLACE VIEW fleet_settings_view AS
+SELECT coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_repair_kit_threshold'), 0) AS repair_kit_threshold,
+       coalesce((SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'low_ceruleum_threshold'), 0) AS ceruleum_threshold,
+       coalesce((SELECT setting_value::int FROM fleet_economics_settings
+                 WHERE setting_key = 'house_warn_days' AND setting_value = round(setting_value) AND setting_value BETWEEN 1 AND 44), 7) AS house_warn_days,
+       coalesce((SELECT setting_value::int FROM fleet_economics_settings
+                 WHERE setting_key = 'not_synced_after_minutes' AND setting_value = round(setting_value) AND setting_value BETWEEN 10 AND 1440), 30) AS not_synced_minutes,
+       (SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost') AS repair_kit_cost,
+       coalesce((SELECT setting_value = 'true' FROM tier3_settings WHERE setting_key = 'universalis_enabled'), false) AS live_prices,
+       coalesce((SELECT setting_value FROM tier3_settings WHERE setting_key = 'play_style' AND setting_value IN ('auto', 'both', 'subs', 'retainers')), 'auto') AS play_style_choice,
+       (SELECT count(*)::int FROM companion_submarine_snapshot s WHERE s.level > 0 AND s.cid IN (SELECT cid FROM companion_character_current)) AS subs_built,
+       (SELECT count(*)::int FROM companion_retainer_lookup r WHERE r.job > 0 AND r.owner_cid IN (SELECT cid FROM companion_character_current)) AS retainers_with_class;

@@ -340,7 +340,17 @@ CREATE TABLE fight_club_routes (
     gil_day         REAL,
     gil_week        REAL,
     gil_month       REAL,
-    repair_times    TEXT
+    gil_year        REAL,
+    avg_exp         REAL,
+    avg_exp_hr      REAL,
+    repair_times    TEXT,
+    notes           TEXT,
+    fc_points       REAL,
+    gc_ilvl_day     REAL,
+    qvs_day         REAL,
+    fuel_day        REAL,
+    imported_at     REAL,
+    patch_label     TEXT
 );
 
 -- What each retainer has up for sale, and since when (the Gil & Market page), and the app's on/off settings (Live

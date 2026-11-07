@@ -128,7 +128,12 @@ ipcMain.handle('settings:get-repair-kit-cost', async () => {
   });
 });
 
+// Whole gil, 0 or more (a blank box would otherwise save as nothing useful).
+const MAX_GIL = 999999999;
+const wholeUpTo = (n, max) => Number.isInteger(n) && n >= 0 && n <= max;
+
 ipcMain.handle('settings:save-repair-kit-cost', async (event, value) => {
+  if (!wholeUpTo(value, MAX_GIL)) return { success: false, error: 'The repair kit cost must be a whole number of gil, 0 or more.' };
   return withClient(async (client) => {
     await client.query(
       `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
@@ -167,6 +172,8 @@ ipcMain.handle('settings:get-low-thresholds', async () => {
 });
 
 ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshold, ceruleumThreshold, houseWarnDays, notSyncedMinutes }) => {
+  if (!wholeUpTo(repairKitThreshold, 99999)) return { success: false, error: 'Low repair kits must be a whole number from 0 to 99999 (0 turns it off).' };
+  if (!wholeUpTo(ceruleumThreshold, 99999)) return { success: false, error: 'Low ceruleum must be a whole number from 0 to 99999 (0 turns it off).' };
   // The house warning (days since an FC house was last entered) is saved alongside, when given.
   if (houseWarnDays !== undefined && !(Number.isInteger(houseWarnDays) && houseWarnDays >= 1 && houseWarnDays < DEMOLITION_DAYS)) {
     return { success: false, error: `The house warning must be a whole number of days from 1 to ${DEMOLITION_DAYS - 1}.` };
