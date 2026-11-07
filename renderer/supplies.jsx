@@ -209,7 +209,7 @@ function SuppliesView({ refreshKey }) {
             {t.ceruleumRestock.toLocaleString()} ceruleum · {t.repairKitsRestock.toLocaleString()} repair kits
           </div>
           <div className="supply-card-note">
-            {kitGil !== null ? `Repair kits ≈ ${kitGil.toLocaleString()} gil. ` : ''}
+            {kitGil !== null ? <>Repair kits ≈ <span className="gil">{kitGil.toLocaleString()} gil</span>. </> : ''}
             FC chests hold {t.fcChestCeruleum.toLocaleString()} ceruleum.
           </div>
         </div>

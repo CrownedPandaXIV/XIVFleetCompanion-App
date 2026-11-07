@@ -49,7 +49,10 @@ const READY_SUB_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
   { key: 'rank', label: 'Rank', cell: (r) => (r.isNew ? <span className="dim" title="A sub not built yet: its first build">new</span> : r.rank), sort: (r) => Number(r.rank) },
-  { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p) => `${p.slot} ${p.part} (${p.spare ? `spare in ${p.spare}` : 'to craft'})`).join(', '), sortable: false },
+  // One part to a line, the class then the slot ("Shark Hull (to craft)"); a long one wraps.
+  { key: 'parts', label: 'New parts', cell: (r) => r.parts.map((p, i) => (
+    <div key={i} className="summary-part">{`${p.part} ${p.slot}`} <span className={p.spare ? 'dim' : 'tone-warn'}>({p.spare ? `spare in ${p.spare}` : 'to craft'})</span></div>
+  )), sortable: false },
 ];
 
 const LOW_SUPPLY_COLUMN_DEFS = [
@@ -114,14 +117,14 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
         <SummaryTile className="retainers-ventures-tile" label="Ventures" value={data ? `${data.ready} ready to collect` : '—'}
           note={data ? `${data.away} out, ${data.soon} back within an hour` : ''} />
         <SummaryTile className="retainers-income-tile" label="Venture Income"
-          value={ventures ? `${summaryGil(ventures.ventureTotals.perDay)} gil a day` : '—'}
-          note={ventures ? `last ${ventures.windowDays} days, at what a vendor pays${ventures.market && ventures.market.ventures
-            ? ` · market: ${['world', 'dc', 'region'].map((sc) => `${summaryGil(ventures.market.ventures[sc].perDay)} (${{ world: 'World', dc: 'DC', region: 'Region' }[sc]})`).join(', ')}` : ''}`
+          value={ventures ? <><span className="gil">{summaryGil(ventures.ventureTotals.perDay)} gil</span> a day</> : '—'}
+          note={ventures ? <>last {ventures.windowDays} days, at what a vendor pays{ventures.market && ventures.market.ventures
+            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(ventures.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}</>
             : ventures === false ? needs008 : ''}>
           <button onClick={() => onNavigate('income')} style={{ marginTop: '8px' }}>View Income</button>
         </SummaryTile>
         <SummaryTile className="retainers-listings-tile" label="Listings Unsold for a While" value={m ? m.totals.stale.toLocaleString() : '—'}
-          note={m ? `up for ${market.minDays}+ days, ${summaryGil(m.totals.staleValue)} gil${m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}` : market ? needs008 : ''}>
+          note={m ? <>up for {market.minDays}+ days, <span className="gil">{summaryGil(m.totals.staleValue)} gil</span>{m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}</> : market ? needs008 : ''}>
           <button onClick={() => onNavigate('market')} style={{ marginTop: '8px' }}>View Gil & Market</button>
         </SummaryTile>
       </div>
@@ -247,7 +250,7 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
       <div style={{ display: 'flex', gap: '16px', padding: '8px 24px 16px', flexWrap: 'wrap' }}>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
           <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Fleet-Wide Salvage Total</div>
-          <div style={{ fontSize: '22px', fontWeight: 600 }}>
+          <div className="gil" style={{ fontSize: '22px', fontWeight: 600 }}>
             {salvageTotal === null ? '—' : `${salvageTotal.toLocaleString()} gil`}
           </div>
         </div>

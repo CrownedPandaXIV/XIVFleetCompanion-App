@@ -115,6 +115,10 @@ do by hand.
 - **The plugin can now make the app's edits from the game** (Sub Rules, Craft?, gear targets, the Roster order, unsold
   days, the Income window, removing a PC, Shopping List ticks), checked against the app's own: tests/db/edits-fixture.js
   makes each edit through the app's calls and records the database after it.
+- **Summary's subs ready for new parts: one part to a line**, the class then the slot ("Shark Hull (to craft)"), "to
+  craft" in amber, as the plugin's. The Parts tab's tables show Needed before Slot by default.
+- **Gil in gil's gold everywhere:** Income's and Gil & Market's cards and notes, Supplies' repair kit cost, the Summary's
+  venture income, unsold listings and salvage total, and the Gil and Salvage value trends.
 - **Gear targets no longer count an empty off-hand** for classes whose weapon fills both hands: only Gladiators,
   Paladins, Miners and Botanists have one, so the Avg ilvl breakdown no longer lists Off-hand as Empty for the rest.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row

@@ -92,6 +92,9 @@ function trendStats(values, timestamps) {
   };
 }
 
+// Values that are gil (gil, salvage value) show in gil's gold, as everywhere else.
+const trendIsGil = (key) => key === 'gil' || key === 'salvage_value';
+
 const trendSigned = (n) => (n === null || n === undefined ? '—' : `${n > 0 ? '+' : ''}${trendFullNumber(n)}`);
 const trendTone = (n) => (n > 0 ? 'tone-good' : n < 0 ? 'tone-warn' : undefined);
 
@@ -575,7 +578,7 @@ function TrendsView({ refreshKey, preset }) {
               <div className="trend-summary">
                 <div>
                   <div className="trend-summary-label">Current</div>
-                  <div className="trend-summary-value">{trendFullNumber(now)}</div>
+                  <div className={`trend-summary-value ${trendIsGil(metric.key) ? 'gil' : ''}`}>{trendFullNumber(now)}</div>
                 </div>
                 <div>
                   <div className="trend-summary-label">Change over this span</div>
@@ -734,7 +737,7 @@ function SummaryTrendTiles({ refreshKey, onOpenTrend, uses = { subs: true, retai
           return (
             <div key={t.key} className="account-group" style={{ padding: '16px', opacity: tiles ? 1 : 0.5 }}>
               <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{t.label || '\u00a0'}</div>
-              <div style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
+              <div className={trendIsGil(t.key) ? 'gil' : undefined} style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
               <div style={{ color: '#8a8f9a', fontSize: '12px', minHeight: '16px' }}>
                 {change === null ? (tiles ? 'No history yet' : '') : (
                   <span className={trendTone(change)}>
@@ -863,7 +866,7 @@ function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, re
           <div className="trend-card-title">{title}</div>
           {open && (
             <div className="trend-card-value">
-              <strong>{trendFullNumber(current)}</strong>
+              <strong className={trendIsGil(metricKey) ? 'gil' : undefined}>{trendFullNumber(current)}</strong>
               {change !== null && (
                 <span className={`trend-summary-sub ${trendTone(change) || ''}`}> {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}</span>
               )}

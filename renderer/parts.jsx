@@ -34,8 +34,9 @@ const PARTS_DETAIL_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', locked: true, cell: (n) => n.sub_name, sort: (r) => r.sub_name },
   { key: 'character', label: 'Character', default: false, cell: (n) => <CharacterName name={n.character_name} world={n.world} />, sort: (r) => r.character_name },
   { key: 'rank', label: 'Rank', cell: (n) => n.rank, sort: (r) => r.rank },
-  { key: 'slot', label: 'Slot', cell: (n) => n.slot, sort: (r) => r.slot },
+  // The class, then the slot ("Shark Hull"), as the plugin's.
   { key: 'needed', label: 'Needed', cell: (n) => needsLabel(n), sort: (r) => needsLabel(r) },
+  { key: 'slot', label: 'Slot', cell: (n) => n.slot, sort: (r) => r.slot },
   { key: 'status', label: 'Status', cell: (n) => partStatus(n), sort: (r) => partStatus(r) }
 ];
 // With Look ahead on: when each part is due (its sub's next build), or now.
@@ -94,8 +95,8 @@ const SLOT_DISPLAY_ORDER = ['Hull', 'Stern', 'Bow', 'Bridge'];
 // the whole fleet, not split by account/character - the point of this
 // view is "how many of each part do I actually need to craft."
 const PARTS_SUMMARY_COLUMN_DEFS = [
-  { key: 'slot', label: 'Slot', locked: true, cell: (e) => e.slot, sort: (e) => e.slot },
-  { key: 'neededClass', label: 'Needed Class', cell: (e) => e.needed, sort: (e) => e.needed },
+  { key: 'neededClass', label: 'Needed Class', locked: true, cell: (e) => e.needed, sort: (e) => e.needed },
+  { key: 'slot', label: 'Slot', cell: (e) => e.slot, sort: (e) => e.slot },
   { key: 'qty', label: 'Qty Still Needed', cell: (e) => e.qty, sort: (e) => e.qty }
 ];
 // With Look ahead on: what is needed now and what builds coming up need, side by side.

@@ -99,14 +99,14 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-summary">
         <div className="account-group supply-card">
           <div className="supply-card-label">Fleet gil</div>
-          <div className="supply-card-value">{marketGil(f.total)} gil</div>
-          <div className="supply-card-note">{marketGil(f.characterGil)} on {f.characters} characters · {marketGil(f.retainerGil)} on {f.retainers} retainers</div>
+          <div className="supply-card-value gil">{marketGil(f.total)} gil</div>
+          <div className="supply-card-note"><span className="gil">{marketGil(f.characterGil)}</span> on {f.characters} characters · <span className="gil">{marketGil(f.retainerGil)}</span> on {f.retainers} retainers</div>
         </div>
         {m && (
           <div className="account-group supply-card">
             <div className="supply-card-label">Up for sale</div>
-            <div className="supply-card-value">{m.totals.listings.toLocaleString()} listing{m.totals.listings === 1 ? '' : 's'} · {marketGil(m.totals.value)} gil</div>
-            <div className="supply-card-note">{m.totals.stale.toLocaleString()} up for {data.minDays}+ days ({marketGil(m.totals.staleValue)} gil)</div>
+            <div className="supply-card-value">{m.totals.listings.toLocaleString()} listing{m.totals.listings === 1 ? '' : 's'} · <span className="gil">{marketGil(m.totals.value)} gil</span></div>
+            <div className="supply-card-note">{m.totals.stale.toLocaleString()} up for {data.minDays}+ days (<span className="gil">{marketGil(m.totals.staleValue)} gil</span>)</div>
           </div>
         )}
       </div>

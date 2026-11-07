@@ -43,12 +43,12 @@ module.exports = async (t) => {
     },
     {
       name: 'Parts summary', nav: 'Parts',
-      default: ['slot', 'needed class', 'qty still needed'],
-      move: ['qty still needed', 'slot'], remove: 'Needed Class',
+      default: ['needed class', 'slot', 'qty still needed'],
+      move: ['qty still needed', 'slot'], remove: 'Slot',
     },
     {
       name: 'Parts detail', nav: 'Parts', prepare: async () => { await pressWhenThere('Detail'); },
-      default: ['sub', 'rank', 'slot', 'needed', 'status'],
+      default: ['sub', 'rank', 'needed', 'slot', 'status'],
       move: ['status', 'rank'], remove: 'Slot', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },

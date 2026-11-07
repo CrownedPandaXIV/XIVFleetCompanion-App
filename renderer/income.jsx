@@ -156,8 +156,8 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
       <div className="supplies-note">
         What each voyage really brought back over the last {data.windowDays} days, from Submarine Tracker (items at what a vendor pays;
         salvage at the Salvage tab's prices). {data.totals.voyages.toLocaleString()} voyage{data.totals.voyages === 1 ? '' : 's'},
-        {' '}{incomeGil(data.totals.gil)} gil, {incomeGil(data.totals.perDay)} gil a day.
-        {live && ` At market prices: ${['world', 'dc', 'region'].map((sc) => `${incomeGil(data.market.loot[sc].perDay)} a day (${MARKET_SCOPE_LABELS[sc]})`).join(', ')}.`}
+        {' '}<span className="gil">{incomeGil(data.totals.gil)} gil</span>, <span className="gil">{incomeGil(data.totals.perDay)} gil</span> a day.
+        {live && <> At market prices: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{incomeGil(data.market.loot[sc].perDay)}</span> a day ({MARKET_SCOPE_LABELS[sc]})</React.Fragment>)}.</>}
       </div>
       {subs.length === 0 && <div className="status">No voyages recorded in this time. Submarine Tracker records a voyage when its loot is collected on a PC running it.</div>}
       {subs.length > 0 && (
@@ -178,8 +178,8 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
       <h2 style={{ padding: '16px 24px 0' }}>Retainer Ventures</h2>
       <div className="supplies-note">
         Venture rewards AutoRetainer recorded over the last {data.windowDays} days, at what a vendor pays (items are often worth more on
-        the market board). {v.rewards.toLocaleString()} reward{v.rewards === 1 ? '' : 's'}, {incomeGil(v.gil)} gil, {incomeGil(v.perDay)} gil a day.
-        {live && ` At market prices: ${['world', 'dc', 'region'].map((sc) => `${incomeGil(data.market.ventures[sc].perDay)} a day (${MARKET_SCOPE_LABELS[sc]})`).join(', ')}.`}
+        the market board). {v.rewards.toLocaleString()} reward{v.rewards === 1 ? '' : 's'}, <span className="gil">{incomeGil(v.gil)} gil</span>, <span className="gil">{incomeGil(v.perDay)} gil</span> a day.
+        {live && <> At market prices: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{incomeGil(data.market.ventures[sc].perDay)}</span> a day ({MARKET_SCOPE_LABELS[sc]})</React.Fragment>)}.</>}
       </div>
       {data.ventures.length === 0 && <div className="status">No venture rewards recorded in this time (AutoRetainer: "Record statistics").</div>}
       {data.ventures.length > 0 && (
@@ -271,16 +271,16 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-summary">
         <div className="account-group supply-card">
           <div className="supply-card-label">Fleet real net per day</div>
-          <div className="supply-card-value">{incomeGil(t.perDay)} gil</div>
-          <div className="supply-card-note">{incomeGil(t.salvagePerDay)} salvage − {incomeGil(t.kitPerDay)} repairs</div>
+          <div className="supply-card-value gil">{incomeGil(t.perDay)} gil</div>
+          <div className="supply-card-note"><span className="gil">{incomeGil(t.salvagePerDay)}</span> salvage − <span className="gil">{incomeGil(t.kitPerDay)}</span> repairs</div>
         </div>
         <div className="account-group supply-card">
           <div className="supply-card-label">Against expected</div>
           <div className="supply-card-value">
-            {t.share === null ? '—' : `${incomeShare(t.share)} of ${incomeGil(t.expectedPerDay)} gil a day`}
+            {t.share === null ? '—' : <>{incomeShare(t.share)} of <span className="gil">{incomeGil(t.expectedPerDay)} gil</span> a day</>}
           </div>
           <div className="supply-card-note">
-            {t.compared} character{t.compared === 1 ? '' : 's'} compared{t.share === null ? '' : `: ${incomeSigned(t.comparedPerDay - t.expectedPerDay)} gil a day`}
+            {t.compared} character{t.compared === 1 ? '' : 's'} compared{t.share === null ? '' : <>: <span className="gil">{incomeSigned(t.comparedPerDay - t.expectedPerDay)} gil</span> a day</>}
           </div>
         </div>
         <div className="account-group supply-card">
@@ -293,7 +293,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-note">
         Salvage: every piece that came into a character's bags or retainers over the last {data.windowDays} days, at its
         vendor price (selling or moving it is not counted). Repairs: repair kits used
-        {data.kitCost ? ` at ${data.kitCost.toLocaleString()} gil each` : ' (set the repair kit cost in Settings to count them)'}.
+        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit cost in Settings to count them)'}.
         Expected: the subs' Current Gil/Day from the Subs tab, for the routes they are on now.
         {t.notEnough ? ` ${t.notEnough} character${t.notEnough === 1 ? ' has' : 's have'} less than a day of salvage history.` : ''}
         {data.withoutSubs ? ` ${data.withoutSubs} character${data.withoutSubs === 1 ? '' : 's'} with no subs built ${data.withoutSubs === 1 ? 'is' : 'are'} left out.` : ''}
