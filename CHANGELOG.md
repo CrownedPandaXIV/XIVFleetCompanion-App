@@ -3,7 +3,7 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
-## 1.8.0 - unreleased
+## 1.8.0 - 2026-11-07
 
 For plugin 2.0, which shows the fleet inside the game. The app updates the database by itself (updates 14 to 16); nothing to
 do by hand.
