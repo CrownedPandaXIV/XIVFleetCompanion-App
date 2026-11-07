@@ -39,7 +39,8 @@ function HelperView({ refreshKey, onOpenSettings, onNavigate }) {
   return (
     <div className="helper-view">
       <p className="alerts-help helper-intro">
-        This PC shows only the database tools. Your fleet is in the game (the plugin), or on any PC that shows the whole app.
+        This is the Database Helper: the app with only its database tools. Your fleet's pages are in the game (the
+        plugin), and on any PC that opens the full app.
       </p>
 
       <HelperCard
@@ -100,8 +101,8 @@ function HelperView({ refreshKey, onOpenSettings, onNavigate }) {
       </HelperCard>
 
       <div className="alerts-help helper-switch">
-        Want your fleet on this PC too?{' '}
-        <button className="helper-show-fleet" onClick={() => window.api.setAppMode('fleet')}>Show the whole app</button>
+        Want your fleet's pages on this PC too?{' '}
+        <button className="helper-show-fleet" onClick={() => window.api.setAppMode('fleet')}>Open the full app</button>
         {' '}(also in Settings → General).
       </div>
     </div>

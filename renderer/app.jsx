@@ -403,7 +403,7 @@ function App() {
   // false, or which Settings tab to open on (true: the last one used).
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState('summary');
-  // What this PC shows (shared/app-mode.js): 'fleet' (the whole app) or 'tools' (the Database Helper). Nothing is
+  // What this PC shows (shared/app-mode.js): 'fleet' (the full app) or 'tools' (the Database Helper). Nothing is
   // drawn until it's known, so a Database Helper PC never starts loading the fleet's tabs.
   const [appMode, setAppMode] = useState(null);
   useEffect(() => {

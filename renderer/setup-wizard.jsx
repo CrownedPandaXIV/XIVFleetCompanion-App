@@ -89,10 +89,10 @@ function SetupWizard({ onClose, firstRun = false }) {
             )}
             {chosen && (
               <div className="setup-app-mode">
-                <p>Afterwards, this PC shows:</p>
-                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-fleet" checked={shownMode === 'fleet'} onChange={() => setAppModeChoice('fleet')} /> My fleet (the whole app)</label>
-                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-tools" checked={shownMode === 'tools'} onChange={() => setAppModeChoice('tools')} /> Just the database tools (the Database Helper: setup, backups, moving the database)</label>
-                <span className="alerts-help">Your fleet is in the game either way. This can be changed any time in Settings → General.</span>
+                <p>Afterwards, this PC opens:</p>
+                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-fleet" checked={shownMode === 'fleet'} onChange={() => setAppModeChoice('fleet')} /> <strong>The full app</strong>: your fleet's pages and the database tools</label>
+                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-tools" checked={shownMode === 'tools'} onChange={() => setAppModeChoice('tools')} /> <strong>The Database Helper</strong>: only the database tools (setup, backups, moving the database), no fleet pages</label>
+                <span className="alerts-help">Same app either way, and your fleet is in the game either way. Change it any time in Settings → General → This PC shows.</span>
               </div>
             )}
             <p className="alerts-help">

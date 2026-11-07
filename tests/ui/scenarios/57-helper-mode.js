@@ -1,6 +1,6 @@
 // Settings → General → This PC shows → Just the database tools (the Database Helper): the sidebar keeps only its home
 // page and PCs, the home page says where the database is, whether it's up to date and this PC's backups, its buttons
-// open the right Settings tabs, the choice is kept after a restart of the page, and Show the whole app brings it all back.
+// open the right Settings tabs, the choice is kept after a restart of the page, and Open the full app brings it all back.
 module.exports = async (t) => {
   const { ev, waitFor, check, nav, shot } = t;
   const groups = () => ev(`[...document.querySelectorAll('.sidebar-group')].map((g) => g.querySelector('.sidebar-group-title').innerText + ': ' + [...g.querySelectorAll('.sidebar-button')].map((b) => b.innerText).join(', ')).join(' | ').toLowerCase()`);
@@ -10,7 +10,7 @@ module.exports = async (t) => {
     await waitFor(`!!document.querySelector('.app-mode-section')`, 'This PC shows', 20000);
   };
 
-  check(!(await groups()).includes('database helper'), 'the whole app has no Database Helper page');
+  check(!(await groups()).includes('database helper'), 'the full app has no Database Helper page');
   await openSettings();
   check(await ev(`document.querySelector('.app-mode-fleet').checked`), 'This PC shows: My fleet, to start with');
   check(await ev(`!!document.querySelector('.settings-warnings')`), 'the fleet settings are there');
@@ -45,6 +45,6 @@ module.exports = async (t) => {
   check(await groups() === 'database helper: home | system: pcs', 'the choice is kept on this PC');
 
   await ev(`document.querySelector('.helper-show-fleet').click()`);
-  await waitFor(`document.querySelector('h1').innerText === 'Summary'`, 'the whole app back', 20000);
-  check((await groups()).startsWith('overview: summary, trends') && !(await groups()).includes('database helper'), 'Show the whole app brings every page back');
+  await waitFor(`document.querySelector('h1').innerText === 'Summary'`, 'the full app back', 20000);
+  check((await groups()).startsWith('overview: summary, trends') && !(await groups()).includes('database helper'), 'Open the full app brings every page back');
 };

@@ -41,6 +41,19 @@ without them.
 
 No administrator rights are needed: it installs just for your Windows account.
 
+**One download, two ways to open it** (pick in the setup screen, or later in Settings → General → This PC shows):
+
+| | The full app | The Database Helper |
+| --- | --- | --- |
+| Your fleet's pages (Summary, Subs, Trends...) | Yes | No: your fleet is in the game, through the plugin |
+| Setup, connection, moving the database | Yes | Yes |
+| Backups and restore, Remove everything | Yes | Yes |
+| PCs list | Yes | Yes |
+| Keeps the database up to date | Yes | Yes |
+| Good for | A PC where you want to see your fleet | The PC that keeps the database, or one that only plays |
+
+Neither one is the database itself: that's PostgreSQL, which the setup screen installs on the PC you choose.
+
 ### Updates happen by themselves
 
 The app looks for a new version when it starts and every hour, and downloads it in the background. When it's ready,
@@ -178,12 +191,12 @@ Handy everywhere:
 
 ### The Database Helper
 
-On a PC where you don't need your fleet in the app, such as the PC that keeps the database or one that only plays
-with the plugin, choose **Settings → General → This PC shows → Just the database tools**. The app then shows only
-the **Database Helper**: where the database is and whether it's up to date, this PC's backups, and the PCs that use
+On a PC where you don't need your fleet's pages, such as the PC that keeps the database or one that only plays
+with the plugin, choose **Settings → General → This PC shows → The Database Helper**. It's the same app with only
+its database tools: where the database is and whether it's up to date, this PC's backups, and the PCs that use
 it, with setup, moving the database, backups and restore, and Remove everything a click away. It still keeps the
 database up to date and makes the nightly backup. The setup screen asks the same question the first time. It's for
-that PC only, and switching back loses nothing.
+that PC only, and **Open the full app** switches back without losing anything.
 
 ## Backups
 

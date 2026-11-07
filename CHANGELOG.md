@@ -5,16 +5,21 @@ All notable changes to the app are recorded here. Versions follow
 
 ## 1.9.0 - 2026-11-07
 
-- **The Database Helper.** For a PC where you don't need your fleet in the app (the PC that keeps the database, or
-  one that only plays with the plugin): **Settings → General → This PC shows → Just the database tools**.
-  - The app then shows a Database Helper page: where the database is, whether it answers and is up to date, this
+- **The Database Helper: the app with only its database tools.** The same download now opens one of two ways, per PC
+  (**Settings → General → This PC shows**):
+  - **The full app**: your fleet's pages and the database tools, as before. Every PC that's already set up stays on it.
+  - **The Database Helper**: only the database tools, with no fleet pages. For the PC that keeps the database, or one
+    that only plays with the plugin, where your fleet is in the game anyway.
+  - The Database Helper opens on its own page: where the database is, whether it answers and is up to date, this
     PC's backups and how many PCs use the database, with buttons to setup, moving the database, and backups and restore.
-  - The PCs page stays, and the app still updates the database and makes the nightly backup.
+  - The PCs page stays, and the Database Helper still updates the database and makes the nightly backup, as the full
+    app does.
   - The fleet's own settings (what you run, live prices, repair kit cost, warnings) leave Settings there. They're
-    also in the plugin, and on any PC that shows the whole app.
+    also in the plugin, and on any PC that opens the full app.
   - The setup screen asks the first time too: a PC that only plays suggests the Database Helper, the others the
-    whole app.
-  - It's for that PC only. **Show the whole app** switches back, and nothing is lost either way.
+    full app.
+  - Neither is the database itself (that's PostgreSQL). It's for that PC only: **Open the full app** switches
+    back, and nothing is lost either way.
 
 ## 1.8.1 - 2026-11-07
 

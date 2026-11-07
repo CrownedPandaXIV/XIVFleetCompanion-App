@@ -482,7 +482,7 @@ function PlayStyleSection() {
 // Settings → General → Look (themes.js): the window's colours, kept on this PC; the same looks as the plugin's.
 // Colour-blind friendly: blue, yellow and orange-red (shaded for each look) for fine, a look and urgent, and the
 // colours that only say what a thing is (gil, addresses, Free Companies, classes) plain.
-// What this PC shows (shared/app-mode.js): the whole app, or only the database tools (the Database Helper). Kept on
+// What this PC shows (shared/app-mode.js): the full app, or only the database tools (the Database Helper). Kept on
 // this PC only; nothing in the database changes.
 function AppModeSection({ appMode }) {
   const [status, setStatus] = useState('');
@@ -495,15 +495,16 @@ function AppModeSection({ appMode }) {
     <section className="settings-section app-mode-section">
       <h3>This PC shows</h3>
       <div className="settings-row">
-        <label><input type="radio" name="app-mode" className="app-mode-fleet" checked={appMode !== 'tools'} onChange={() => choose('fleet')} /> My fleet (the whole app)</label>
+        <label><input type="radio" name="app-mode" className="app-mode-fleet" checked={appMode !== 'tools'} onChange={() => choose('fleet')} /> <strong>The full app</strong>: your fleet's pages (Summary, Subs, Trends and the rest) and the database tools</label>
       </div>
       <div className="settings-row">
-        <label><input type="radio" name="app-mode" className="app-mode-tools" checked={appMode === 'tools'} onChange={() => choose('tools')} /> Just the database tools (the Database Helper)</label>
+        <label><input type="radio" name="app-mode" className="app-mode-tools" checked={appMode === 'tools'} onChange={() => choose('tools')} /> <strong>The Database Helper</strong>: only the database tools, with no fleet pages</label>
       </div>
       <div className="alerts-help">
-        The Database Helper keeps setup, the database connection and moving it, backups and restore, Remove everything and
-        the PCs list, and still updates the database. Good for the PC that keeps the database, or one that only plays with
-        the plugin. For this PC only: switch back any time, nothing is lost.
+        Both are this same app, and both keep the database up to date and make this PC's backups. The Database Helper
+        only leaves out the pages that show your fleet: it keeps setup, the connection and moving the database, backups
+        and restore, Remove everything and the PCs list. Your fleet is still in the game, through the plugin. Good for the
+        PC that keeps the database, or one that only plays. For this PC only: switch back any time, nothing is lost.
       </div>
       {status && <span className="save-status">{status}</span>}
     </section>
