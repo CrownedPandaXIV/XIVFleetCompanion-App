@@ -139,6 +139,9 @@ do by hand.
   (tests/themes.test.js): text contrast, every colour that means something readable on its background, and the
   colour-blind colours apart with each common kind of colour blindness. The plugin's tests check it has the same
   colours (tests/themes-fixture.js).
+- **The sidebar in groups, as the plugin's:** Overview (Summary, Trends), Submarines (Subs, Route Optimization, Parts,
+  Supplies, Salvage), Characters (Character Roster, Retainers, Free Companies, Inventory), Gil (Income, Gil & Market)
+  and System (PCs). A group with nothing to show (Submarines with retainers only) is left out.
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.
