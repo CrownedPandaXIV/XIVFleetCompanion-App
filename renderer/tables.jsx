@@ -313,7 +313,7 @@ function ColumnPicker({ cols }) {
   return (
     <span ref={boxRef} className="column-chooser-wrap">
       <button onClick={() => setOpen(!open)}>Columns</button>
-      {cols.extrasFailed && !open && <span style={{ color: '#e57373', marginLeft: 8 }}>Some added columns could not load</span>}
+      {cols.extrasFailed && !open && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>Some added columns could not load</span>}
       {open && (
         <div className="column-chooser">
           <div className="column-chooser-title">Shown</div>
@@ -346,7 +346,7 @@ function ColumnPicker({ cols }) {
               </div>
             ))}
           </div>
-          {cols.extrasFailed && <div className="status" style={{ color: '#e57373' }}>Could not load the added columns: {cols.extrasFailed}</div>}
+          {cols.extrasFailed && <div className="status" style={{ color: 'var(--danger)' }}>Could not load the added columns: {cols.extrasFailed}</div>}
           <button style={{ marginTop: 10 }} onClick={cols.reset} disabled={!cols.isCustom}>Reset columns</button>
         </div>
       )}
@@ -365,7 +365,7 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
   return (
     <th
       className="resizable"
-      style={{ width: `${widths[columnKey] || 150}px`, position: 'relative', boxShadow: dropTarget ? 'inset 3px 0 0 #5b8def' : undefined }}
+      style={{ width: `${widths[columnKey] || 150}px`, position: 'relative', boxShadow: dropTarget ? 'inset 3px 0 0 var(--accent)' : undefined }}
       onDragOver={onMoveColumn ? (e) => {
         if (!Array.from(e.dataTransfer.types).includes(COLUMN_DRAG)) return;
         e.preventDefault();
@@ -403,7 +403,7 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
           bottom: 0,
           width: '6px',
           cursor: 'col-resize',
-          borderRight: hovering ? '2px solid #5b8def' : '1px solid #3a3f4a'
+          borderRight: hovering ? '2px solid var(--accent)' : '1px solid var(--border-strong)'
         }}
       />
     </th>

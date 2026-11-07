@@ -75,9 +75,9 @@ const summaryGil = (n) => Math.round(Number(n) || 0).toLocaleString();
 function SummaryTile({ label, value, note, className = '', children }) {
   return (
     <div className={`account-group ${className}`} style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-      <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{label}</div>
+      <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{label}</div>
       <div style={{ fontSize: '22px', fontWeight: 600 }}>{value}</div>
-      {note && <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{note}</div>}
+      {note && <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{note}</div>}
       {children}
     </div>
   );
@@ -249,18 +249,18 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
       {uses.subs && (<React.Fragment>
       <div style={{ display: 'flex', gap: '16px', padding: '8px 24px 16px', flexWrap: 'wrap' }}>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Fleet-Wide Salvage Total</div>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Fleet-Wide Salvage Total</div>
           <div className="gil" style={{ fontSize: '22px', fontWeight: 600 }}>
             {salvageTotal === null ? '—' : `${salvageTotal.toLocaleString()} gil`}
           </div>
         </div>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Parts That Need Crafting</div>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Parts That Need Crafting</div>
           <div style={{ fontSize: '22px', fontWeight: 600 }}>{partsNeededCount === null ? '—' : partsNeededCount}</div>
           <button onClick={() => onNavigate('parts')} style={{ marginTop: '8px' }}>View Parts</button>
         </div>
         <div className="account-group" style={{ flex: 1, minWidth: '200px', padding: '16px' }}>
-          <div style={{ color: '#8a8f9a', fontSize: '13px' }}>Route Optimizations Possible</div>
+          <div style={{ color: 'var(--dim)', fontSize: '13px' }}>Route Optimizations Possible</div>
           <div style={{ fontSize: '22px', fontWeight: 600 }}>{routeOptCount === null ? '—' : routeOptCount}</div>
           <button onClick={() => onNavigate('routeOpt')} style={{ marginTop: '8px' }}>View Route Optimization</button>
         </div>

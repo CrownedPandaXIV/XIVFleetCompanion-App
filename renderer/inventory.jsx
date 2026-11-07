@@ -31,8 +31,8 @@ function MultiCharacterPicker({ roster, selectedCids, onChange }) {
           <span
             key={r.cid}
             style={{
-              background: '#1a1d24',
-              border: '1px solid #2a2e38',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
               borderRadius: '4px',
               padding: '3px 8px',
               fontSize: '12px'
@@ -63,8 +63,8 @@ function MultiCharacterPicker({ roster, selectedCids, onChange }) {
               top: '100%',
               left: 0,
               zIndex: 10,
-              background: '#1a1d24',
-              border: '1px solid #333',
+              background: 'var(--panel)',
+              border: '1px solid var(--border-strong)',
               maxHeight: '200px',
               overflowY: 'auto',
               minWidth: '260px'
@@ -268,8 +268,8 @@ function MultiFcPicker({ fcList, selectedFcIds, onChange }) {
           <span
             key={fc.fc_id}
             style={{
-              background: '#1a1d24',
-              border: '1px solid #2a2e38',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
               borderRadius: '4px',
               padding: '3px 8px',
               fontSize: '12px'
@@ -300,8 +300,8 @@ function MultiFcPicker({ fcList, selectedFcIds, onChange }) {
               top: '100%',
               left: 0,
               zIndex: 10,
-              background: '#1a1d24',
-              border: '1px solid #333',
+              background: 'var(--panel)',
+              border: '1px solid var(--border-strong)',
               maxHeight: '220px',
               overflowY: 'auto',
               minWidth: '320px'

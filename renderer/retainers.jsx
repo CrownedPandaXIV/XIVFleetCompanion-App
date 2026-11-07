@@ -43,7 +43,7 @@ function GearSlotRow({ slot, jobAbbreviation, targetMode, targetValue, onlyCraft
     }
   }, [hovering, canSuggest, suggestions]);
 
-  const statusColor = slot.status === 'OK' ? '#7ec97e' : (slot.status === 'Mismatch' || slot.status === 'Wrong Job' || slot.status === 'Empty') ? '#e57373' : '#8a8f9a';
+  const statusColor = slot.status === 'OK' ? 'var(--good)' : (slot.status === 'Mismatch' || slot.status === 'Wrong Job' || slot.status === 'Empty') ? 'var(--danger)' : 'var(--dim)';
 
   return (
     <tr>
@@ -66,15 +66,15 @@ function GearSlotRow({ slot, jobAbbreviation, targetMode, targetValue, onlyCraft
               left: '100%',
               marginLeft: '8px',
               zIndex: 30,
-              background: '#1a1d24',
-              border: '1px solid #333',
+              background: 'var(--panel)',
+              border: '1px solid var(--border-strong)',
               padding: '8px',
               width: 'max-content',
               boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
             }}
           >
             {suggestions.length === 0 ? (
-              <div style={{ fontSize: '0.85em', color: '#8a8f9a' }}>No eligible gear found.</div>
+              <div style={{ fontSize: '0.85em', color: 'var(--dim)' }}>No eligible gear found.</div>
             ) : (
               <table style={{ width: 'auto', tableLayout: 'auto' }}>
                 <thead>
@@ -128,8 +128,8 @@ function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetVa
             top: '100%',
             left: 0,
             zIndex: 20,
-            background: '#1a1d24',
-            border: '1px solid #333',
+            background: 'var(--panel)',
+            border: '1px solid var(--border-strong)',
             padding: '8px',
             width: 'max-content',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
@@ -197,7 +197,7 @@ const RETAINER_COLUMN_DEFS = [
       <td style={{ whiteSpace: 'nowrap' }}>
         <button onClick={ctx.handleSave}>Save</button>{' '}
         <button onClick={ctx.handleClear}>Clear</button>
-        {ctx.saveStatus && <div style={{ fontSize: '0.8em', color: '#8a8f9a' }}>{ctx.saveStatus}</div>}
+        {ctx.saveStatus && <div style={{ fontSize: '0.8em', color: 'var(--dim)' }}>{ctx.saveStatus}</div>}
       </td>
     ) }
 ];

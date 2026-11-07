@@ -391,6 +391,13 @@ function App() {
   // false, or which Settings tab to open on (true: the last one used).
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState('summary');
+  // A new look (Settings → General → Look) redraws the page, so charts pick up its colours too.
+  const [lookKey, setLookKey] = useState(0);
+  useEffect(() => {
+    const changed = () => setLookKey((k) => k + 1);
+    window.addEventListener('look-changed', changed);
+    return () => window.removeEventListener('look-changed', changed);
+  }, []);
   // The setup screen opens by itself the first time, while no connection is saved, until it has been finished
   // or skipped once on this PC (a PC that only plays never saves a connection here).
   const [showSetup, setShowSetup] = useState(false);
@@ -521,7 +528,7 @@ function App() {
     <div className="app-shell">
       <SidebarNav currentView={currentView} onSelect={setCurrentView} hidden={playStyle.hidden} />
 
-      <div className="main-pane">
+      <div className="main-pane" key={lookKey}>
         <div className="header-row">
           <div>
             <h1>{activeViewLabel}</h1>
@@ -597,7 +604,7 @@ function App() {
                   </button>
                 )}
                 <span style={{ marginLeft: '16px' }}><ColumnPicker cols={rosterCols} /></span>
-                {saveStatus && <span style={{ marginLeft: '16px', color: '#8a8f9a' }}>{saveStatus}</span>}
+                {saveStatus && <span style={{ marginLeft: '16px', color: 'var(--dim)' }}>{saveStatus}</span>}
               </div>
             )}
 

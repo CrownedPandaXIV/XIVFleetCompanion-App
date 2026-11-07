@@ -240,7 +240,7 @@ function GameDataSection() {
   const changed = check ? check.tables.filter((t) => t.status === 'ok') : [];
   const blocked = check ? check.tables.filter((t) => t.status === 'blocked') : [];
   const unchanged = check ? check.tables.filter((t) => t.status === 'unchanged') : [];
-  const problem = { color: '#e57373' };
+  const problem = { color: 'var(--danger)' };
   const formatWhen = (iso) => new Date(iso).toLocaleString();
   const formatSize = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   const totalRows = (b) => b.tables.reduce((n, t) => n + t.rows, 0);
@@ -475,6 +475,47 @@ function PlayStyleSection() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+// Settings → General → Look (themes.js): the window's colours, kept on this PC; the same looks as the plugin's.
+// Colour-blind friendly: blue, yellow and orange-red (shaded for each look) for fine, a look and urgent, and the
+// colours that only say what a thing is (gil, addresses, Free Companies, classes) plain.
+function LookSwatches({ theme }) {
+  const t = window.Themes.themeByKey(theme).tokens;
+  return (
+    <span className="look-swatches" aria-hidden="true">
+      {[t.bg, t.panel, t.accent, t.text, t.good, t.warn, t.danger, t.gil].map((c, i) => <span key={i} style={{ background: c }} />)}
+    </span>
+  );
+}
+
+function LookSection() {
+  const [look, setLook] = useState(() => window.Themes.savedLook());
+  const change = (next) => {
+    const merged = { ...look, ...next };
+    setLook(merged);
+    window.Themes.saveLook(merged.theme, merged.colourBlind);
+  };
+  const current = window.Themes.themeByKey(look.theme);
+  return (
+    <section className="settings-section look-section">
+      <h3>Look</h3>
+      <div className="settings-row">
+        <select className="look-choice" value={look.theme} onChange={(e) => change({ theme: e.target.value })}>
+          {window.Themes.appThemes().map((t) => <option key={t.key} value={t.key} title={t.about}>{t.name}</option>)}
+        </select>
+        <LookSwatches theme={look.theme} />
+      </div>
+      <div className="alerts-help">{current.about} Only this PC changes; the plugin has the same looks in its own Settings.</div>
+      <div className="settings-row">
+        <label>
+          <input type="checkbox" className="look-colour-blind" checked={look.colourBlind} onChange={(e) => change({ colourBlind: e.target.checked })} />
+          {' '}Colour-blind friendly status colors
+        </label>
+      </div>
+      <div className="alerts-help">Blue for fine, yellow for a look, orange-red for urgent, in place of green, amber and red: told apart with every common kind of colour blindness. Gil, addresses, Free Companies and classes are then in plain text.</div>
     </section>
   );
 }
@@ -805,6 +846,8 @@ function SettingsModal({ onClose, initialTab = null }) {
         <div className="settings-body">
           {tab === 'general' && (
             <>
+        <LookSection />
+
         <PlayStyleSection />
 
         <LivePricesSection />

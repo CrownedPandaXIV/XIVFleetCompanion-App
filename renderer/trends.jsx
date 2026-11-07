@@ -2,15 +2,21 @@
 // Data comes from the plugin's metric history via the get-metric-* calls (see metric-series.js).
 // Loaded after tables.js and before app.js; TrendsView is used by App.
 
-const TREND_SURFACE = '#12141a';
-const TREND_TEXT = '#e6e6e6';
-const TREND_MUTED = '#8a8f9a';
-const TREND_GRID = 'rgba(138, 143, 154, 0.16)';
+// The look's colours (renderer/themes.js), read when a chart is drawn: the canvas can't use CSS variables itself.
+const trendCss = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const TREND_SURFACE = () => trendCss('--bg');
+const TREND_MUTED = () => trendCss('--dim');
+// A canvas takes plain colours: the less important colour, faint.
+const TREND_GRID = () => {
+  const hex = trendCss('--dim').replace('#', '');
+  const n = parseInt(hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex, 16) || 0x8a8f9a;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.16)`;
+};
 
 // Categorical colors in fixed slot order (validated for the dark surface: lightness band,
 // chroma, adjacent color-blind separation and contrast). A series keeps the slot it was given
 // when others are removed, so colors follow the entity, never its position.
-const TREND_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+const TREND_COLORS = ['var(--accent-strong)', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 const TREND_MAX_SERIES = TREND_COLORS.length;
 
 const TREND_DAY = 86400000;
@@ -151,9 +157,9 @@ function TrendChart({ timestamps, series, dimmed, onZoom, height = 360 }) {
     const single = series.length === 1;
 
     const axisBase = {
-      stroke: TREND_MUTED,
+      stroke: TREND_MUTED(),
       font: '12px -apple-system, Segoe UI, Roboto, sans-serif',
-      grid: { stroke: TREND_GRID, width: 1 },
+      grid: { stroke: TREND_GRID(), width: 1 },
       ticks: { show: false },
     };
 
@@ -181,7 +187,7 @@ function TrendChart({ timestamps, series, dimmed, onZoom, height = 360 }) {
         x: true,
         y: false,
         drag: { x: true, y: false, setScale: false },
-        points: { size: 8, width: 2, stroke: () => TREND_SURFACE, fill: (u, i) => series[i - 1].color },
+        points: { size: 8, width: 2, stroke: () => TREND_SURFACE(), fill: (u, i) => series[i - 1].color },
       },
       select: { show: true, left: 0, top: 0, width: 0, height: 0 },
       series: [
@@ -665,7 +671,7 @@ function TrendSparkline({ values, height = 44 }) {
   return (
     <div style={{ position: 'relative', height }} aria-hidden="true">
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-        <path d={path} fill="none" stroke="#3987e5" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <path d={path} fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       </svg>
       <span
         style={{
@@ -677,8 +683,8 @@ function TrendSparkline({ values, height = 44 }) {
           marginLeft: -4,
           marginTop: -4,
           borderRadius: '50%',
-          background: '#3987e5',
-          boxShadow: `0 0 0 2px ${TREND_SURFACE}`,
+          background: 'var(--accent-strong)',
+          boxShadow: '0 0 0 2px var(--bg)',
         }}
       />
     </div>
@@ -736,9 +742,9 @@ function SummaryTrendTiles({ refreshKey, onOpenTrend, uses = { subs: true, retai
           const pct = change !== null && start !== 0 ? (change / Math.abs(start)) * 100 : null;
           return (
             <div key={t.key} className="account-group" style={{ padding: '16px', opacity: tiles ? 1 : 0.5 }}>
-              <div style={{ color: '#8a8f9a', fontSize: '13px' }}>{t.label || '\u00a0'}</div>
+              <div style={{ color: 'var(--dim)', fontSize: '13px' }}>{t.label || '\u00a0'}</div>
               <div className={trendIsGil(t.key) ? 'gil' : undefined} style={{ fontSize: '22px', fontWeight: 600 }}>{trendFullNumber(current)}</div>
-              <div style={{ color: '#8a8f9a', fontSize: '12px', minHeight: '16px' }}>
+              <div style={{ color: 'var(--dim)', fontSize: '12px', minHeight: '16px' }}>
                 {change === null ? (tiles ? 'No history yet' : '') : (
                   <span className={trendTone(change)}>
                     {change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '\u25AC'} {pct !== null ? `${Math.abs(pct).toFixed(1)}%` : trendFullNumber(Math.abs(change))}

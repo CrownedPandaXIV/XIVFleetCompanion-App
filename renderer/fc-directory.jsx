@@ -20,8 +20,8 @@ function HouseCell({ row }) {
             top: '100%',
             left: 0,
             zIndex: 20,
-            background: '#1a1d24',
-            border: '1px solid #333',
+            background: 'var(--panel)',
+            border: '1px solid var(--border-strong)',
             padding: '8px',
             width: 'max-content',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'

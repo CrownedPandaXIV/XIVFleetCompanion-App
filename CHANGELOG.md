@@ -132,6 +132,13 @@ do by hand.
 - **PCs that only read** (plugin 2.0, database update 16): a PC whose plugin syncs no characters checks in while the
   game runs. The PCs tab lists it ("Only reads", seen when), and **Move the database to this PC** checks it like the
   others (its plugin version and login) instead of skipping it.
+- **Looks, as in the plugin** (Settings → General → Look): XIV Fleet Companion (as before), High contrast, Princess,
+  Deep Sea, Sunset Harbor, Parchment (a light look) and Evergreen, with a strip of each look's colours. Kept on this PC.
+  **Colour-blind friendly status colors** too: blue, yellow and orange-red for fine, a look and urgent, shaded for each
+  look; gil, addresses, Free Companies and classes are then plain text. Every look is measured by the tests
+  (tests/themes.test.js): text contrast, every colour that means something readable on its background, and the
+  colour-blind colours apart with each common kind of colour blindness. The plugin's tests check it has the same
+  colours (tests/themes-fixture.js).
 - **SQLite twins of every view** (db/sqlite/), for the plugin-only one-file version planned later in 2.x, checked row
   for row against PostgreSQL with made-up fleets. "Needs attention" now orders ties letter by letter, so it's the same
   whatever the database's language setting.

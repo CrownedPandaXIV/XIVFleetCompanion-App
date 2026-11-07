@@ -233,8 +233,8 @@ function CharacterOverrideInput({ roster, cid, onChange }) {
             top: '100%',
             left: 0,
             zIndex: 10,
-            background: '#1a1d24',
-            border: '1px solid #333',
+            background: 'var(--panel)',
+            border: '1px solid var(--border-strong)',
             maxHeight: '160px',
             overflowY: 'auto',
             minWidth: '180px'
@@ -353,7 +353,7 @@ function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
       <td style={{ whiteSpace: 'nowrap' }}>
         <button onClick={handleSave}>Save</button>{' '}
         <button onClick={() => onDelete(local.id)}>Delete</button>
-        {saveStatus && <div style={{ fontSize: '0.8em', color: '#8a8f9a' }}>{saveStatus}</div>}
+        {saveStatus && <div style={{ fontSize: '0.8em', color: 'var(--dim)' }}>{saveStatus}</div>}
       </td>
     </tr>
   );
@@ -625,7 +625,7 @@ function PartsView({ refreshKey }) {
               draggingRef.current = true;
             }}
             title="Drag to resize"
-            style={{ width: '6px', alignSelf: 'stretch', cursor: 'col-resize', background: '#333', flexShrink: 0 }}
+            style={{ width: '6px', alignSelf: 'stretch', cursor: 'col-resize', background: 'var(--border-strong)', flexShrink: 0 }}
           />
           <div style={{ width: `${rulesPanelWidth}px`, minWidth: '180px', flexShrink: 0, overflowX: 'auto' }}>
             <h2 style={{ padding: '0 0 8px' }}>Sub Build Rules</h2>

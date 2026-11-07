@@ -19,8 +19,8 @@ function SalvageBreakdownCell({ total, breakdown }) {
             right: 0,
             zIndex: 20,
             textAlign: 'left',
-            background: '#1a1d24',
-            border: '1px solid #333',
+            background: 'var(--panel)',
+            border: '1px solid var(--border-strong)',
             padding: '8px',
             minWidth: '260px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
@@ -44,7 +44,7 @@ function SalvageBreakdownCell({ total, breakdown }) {
                   <td style={{ padding: '2px 6px' }}>{item.subtotal.toLocaleString()}</td>
                 </tr>
               ))}
-              <tr style={{ borderTop: '1px solid #333' }}>
+              <tr style={{ borderTop: '1px solid var(--border-strong)' }}>
                 <td style={{ padding: '4px 6px', fontWeight: 600 }} colSpan={3}>Total</td>
                 <td style={{ padding: '4px 6px', fontWeight: 600 }}>
                   {breakdown.reduce((sum, item) => sum + item.subtotal, 0).toLocaleString()}

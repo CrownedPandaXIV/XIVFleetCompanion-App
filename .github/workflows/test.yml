@@ -94,6 +94,8 @@ jobs:
       run: node tests/db/edits-fixture.js
     - name: Read made-up Fight Club spreadsheets and import them (the answers the plugin's own import is checked against)
       run: node tests/db/fight-club-fixture.js
+    - name: Write out the looks' colours (what the plugin's Theme.cs is checked against)
+      run: node tests/themes-fixture.js
     - name: Work out live market prices from canned Universalis listings (the answers the plugin's own Universalis code is checked against)
       run: node tests/market-fixture.js
     - name: Verify the venture reward totals
