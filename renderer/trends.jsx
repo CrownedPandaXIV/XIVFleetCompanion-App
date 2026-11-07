@@ -2,7 +2,7 @@
 // Data comes from the plugin's metric history via the get-metric-* calls (see metric-series.js).
 // Loaded after tables.js and before app.js; TrendsView is used by App.
 
-// The look's colours (renderer/themes.js), read when a chart is drawn: the canvas can't use CSS variables itself.
+// The look's colours (shared/themes.js), read when a chart is drawn: the canvas can't use CSS variables itself.
 const trendCss = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const TREND_SURFACE = () => trendCss('--bg');
 const TREND_MUTED = () => trendCss('--dim');

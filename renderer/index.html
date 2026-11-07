@@ -26,7 +26,7 @@
        thing is (gil, a house's address, a Free Company's name). The same as the plugin's (Theme.cs); the warning is
        orange rather than gold so it is never mistaken for gil. */
     :root {
-      /* The default look's colours; renderer/themes.js sets the chosen look's over these before anything is drawn. */
+      /* The default look's colours; shared/themes.js sets the chosen look's over these before anything is drawn. */
       --bg: #12141a; --sidebar: #0d0f13; --panel: #1a1d24; --modal: #181b21; --hover: #23262e; --hover-strong: #2f3440;
       --border: #2a2e38; --border-strong: #3a3f4a; --text: #e6e6e6; --text-bright: #ffffff; --text-soft: #c0c4cc;
       --dim: #8a8f9a; --faint: #565b66; --accent: #5b8def; --accent-strong: #3987e5; --link: #7aa7e0; --row-alt: rgba(255, 255, 255, 0.055);
@@ -676,7 +676,7 @@
   <script src="../node_modules/uplot/dist/uPlot.iife.min.js"></script>
   <!-- The window's code, one file per tab plus the shared table pieces. They share one scope, so
        tables.js goes first and app.js (which starts the app) goes last. -->
-  <script src="themes.js"></script>
+  <script src="../shared/themes.js"></script>
   <script src="tables.js"></script>
   <script src="roster.js"></script>
   <script src="backups.js"></script>

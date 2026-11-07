@@ -1,9 +1,9 @@
-// Every look (renderer/themes.js, the plugin's too) measured: text and every meaning colour readable on its background
+// Every look (shared/themes.js, the plugin's too) measured: text and every meaning colour readable on its background
 // (WCAG contrast), the meaning colours far enough apart to tell at a glance, and the colour-blind friendly ones still
 // apart with each common kind of colour blindness (Machado, Oliveira and Fernandes' simulation, full strength).
 const test = require('node:test');
 const assert = require('node:assert');
-const { THEMES, themeVariables } = require('../renderer/themes');
+const { THEMES, themeVariables } = require('../shared/themes');
 
 const lin = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 const unlin = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
