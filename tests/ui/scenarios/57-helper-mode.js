@@ -22,6 +22,8 @@ module.exports = async (t) => {
   await waitFor(`document.querySelector('h1').innerText === 'Database Helper' && !!document.querySelector('.helper-card')`, 'the Database Helper', 20000);
   check(await groups() === 'database helper: home | system: pcs', 'the sidebar keeps only Home and PCs: ' + await groups());
   await waitFor(`/Up to date \\(database version \\d+\\)/.test(document.querySelector('.helper-view').innerText)`, 'the database version', 20000);
+  // The backups are read separately and can arrive a moment later.
+  await waitFor(`/daily backup is off|Backs up every day/.test(document.querySelector('.helper-view').innerText)`, "this PC's backups", 20000);
   const text = await ev(`document.querySelector('.helper-view').innerText`);
   check(/uitest/.test(text) && /Answering/.test(text), 'where the database is, and that it answers');
   check(/No backup made on this PC yet|Last backup/.test(text) && /daily backup is off|Backs up every day/.test(text), "this PC's backups");
