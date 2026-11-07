@@ -350,6 +350,11 @@ Add the change as the next numbered file in `db/updates/`, and make the same cha
 instead, which the app applies again whenever it changes.
 [db/updates/README.md](db/updates/README.md) has the details. The app applies it on every database the next time it connects.
 
+The plugin (2.1.0 and later) applies the same files itself, from a copy built into it. After changing anything in `db/`,
+copy it across and refresh the plugin's check of it (needs a scratch Postgres):
+`node tests/db/plugin-database-fixture.js ../XIVFleetCompanion`, then commit the plugin's `XIVFleetCompanion/Database/`
+and `tests/FleetWriterTests/database-fixture.json`.
+
 ### Releasing a new version
 
 1. Raise the version: `npm version <new> --no-git-tag-version`.

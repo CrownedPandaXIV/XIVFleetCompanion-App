@@ -20,6 +20,8 @@ All notable changes to the app are recorded here. Versions follow
     full app.
   - Neither is the database itself (that's PostgreSQL). It's for that PC only: **Open the full app** switches
     back, and nothing is lost either way.
+- **Plugin 2.1.0 keeps the database up to date too**, with a copy of the app's own update files, so a PC with only
+  the plugin needs no app open after an update. The app and the plugin take turns, and neither undoes the other's.
 
 ## 1.8.1 - 2026-11-07
 
