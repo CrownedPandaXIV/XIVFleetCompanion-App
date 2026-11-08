@@ -35,7 +35,7 @@ ipcMain.handle('get-roster', async () => {
         h.fc_name, h.fc_points, h.has_house, h.house_ward, h.house_plot,
         k.city_name AS district_name,
         so.sort_index,
-        (SELECT COUNT(*) FROM companion_submarine_snapshot sub WHERE sub.cid = s.cid AND sub.level > 0) AS subs_built
+        (SELECT COUNT(*) FROM companion_submarine_snapshot sub WHERE sub.cid = s.cid AND sub.level > 0)::int AS subs_built
       FROM ${latestCharacter} s
       LEFT JOIN companion_character_housing h ON s.cid = h.cid
       LEFT JOIN housing_key_city_lookup k ON h.house_city = k.city_id
@@ -152,7 +152,7 @@ ipcMain.handle('remove-character', async (event, cid) => {
       if (tables.has_current) await client.query('DELETE FROM companion_character_current WHERE cid = $1', [cid]);
       if (tables.has_history) await client.query('DELETE FROM companion_character_snapshot WHERE cid = $1', [cid]);
       if (tables.has_latest) {
-        await client.query(`DELETE FROM companion_metric_latest WHERE subject_type = 'character' AND subject_id = $1`, [cid]);
+        await client.query(`DELETE FROM companion_metric_latest WHERE subject_type = 'character' AND subject_id = $1::numeric`, [cid]);
       }
       if (tables.has_forecasts) await client.query('DELETE FROM companion_rankup_forecast WHERE cid = $1', [cid]);
       if (tables.has_logins) await client.query('DELETE FROM companion_character_login WHERE cid = $1', [cid]);

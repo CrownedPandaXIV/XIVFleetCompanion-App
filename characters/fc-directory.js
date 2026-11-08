@@ -13,7 +13,7 @@ async function houseWarnDays(client) {
 
 async function loadFcDirectory(client) {
   const { latestFcMember } = await snapshotFragments(client);
-  const result = await client.query(fcDirectorySql(latestFcMember));
+  const result = await client.query(fcDirectorySql(latestFcMember, { sqlite: client.dialect === 'sqlite' }));
   const warnDays = await houseWarnDays(client);
   return { rows: fcDirectoryRows(result.rows, warnDays), warnDays };
 }

@@ -392,7 +392,7 @@ ipcMain.handle('get-sub-build-rules', async () => {
     const result = await client.query(`
       SELECT id, rank, cid_override, sub_filter, hull, stern, bow, bridge
       FROM sub_build_rules
-      ORDER BY rank
+      ORDER BY rank, id
     `);
     return { success: true, rows: result.rows };
   }, (err) => {

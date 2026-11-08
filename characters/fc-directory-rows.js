@@ -3,7 +3,8 @@
 // snapshotFragments), fcDirectoryRows adds bid eligibility and the house's age to what it returns.
 const { withHouseAge } = require('./house-warning');
 
-function fcDirectorySql(latestFcMember) {
+// sqlite: for the fleet file, which has no array_agg (the first account label in order is the smallest).
+function fcDirectorySql(latestFcMember, { sqlite = false } = {}) {
   return `
     WITH fc_housing AS (
       SELECT DISTINCT ON (fc_id) fc_id, fc_name, fc_master, fc_points, fc_rank, total_members,
@@ -25,7 +26,7 @@ function fcDirectorySql(latestFcMember) {
            fh.fc_founding_date, fh.fc_eligibility_override, fv.house_last_visited,
            k.city_name AS district_name,
            w.name AS fc_world,
-           (array_agg(DISTINCT c.account_label))[1] AS account_label,
+           ${sqlite ? 'min(c.account_label)' : '(array_agg(DISTINCT c.account_label))[1]'} AS account_label,
            MIN(so.sort_index) AS sort_index
     FROM fc_housing fh
     LEFT JOIN fc_visited fv ON fv.fc_id = fh.fc_id
