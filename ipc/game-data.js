@@ -114,6 +114,8 @@ function testFetch() {
 }
 
 ipcMain.handle('game-data-notice:get', () => withClient(async (client) => {
+  // (The fleet file's game data is updated from Settings > Data: no notice.)
+  if (client.dialect === 'sqlite') return { success: true, available: false, files: [], newest: null };
   const found = await gameDataNotice.refresh(client, { fetch: testFetch() });
   if (found.error) console.log(`Game data: couldn't look for new game data (${found.error}); trying again in an hour.`);
   return { success: true, ...gameDataNotice.noticeFrom({ changes: found.changes, dismissed: readDismissed() }) };

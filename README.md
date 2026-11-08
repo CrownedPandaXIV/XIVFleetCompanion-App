@@ -12,6 +12,9 @@ low, which parts to build next, and what your retainers are up to. It can also b
 - **A PostgreSQL database** on one PC. That's where the plugin sends the data and the app reads it from.
 - **Tailscale** (free), if your PCs aren't all on the same home network, so they can reach the database.
 
+Playing on just one PC? You don't need the database: the plugin can keep your fleet in a file on that PC instead (it
+asks the first time), and the app opens the same file by itself. See [Just this PC](#just-this-pc).
+
 The app works on Windows. It installs PostgreSQL and Tailscale for you where they're needed (see First-time setup).
 
 ### The plugins it works with
@@ -198,6 +201,23 @@ it, with setup, moving the database, backups and restore, and Remove everything 
 database up to date and makes the nightly backup. The setup screen asks the same question the first time. It's for
 that PC only, and **Open the full app** switches back without losing anything.
 
+## Just this PC
+
+When the plugin keeps the fleet in a file on this PC (its "Keep it on this PC" choice) rather than a shared database,
+the app opens that file by itself: there's no database to set up, and the setup screen doesn't appear. Every page works
+the same, and edits made here (Sub Rules, targets, settings) go into the same file the game uses.
+
+- The header says **Fleet file** instead of Database.
+- **Settings → Database** shows where the file is and what the plugin last found when it checked it.
+- **Settings → Backups** lists the plugin's backups of the file (it makes one a day and keeps 7), with **Back up now**.
+  Putting one back is done in the game, on the plugin's Status page.
+- **Settings → Data → Game Data** loads the item names, recipes and the like into a file of the app's own
+  (`game-data.db`, beside its settings). The first time, that happens by itself and takes a minute or two.
+- The database tools (moving the database, the speed check, nightly database backups) aren't needed and aren't shown.
+
+To share the fleet between PCs later, move it into a database from the game (**Settings → Move your fleet**). The app
+follows the game's choice for the PC, so it switches over once its connection to that database is saved.
+
 ## Backups
 
 On the PC with the database, open **Settings → Backups**:
@@ -334,7 +354,9 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
 - `main.js` starts the app; `preload.js` is the only bridge between the window and the rest.
 - `ipc/` answers the window's requests, one file per area. `renderer/` is the window itself (React), one file per tab.
 - `db/` is the database: `index.js` holds the connection, `apply-updates.js` keeps the tables up to date, and
-  `schema.sql` describes every table.
+  `schema.sql` describes every table. For the plugin's fleet file (Just this PC), `fleet-store.js` works out where the
+  fleet is and `sqlite-client.js` runs the same queries on the file (`sqlite/` has its tables and views, and the kind of
+  value each column comes back as); `game-data-file.js` keeps its game data and `fleet-file-backups.js` its backups.
 - `subs/` works out subs, parts, supplies, income and the shopping list. `characters/` covers retainers, Free
   Companies, inventories and the market. `shared/` has the pieces used all over (table columns, CSV, what you run).
 - `setup/` is "Set up this PC" (the downloads, with their checksums, in `setup/installers.js`), Setup Help, "Let

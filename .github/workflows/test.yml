@@ -84,6 +84,8 @@ jobs:
       run: node tests/db/verify-fleet-views.js
     - name: Verify the views give the same answers on SQLite (the plugin-only one-file version)
       run: node tests/db/verify-sqlite-views.js
+    - name: Verify the app on the fleet file (every page and edit the same as on PostgreSQL)
+      run: node tests/db/verify-file-pages.js
     - name: Work out the Parts tab for made-up fleets (the answers the plugin's own working out is checked against)
       run: node tests/db/parts-fixture.js
     - name: Work out the Subs tab's routes, rank-up dates and Look ahead for made-up fleets (the answers the plugin's own working out is checked against)

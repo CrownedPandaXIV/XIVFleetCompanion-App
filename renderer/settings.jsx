@@ -375,6 +375,110 @@ function GameDataSection() {
 // The Settings window's tabs, in order. The last one used is remembered (on this PC).
 // Settings → General → Updates (updater.js): this app's version, what the update check is doing, and looking now.
 // The installed app also looks by itself when it starts and every hour.
+// This PC keeps its fleet in the plugin's file ("Just this PC"): where it is, what the plugin last found when it
+// checked it, and how to change that (in the game).
+function FleetFileSection({ where }) {
+  const health = where.health;
+  return (
+    <section className="settings-section">
+      <h3>The fleet file</h3>
+      <div className="alerts-help">
+        This PC keeps its fleet in the plugin's file, not a shared database (as chosen in the game). The app
+        reads and edits the same file as the game, so nothing needs setting up here.
+      </div>
+      <div className="settings-row"><span className="dim">File:</span> <code>{where.file}</code></div>
+      {where.plugin && <div className="settings-row"><span className="dim">Set up by:</span> plugin {where.plugin}</div>}
+      {health && (
+        <div className="settings-row" style={health.ok ? undefined : { color: 'var(--danger)' }}>
+          {health.ok
+            ? `Last checked by the plugin ${new Date(health.at).toLocaleDateString()}: whole.`
+            : `The plugin found damage on ${new Date(health.at).toLocaleDateString()}: ${health.problems}. Put a backup back in the game (its Status page).`}
+        </div>
+      )}
+      <div className="alerts-help">
+        To share the fleet between PCs, move it into a shared database from the game (Settings &gt; Move your fleet).
+        The app follows by itself once a connection to that database is saved here.
+      </div>
+    </section>
+  );
+}
+
+// The fleet file's backups, as the plugin makes them (one a day, the newest 7 kept). One can be made from here too;
+// putting one back is done in the game, which stops its own writing while it does.
+function FleetFileBackupsSection() {
+  const [list, setList] = useState(null);
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = () => window.api.getFleetFileBackups().then((r) => (r.success ? setList(r) : setStatus(`Could not list them: ${r.error}`)));
+  useEffect(() => { load(); }, []);
+  async function backUp() {
+    setBusy(true); setStatus('Backing up...');
+    const r = await window.api.backUpFleetFileNow();
+    setBusy(false);
+    setStatus(r.success ? `Backed up as ${r.name}.` : `Backup failed: ${r.error}`);
+    load();
+  }
+  return (
+    <section className="settings-section">
+      <h3>Backups of the fleet file</h3>
+      <div className="alerts-help">
+        The plugin backs the file up once a day and keeps the newest {list ? list.kept : 7}. To put one back, use the game's
+        Status page (Restore a backup).
+      </div>
+      <div className="settings-row">
+        <button onClick={backUp} disabled={busy}>Back up now</button>
+        <button onClick={() => window.api.openFleetFileBackups()}>Open the folder</button>
+        {status && <span className="save-status">{status}</span>}
+      </div>
+      {list && list.backups.length === 0 && <div className="status">No backups yet.</div>}
+      {list && list.backups.length > 0 && (
+        <table className="data-table">
+          <thead><tr><th>Backup</th><th>Made</th><th>Size</th></tr></thead>
+          <tbody>
+            {list.backups.map((b) => (
+              <tr key={b.name}><td>{b.name}</td><td>{new Date(b.at).toLocaleString()}</td><td>{(b.bytes / (1024 * 1024)).toFixed(1)} MB</td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+// The game data for the fleet file, in the app's own file: loaded again in full when updated (there is nothing in it
+// to keep, so no backups).
+function FileGameDataSection() {
+  const [last, setLast] = useState(null);
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = () => window.api.getFileGameDataStatus().then((r) => setLast(r.success ? r.last : null));
+  useEffect(() => { load(); }, []);
+  async function update() {
+    setBusy(true); setStatus('Downloading and loading the game data. This takes a minute or two...');
+    const r = await window.api.updateFileGameData();
+    setBusy(false);
+    if (!r.success) { setStatus(`Update failed: ${r.error}`); return; }
+    setStatus(r.failed.length
+      ? `Updated ${r.updated} tables. Not updated (kept as they were): ${r.failed.map((f) => `${f.table.replace(/^ffxiv_/, '')} (${f.reason})`).join('; ')}.`
+      : `Updated all ${r.updated} tables.`);
+    load();
+  }
+  return (
+    <section className="settings-section">
+      <h3>Game Data</h3>
+      <div className="status" style={{ marginBottom: 8 }}>
+        Item, recipe, retainer task and other game tables, from the ffxiv-datamining repository on GitHub, kept by the app beside
+        its settings.
+        {last
+          ? ` Last updated ${new Date(last.appliedAt).toLocaleString()}${last.source && last.source.sha ? ` (source ${last.source.sha})` : ''}.`
+          : ' Not loaded yet.'}
+      </div>
+      <button onClick={update} disabled={busy}>{busy ? 'Updating...' : 'Update now'}</button>
+      {status && <div className="status">{status}</div>}
+    </section>
+  );
+}
+
 function UpdatesSection() {
   const [info, setInfo] = useState(null);
   const [recent, setRecent] = useState(null);
@@ -732,6 +836,13 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
     window.api.getAppVersion().then(setAppVersion);
   }, []);
 
+  // Where the fleet is (db/fleet-store.js): the fleet file has no connection to set up, and backups and game data of its own.
+  const [where, setWhere] = useState(null);
+  useEffect(() => {
+    window.api.getFleetLocation().then((r) => setWhere(r && r.success ? r : null)).catch(() => setWhere(null));
+  }, []);
+  const onFile = !!where && where.location === 'file';
+
   // --- Auto-Refresh section ---
   const [refreshMinutes, setRefreshMinutes] = useState('');
   const [refreshLoaded, setRefreshLoaded] = useState(false);
@@ -971,7 +1082,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
             </>
           )}
 
-          {tab === 'database' && (
+          {tab === 'database' && onFile && <FleetFileSection where={where} />}
+          {tab === 'database' && !onFile && (
             <>
         <section className="settings-section">
           <h3>Database Connection</h3>
@@ -1014,7 +1126,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
             </>
           )}
 
-          {tab === 'backups' && <BackupsSection />}
+          {tab === 'backups' && (onFile ? <FleetFileBackupsSection /> : <BackupsSection />)}
 
           {tab === 'setup' && <SetupHelpSection />}
 
@@ -1028,7 +1140,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
           )}
         </section>
 
-        <GameDataSection />
+        {onFile ? <FileGameDataSection /> : <GameDataSection />}
             </>
           )}
         </div>

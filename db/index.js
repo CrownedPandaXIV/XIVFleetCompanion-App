@@ -63,7 +63,7 @@ const connection = createConnectionTracker({
   reconnectMs: Number(process.env.FLEET_RECONNECT_MS) || 30000,
   notify: (status) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('connection-status', status);
+      if (!win.isDestroyed()) win.webContents.send('connection-status', { ...status, file: fleetLocation() === 'file' });
     }
   },
   probe: async () => {
@@ -165,7 +165,7 @@ function describeFileError(err) {
   const text = String(err && err.message || err);
   if (/database is locked|SQLITE_BUSY/i.test(text)) return 'The fleet file is busy (a game is writing to it). Try again in a moment.';
   if (/unable to open|SQLITE_CANTOPEN/i.test(text)) return `The fleet file could not be opened (${FLEET_FILE()}).`;
-  if (/malformed|SQLITE_CORRUPT|not a database/i.test(text)) return 'The fleet file is damaged. The plugin can check it and put a backup back (Settings > Database in the game).';
+  if (/malformed|SQLITE_CORRUPT|not a database/i.test(text)) return 'The fleet file is damaged. The plugin can check it and put a backup back (the Status page in the game).';
   return text;
 }
 
@@ -354,7 +354,8 @@ function savePostgresConfig(config) {
 module.exports = {
   createPgClient, loadPostgresConfig, savePostgresConfig, withClient, snapshotFragments, followMoveNow,
   openClient, fleetLocation, fleetFile: FLEET_FILE, gameDataFile: GAME_DATA_FILE,
-  connectionStatus: () => connection.status(),
+  // (file: this PC's fleet is in the plugin's file, for the header)
+  connectionStatus: () => ({ ...connection.status(), file: fleetLocation() === 'file' }),
   databaseStatus: () => databaseState || (moveState ? { ok: true, move: moveState } : null),
   // After restoring a backup: check for database updates again on the next connection.
   recheckDatabase: () => { databaseCheck = null; },

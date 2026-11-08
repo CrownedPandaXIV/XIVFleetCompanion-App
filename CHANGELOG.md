@@ -3,6 +3,24 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.0 - 2026-11-08
+
+- **The app opens the plugin's fleet file.** A PC where the plugin keeps the fleet in a file ("Keep it on this PC",
+  plugin 2.2 and later) needs no database for the app either: it opens the same file by itself, following the game's
+  choice for the PC.
+  - Every page works on the file, and edits (Sub Rules, Craft?, gear targets, the Roster order, settings, the
+    Shopping List's ticks, removing a character or a PC, the Fight Club import) go into it, for the game to see.
+  - No setup screen and nothing to connect. The header says **Fleet file**.
+  - **Settings → Database** shows the file and the plugin's last check of it; **Settings → Backups** its backups,
+    with **Back up now** (putting one back is done in the game); **Settings → Data → Game Data** updates the app's own
+    copy of the game data (item names, recipes...), which is filled in by itself the first time.
+  - The database tools (moving it, the speed check, the nightly database backups) aren't shown, as there's no
+    database.
+  - Checked by making every page's call and every edit on the same fleet in a database and in a file, and comparing
+    the answers and the tables afterwards.
+- A few lists now keep the same order every time when two rows tie (Sub Rules of the same rank, retainers' gear,
+  Free Companies of the same name, items held in the same amount).
+
 ## 1.9.0 - 2026-11-07
 
 - **The Database Helper: the app with only its database tools.** The same download now opens one of two ways, per PC
