@@ -115,6 +115,40 @@ const SERIES_SQL = `
   GROUP BY b.i, CASE WHEN $8::boolean THEN s.subject_id END
   ORDER BY 2, b.i`;
 
+// The same on the fleet file (db/sqlite-client.js), which has no generate_series or LATERAL: the instants counted
+// out, each subject's value at each instant looked up on its own, and the instants without one left out (as LATERAL
+// leaves them out). There a character's id is a whole number and an FC's text, as the plugin writes them.
+const SERIES_FILE_SQL = `
+  WITH RECURSIVE buckets(i, ts) AS (
+    SELECT ?9, pg_time(?1) + (pg_time(?2) - pg_time(?1)) * 1.0 * ?9 / ?3
+    UNION ALL
+    SELECT i + 1, pg_time(?1) + (pg_time(?2) - pg_time(?1)) * 1.0 * (i + 1) / ?3 FROM buckets WHERE i < ?10
+  ),
+  parts AS (
+    SELECT u0.value AS metric, u1.value AS subject_type, u2.value AS weight
+    FROM json_each(?4) u0 JOIN json_each(?5) u1 ON u1.key = u0.key JOIN json_each(?6) u2 ON u2.key = u0.key
+  ),
+  subjects AS (
+    SELECT DISTINCT l.subject_type, l.subject_id, pt.metric, pt.weight
+    FROM parts pt
+    JOIN companion_metric_latest l ON l.metric = pt.metric AND l.subject_type = pt.subject_type
+    WHERE ?7 IS NULL OR l.subject_id IN (
+      SELECT CASE WHEN l.subject_type = 'fc' THEN CAST(value AS TEXT) ELSE CAST(value AS INTEGER) END FROM json_each(?7))
+  ),
+  probes AS (
+    SELECT b.i, s.subject_id, s.weight,
+           (SELECT h.value FROM companion_metric_history h
+            WHERE h.subject_type = s.subject_type AND h.subject_id = s.subject_id AND h.metric = s.metric AND h.recorded_at <= b.ts
+            ORDER BY h.recorded_at DESC LIMIT 1) AS v
+    FROM buckets b
+    CROSS JOIN subjects s
+  )
+  SELECT i, CASE WHEN ?8 THEN subject_id END AS subject_id, sum(v * weight) AS value
+  FROM probes
+  WHERE v IS NOT NULL
+  GROUP BY i, CASE WHEN ?8 THEN subject_id END
+  ORDER BY 2, i`;
+
 function seriesQueryArgs(p, lo = 0, hi = p.points - 1) {
   return [
     p.from.toISOString(),
@@ -159,7 +193,7 @@ async function runSeries(newClient, p) {
       slices.map(async ([lo, hi]) => {
         const client = await newClient();
         clients.push(client);
-        const result = await client.query(SERIES_SQL, seriesQueryArgs(p, lo, hi));
+        const result = await client.query(client.dialect === 'sqlite' ? SERIES_FILE_SQL : SERIES_SQL, seriesQueryArgs(p, lo, hi));
         return result.rows;
       })
     );
@@ -213,6 +247,7 @@ module.exports = {
   MAX_POINTS,
   DEFAULT_POINTS,
   SERIES_SQL,
+  SERIES_FILE_SQL,
   CATALOG_SQL,
   validateSeriesRequest,
   seriesQueryArgs,

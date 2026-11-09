@@ -60,6 +60,7 @@ require('./ipc/setup-wizard');
 require('./ipc/remove-everything');
 require('./ipc/move-database');
 require('./ipc/leftovers');
+require('./ipc/fleet-file');
 
 let mainWindow;
 
@@ -146,6 +147,9 @@ app.whenReady().then(() => {
   // already in place; skipped quietly when no connection is set up yet.
   withClient(
     async (client) => {
+      // (The fleet file is the plugin's to keep: nothing to prepare there. Opening it starts the game data download
+      // when there is none yet.)
+      if (client.dialect === 'sqlite') return;
       const done = await gameData.prepareTables(client);
       if (done.indexesMade.length || done.analyzed.length) {
         console.log(`Game tables prepared: indexes made ${done.indexesMade.join(', ') || 'none'}; statistics refreshed for ${done.analyzed.join(', ') || 'none'}.`);

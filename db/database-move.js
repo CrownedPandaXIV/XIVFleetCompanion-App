@@ -10,6 +10,7 @@ const PLUGIN_APPLICATION_NAME = 'XIV Fleet Companion plugin';
 // The note, or null when there is none (or the database doesn't have update 10 yet). fresh: the app moving it
 // said it was still working in the last 5 minutes, by the database's clock.
 async function readMoveNote(client) {
+  if (client.dialect === 'sqlite') return null; // the fleet file never moves between servers
   try {
     const { rows } = await client.query(
       `SELECT state, host, port, from_host, moved_at, updated_at > now() - interval '5 minutes' AS fresh

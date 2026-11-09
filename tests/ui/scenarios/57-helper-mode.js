@@ -19,7 +19,7 @@ module.exports = async (t) => {
   check(await ev(`!document.querySelector('.settings-warnings')`), "the fleet's own settings leave Settings");
   await close();
 
-  await waitFor(`document.querySelector('h1').innerText === 'Database Helper' && !!document.querySelector('.helper-card')`, 'the Database Helper', 20000);
+  await waitFor(`document.querySelector('h1')?.innerText === 'Database Helper' && !!document.querySelector('.helper-card')`, 'the Database Helper', 20000);
   check(await groups() === 'database helper: home | system: pcs', 'the sidebar keeps only Home and PCs: ' + await groups());
   await waitFor(`/Up to date \\(database version \\d+\\)/.test(document.querySelector('.helper-view').innerText)`, 'the database version', 20000);
   // The backups are read separately and can arrive a moment later.
@@ -40,15 +40,15 @@ module.exports = async (t) => {
   await waitFor(`[...document.querySelectorAll('.settings-section h3')].some((h) => /Database Connection/i.test(h.innerText))`, 'Connection and moving opens the Database tab', 20000);
   await close();
   await nav('PCs');
-  await waitFor(`document.querySelector('h1').innerText === 'PCs'`, 'the PCs page', 20000);
+  await waitFor(`document.querySelector('h1')?.innerText === 'PCs'`, 'the PCs page', 20000);
   check(true, 'PCs opens from the sidebar');
 
   await ev('location.reload()');
   await waitFor(`document.querySelectorAll('.sidebar-button').length>0`, 'the app to load again', 60000);
-  await waitFor(`document.querySelector('h1').innerText === 'Database Helper'`, 'the Database Helper again', 20000);
+  await waitFor(`document.querySelector('h1')?.innerText === 'Database Helper'`, 'the Database Helper again', 20000);
   check(await groups() === 'database helper: home | system: pcs', 'the choice is kept on this PC');
 
   await ev(`document.querySelector('.helper-show-fleet').click()`);
-  await waitFor(`document.querySelector('h1').innerText === 'Summary'`, 'the full app back', 20000);
+  await waitFor(`document.querySelector('h1')?.innerText === 'Summary'`, 'the full app back', 20000);
   check((await groups()).startsWith('overview: summary, trends') && !(await groups()).includes('database helper'), 'Open the full app brings every page back');
 };

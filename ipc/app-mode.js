@@ -2,7 +2,7 @@
 const path = require('path');
 const { app, ipcMain, BrowserWindow } = require('electron');
 const { readAppMode, writeAppMode } = require('../shared/app-mode');
-const { withClient, loadPostgresConfig } = require('../db');
+const { withClient, loadPostgresConfig, fleetLocation, fleetFile } = require('../db');
 const { listUpdates, BASELINE } = require('../db/apply-updates');
 
 const modeFile = () => path.join(app.getPath('userData'), 'app-mode.json');
@@ -24,6 +24,8 @@ ipcMain.handle('app-mode:set', (event, mode) => {
 
 // The Database Helper's home page: where the database is (never the password), and how up to date it is.
 ipcMain.handle('helper:overview', async () => {
+  // A PC that keeps its fleet in the plugin's file has no database for these tools to look after.
+  if (fleetLocation() === 'file') return { success: true, file: fleetFile(), connection: null };
   let config = {};
   try { config = loadPostgresConfig() || {}; } catch { /* no connection saved on this PC yet */ }
   const connection = config.host ? { host: config.host, port: config.port, database: config.database, user: config.user } : null;

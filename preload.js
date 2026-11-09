@@ -69,6 +69,12 @@ contextBridge.exposeInMainWorld('api', {
   },
   // Database updates (db/apply-updates.js): { ok, version, created, applied, newer } or { ok: false, message }.
   getDatabaseStatus: () => invoke('get-database-status'),
+  getFleetLocation: () => invoke('fleet:location'),
+  getFleetFileBackups: () => invoke('fleet-file:backups'),
+  backUpFleetFileNow: () => invoke('fleet-file:back-up-now'),
+  openFleetFileBackups: () => invoke('fleet-file:open-folder'),
+  getFileGameDataStatus: () => invoke('fleet-file:game-data-status'),
+  updateFileGameData: () => invoke('fleet-file:game-data-update'),
   checkDatabaseSpeed: () => invoke('database:speed-check'),
   getSpeedDetail: () => invoke('database:speed-detail'),
   getSpeedFindings: (input) => invoke('database:speed-findings', input),

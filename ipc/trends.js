@@ -1,6 +1,6 @@
 // Trend charts and the extra table columns: what can be charted or added, and their values.
 const { ipcMain } = require('electron');
-const { createPgClient, loadPostgresConfig, withClient, snapshotFragments } = require('../db');
+const { withClient, snapshotFragments, openClient, fleetLocation } = require('../db');
 const metricSeries = require('../db/metric-series');
 const columnCatalog = require('../shared/column-catalog');
 const { SALVAGE_PRICES } = require('./inventory');
@@ -37,7 +37,7 @@ ipcMain.handle('get-column-extras', async (event, request) => {
   if (checked.ids.length === 0) return { success: true, values: {} };
   return withClient(async (client) => {
     const { latestCharacter } = await snapshotFragments(client);
-    const { sql, params } = columnCatalog.buildExtrasQuery(checked, latestCharacter);
+    const { sql, params } = columnCatalog.buildExtrasQuery(checked, latestCharacter, { sqlite: client.dialect === 'sqlite' });
     const result = await client.query(sql, params);
     return columnCatalog.shapeExtrasResult(result.rows, checked);
   }, (err) => ({ success: false, error: err.message }));
@@ -88,16 +88,16 @@ const SERIES_CACHE_MAX = 100;
 const seriesCache = new Map();
 
 // When the newest value was recorded (any metric): a remembered result older than that is not used.
-async function newestRecorded(config) {
-  const client = createPgClient(config);
+async function newestRecorded() {
+  let client = null;
   try {
-    await client.connect();
+    client = await openClient();
     const { rows } = await client.query('SELECT max(recorded_at) AS at FROM companion_metric_latest');
     return rows[0].at ? new Date(rows[0].at).getTime() : 0;
   } catch {
     return null;
   } finally {
-    await client.end().catch(() => {});
+    if (client) await client.end().catch(() => {});
   }
 }
 
@@ -111,18 +111,13 @@ ipcMain.handle('get-metric-series', async (event, request) => {
     params.to = new Date(Math.ceil(params.to.getTime() / 60000) * 60000);
   }
 
-  const config = loadPostgresConfig();
-  const key = JSON.stringify([params.from, params.to, params.points, params.metrics, params.subjectTypes, params.weights, params.subjectIds]);
-  const newest = await newestRecorded(config);
+  const key = JSON.stringify([fleetLocation(), params.from, params.to, params.points, params.metrics, params.subjectTypes, params.weights, params.subjectIds]);
+  const newest = await newestRecorded();
   const hit = seriesCache.get(key);
   if (hit && newest !== null && Date.now() - hit.at < SERIES_CACHE_MS && newest <= hit.newest) return hit.value;
 
   try {
-    const value = await metricSeries.runSeries(async () => {
-      const client = createPgClient(config);
-      await client.connect();
-      return client;
-    }, params);
+    const value = await metricSeries.runSeries(openClient, params);
     if (newest !== null) seriesCache.set(key, { at: Date.now(), newest, value });
     if (seriesCache.size > SERIES_CACHE_MAX) seriesCache.delete(seriesCache.keys().next().value);
     return value;

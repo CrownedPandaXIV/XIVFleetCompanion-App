@@ -32,9 +32,35 @@ const SQL = `
       WHERE h.subject_type = $4 AND h.subject_id = c.id AND h.metric = m.metric AND h.recorded_at <= $2
       ORDER BY recorded_at DESC LIMIT 1) b`;
 
+// The same on the fleet file, which has no LATERAL: the window's values numbered per character or FC and metric,
+// and the last one before the window found by its row. There a character's id is a whole number and an FC's text
+// (as the plugin writes them).
+const FILE_SQL = `
+    SELECT CAST(id AS TEXT) AS id, metric, recorded_at, value FROM (
+      SELECT h.subject_id AS id, h.metric, h.recorded_at, h.value,
+             lead(h.value) OVER newest_first AS earlier,
+             row_number() OVER newest_first AS n
+      FROM json_each(?3) c
+      CROSS JOIN json_each(?1) m
+      JOIN companion_metric_history h
+        ON h.subject_type = ?4 AND h.subject_id = (CASE WHEN ?4 = 'fc' THEN CAST(c.value AS TEXT) ELSE CAST(c.value AS INTEGER) END)
+       AND h.metric = m.value AND h.recorded_at > ?2
+      WINDOW newest_first AS (PARTITION BY h.subject_id, h.metric ORDER BY h.recorded_at DESC)
+    ) inside
+    WHERE n = 1 OR earlier IS NOT value
+    UNION ALL
+    SELECT CAST(c.value AS TEXT), m.value, h.recorded_at, h.value
+    FROM json_each(?3) c
+    CROSS JOIN json_each(?1) m
+    JOIN companion_metric_history h ON h.rowid = (
+      SELECT x.rowid FROM companion_metric_history x
+      WHERE x.subject_type = ?4 AND x.subject_id = (CASE WHEN ?4 = 'fc' THEN CAST(c.value AS TEXT) ELSE CAST(c.value AS INTEGER) END)
+        AND x.metric = m.value AND x.recorded_at <= ?2
+      ORDER BY x.recorded_at DESC LIMIT 1)`;
+
 // Map `${id}|${metric}` -> [{ at (ms), value }]. subjectType: 'character' or 'fc'.
 async function metricWindow(client, subjectType, metrics, windowStart, ids) {
-  const result = await client.query(SQL, [metrics, windowStart, ids, subjectType]);
+  const result = await client.query(client.dialect === 'sqlite' ? FILE_SQL : SQL, [metrics, windowStart, ids, subjectType]);
   const points = new Map();
   for (const row of result.rows) {
     const key = `${row.id}|${row.metric}`;

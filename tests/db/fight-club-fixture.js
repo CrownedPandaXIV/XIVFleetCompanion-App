@@ -33,6 +33,12 @@ const db = require('../../db');
 const config = { host: process.env.PGHOST, port: process.env.PGPORT, user: process.env.PGUSER, password: process.env.PGPASSWORD, database: `fleet_${NAME}` };
 db.loadPostgresConfig = () => config;
 db.createPgClient = () => new Client(config);
+// The import's call works on this script's database, on a connection of its own as the app's does.
+db.withClient = async (work, onError) => {
+  const client = new Client(config);
+  await client.connect();
+  try { return await work(client); } catch (err) { return onError(err, client); } finally { await client.end(); }
+};
 const { FIGHT_CLUB_COLUMNS } = require('../../ipc/fight-club');
 Module._load = original;
 

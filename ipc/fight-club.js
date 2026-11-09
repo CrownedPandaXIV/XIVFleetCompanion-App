@@ -1,7 +1,7 @@
 // Fight Club import: read the route spreadsheet, check it, and replace the stored copy.
 const { ipcMain, dialog } = require('electron');
 const XLSX = require('xlsx');
-const { createPgClient, loadPostgresConfig } = require('../db');
+const { withClient } = require('../db');
 
 // Maps each expected Fight Club CSV header to its Postgres column + type.
 // "required: true" means the row is unusable without it (only Route
@@ -179,13 +179,9 @@ ipcMain.handle('import-fight-club:pick-file', async () => {
 // transaction, so a failure partway through leaves the OLD data intact
 // rather than a half-imported table.
 ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) => {
-  const config = loadPostgresConfig();
-  const client = createPgClient(config);
-
   const dbColumns = FIGHT_CLUB_COLUMNS.map((c) => c.dbColumn);
 
-  try {
-    await client.connect();
+  return withClient(async (client) => {
     await client.query('BEGIN');
     await client.query('TRUNCATE TABLE fight_club_routes RESTART IDENTITY');
 
@@ -203,13 +199,11 @@ ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) =
 
     await client.query('COMMIT');
     return { success: true, imported: rows.length };
-  } catch (err) {
+  }, async (err, client) => {
     // (Nothing to undo when the connection itself failed.)
     await client.query('ROLLBACK').catch(() => {});
     return { success: false, error: err.message };
-  } finally {
-    await client.end();
-  }
+  });
 });
 
 module.exports = { FIGHT_CLUB_COLUMNS, parseAndValidateFightClubFile };

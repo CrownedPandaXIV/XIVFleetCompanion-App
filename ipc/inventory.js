@@ -182,17 +182,22 @@ ipcMain.handle('get-fc-list', async () => {
   return withClient(async (client) => {
     const { latestFcMember } = await snapshotFragments(client);
 
+    // The members' names in order, and the first of their worlds (on the fleet file: a list of its own).
+    const names = client.dialect === 'sqlite'
+      ? `(SELECT json_group_array(n) FROM (SELECT DISTINCT m.name AS n FROM ${latestFcMember} m WHERE m.fc_id = h.fc_id ORDER BY n IS NULL, n)) AS member_names,
+             min(c.world) AS world,`
+      : `array_agg(DISTINCT c.name) AS member_names,
+             (array_agg(DISTINCT c.world))[1] AS world,`;
     const result = await client.query(`
       SELECT h.fc_id, h.fc_name,
-             array_agg(DISTINCT c.name) AS member_names,
-             (array_agg(DISTINCT c.world))[1] AS world,
+             ${names}
              MIN(so.sort_index) AS sort_index
       FROM companion_character_housing h
       LEFT JOIN ${latestFcMember} c ON c.fc_id = h.fc_id
       LEFT JOIN character_sort_order so ON so.cid = c.cid
       WHERE h.fc_id IS NOT NULL
       GROUP BY h.fc_id, h.fc_name
-      ORDER BY sort_index NULLS LAST, h.fc_name
+      ORDER BY sort_index NULLS LAST, h.fc_name, h.fc_id
     `);
 
     return { success: true, rows: result.rows };
@@ -236,13 +241,10 @@ ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
 
     const result = await client.query(`
       SELECT fc.fc_id, fc.sorted_container, fc.item_id, fc.quantity, it.name AS item_name,
-             h.fc_name
+             (SELECT fc_name FROM companion_character_housing ch
+              WHERE ch.fc_id = fc.fc_id ORDER BY ch.updated_at DESC LIMIT 1) AS fc_name
       FROM companion_fc_inventory_snapshot fc
       LEFT JOIN ffxiv_item it ON it.id::text = fc.item_id::text
-      LEFT JOIN LATERAL (
-        SELECT fc_name FROM companion_character_housing ch
-        WHERE ch.fc_id = fc.fc_id ORDER BY ch.updated_at DESC LIMIT 1
-      ) h ON true
       WHERE fc.fc_id = ANY($1::numeric[]) AND fc.quantity > 0
         AND fc.sorted_container BETWEEN 20000 AND 20004
     `, [fcIds]);
@@ -306,7 +308,7 @@ ipcMain.handle('get-fleet-inventory-summary', async () => {
         total_quantity: totalsByItemId.get(itemId),
         equipped_quantity: equippedByItemId.get(itemId)
       }))
-      .sort((a, b) => b.total_quantity - a.total_quantity);
+      .sort((a, b) => b.total_quantity - a.total_quantity || a.item_id - b.item_id);
 
     return { success: true, rows };
   }, (err) => {

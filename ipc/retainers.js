@@ -1,6 +1,6 @@
 // Retainers: gear status against each retainer's target, gear suggestions, saving targets.
 const { ipcMain } = require('electron');
-const { createPgClient, loadPostgresConfig, withClient, snapshotFragments } = require('../db');
+const { withClient, snapshotFragments } = require('../db');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
 const { retainerSummary } = require('../characters/retainer-summary');
 
@@ -113,7 +113,7 @@ ipcMain.handle('get-retainer-targets', async () => {
       LEFT JOIN ffxiv_retainertaskrandom vr ON vt.is_random = 'True' AND vr.id = vt.task
       LEFT JOIN ffxiv_retainertasknormal vn ON vt.is_random = 'False' AND vn.id = vt.task
       LEFT JOIN ffxiv_item vi ON vi.id = vn.item
-      ORDER BY so.sort_index NULLS LAST, c.name, rl.hire_order_index NULLS LAST
+      ORDER BY so.sort_index NULLS LAST, c.name, rl.hire_order_index NULLS LAST, rl.retainer_id
     `);
 
     const gearResult = await client.query(`
@@ -123,6 +123,7 @@ ipcMain.handle('get-retainer-targets', async () => {
       LEFT JOIN ffxiv_item i ON i.id::text = inv.item_id::text
       LEFT JOIN ffxiv_classjobcategory cjc ON cjc.id = i.class_job_category
       WHERE inv.sorted_container = 11000
+      ORDER BY inv.retainer_id, inv.sorted_slot_index
     `);
 
     const gearByRetainer = new Map();
@@ -221,9 +222,7 @@ const SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES = {
 // gear couldn't be). This is the suggestion list ONLY - status itself
 // (OK/Mismatch/Wrong Job/Empty) stays an exact match, computed separately.
 ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMode, targetValue, onlyCrafted, slotLabel }) => {
-  const config = loadPostgresConfig();
-  const client = createPgClient(config);
-  try {
+  return withClient(async (client) => {
     const categories = SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES[slotLabel];
     const jobCol = jobAbbreviation ? jobAbbreviation.toLowerCase() : null;
 
@@ -235,8 +234,6 @@ ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMo
     }
     const valueColumn = targetMode === 'level' ? 'level_equip' : 'level_item';
     const secondaryColumn = targetMode === 'level' ? 'level_item' : 'level_equip';
-
-    await client.connect();
 
     const craftedClause = onlyCrafted
       ? 'AND EXISTS (SELECT 1 FROM ffxiv_recipe r WHERE r.item_result = i.id)'
@@ -268,11 +265,7 @@ ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMo
     );
 
     return { success: true, rows: result.rows };
-  } catch (err) {
-    return { success: false, error: err.message };
-  } finally {
-    await client.end();
-  }
+  }, (err) => ({ success: false, error: err.message }));
 });
 
 // What a retainer gear target may be: a level or ilvl target with a whole number from 1 to 999, or no

@@ -107,11 +107,33 @@ const JOINS_FC = {
          WHERE fc.fc_id = ids.id AND fc.item_id::text = '${FC_CHEST_CERULEUM_ITEM_ID}' AND fc.sorted_container BETWEEN 20000 AND 20004) cc ON true`,
 };
 
+// The same joins for the fleet file (db/sqlite-client.js), which has no LATERAL: each total worked out per character
+// or Free Company and joined, with the same zeros (a count of nothing is 0, a sum of nothing empty).
+const FILE_JOINS_CHARACTER = {
+  ...JOINS_CHARACTER,
+  rg: 'LEFT JOIN (SELECT owner_cid, sum(gil) AS gil FROM companion_retainer_lookup GROUP BY owner_cid) rg ON rg.owner_cid = s.cid',
+  sb: `LEFT JOIN (SELECT c.cid, (SELECT count(*) FROM companion_submarine_snapshot sub WHERE sub.cid = c.cid AND sub.level > 0) AS n
+         FROM companion_character_current c) sb ON sb.cid = s.cid`,
+  cc: `LEFT JOIN (SELECT fc_id, sum(quantity) AS n FROM companion_fc_inventory_snapshot
+         WHERE CAST(item_id AS TEXT) = '${FC_CHEST_CERULEUM_ITEM_ID}' AND sorted_container BETWEEN 20000 AND 20004 GROUP BY fc_id) cc ON cc.fc_id = s.fc_id`,
+};
+const FILE_JOINS_FC = {
+  ...JOINS_FC,
+  m: `LEFT JOIN (SELECT i.value AS fc_id, count(cur.cid) AS n, sum(cur.gil) AS gil, sum(cur.ceruleum) AS ceruleum,
+         sum(cur.repair_kits) AS repair_kits, sum(cur.retainer_count) AS retainers, sum(cur.submarine_count) AS subs,
+         min(cur.account_label) AS account
+         FROM json_each($1) i LEFT JOIN cur ON cur.fc_id = i.value GROUP BY i.value) m ON m.fc_id = ids.id`,
+  mr: `LEFT JOIN (SELECT cur.fc_id, sum(rl.gil) AS gil FROM companion_retainer_lookup rl JOIN cur ON rl.owner_cid = cur.cid
+         GROUP BY cur.fc_id) mr ON mr.fc_id = ids.id`,
+  cc: `LEFT JOIN (SELECT fc_id, sum(quantity) AS n FROM companion_fc_inventory_snapshot
+         WHERE CAST(item_id AS TEXT) = '${FC_CHEST_CERULEUM_ITEM_ID}' AND sorted_container BETWEEN 20000 AND 20004 GROUP BY fc_id) cc ON cc.fc_id = ids.id`,
+};
+
 // `checked` is the result of validateExtrasRequest; `latestCharacter` is the fragment from db/index.js that yields
-// the latest snapshot row per character. Returns { sql, params }.
-function buildExtrasQuery(checked, latestCharacter) {
+// the latest snapshot row per character; `sqlite` for the fleet file. Returns { sql, params }.
+function buildExtrasQuery(checked, latestCharacter, { sqlite = false } = {}) {
   const isFc = checked.subject === 'fc';
-  const joins = isFc ? JOINS_FC : JOINS_CHARACTER;
+  const joins = isFc ? (sqlite ? FILE_JOINS_FC : JOINS_FC) : (sqlite ? FILE_JOINS_CHARACTER : JOINS_CHARACTER);
   const needed = new Set();
   for (const column of checked.columns) for (const n of column.needs || []) needed.add(n);
   if (isFc && needed.has('mr')) needed.add('m');

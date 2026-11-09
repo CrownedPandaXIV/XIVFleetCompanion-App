@@ -28,6 +28,9 @@ let shared = null;
 db.withClient = async (work, onError) => { try { return await work(shared); } catch (err) { return onError(err); } };
 db.loadPostgresConfig = () => settings();
 db.createPgClient = (config) => new Client(config);
+// Charts open clients of their own (db.openClient), one per slice, each ended afterwards.
+db.openClient = async () => { const c = new Client(settings()); await c.connect(); return c; };
+db.fleetLocation = () => 'database';
 require('../../ipc/trends');
 Module._load = original;
 

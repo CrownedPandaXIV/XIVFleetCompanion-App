@@ -93,6 +93,9 @@ function ConnectionDot({ status }) {
     return () => clearInterval(interval);
   }, [status.online]);
 
+  if (status.online && status.file) {
+    return <span className="save-status connection-dot" title="This PC keeps its fleet in the plugin's file (Settings > Database).">Fleet file</span>;
+  }
   if (status.online) {
     return <span className="save-status connection-dot" title="The database is answering.">Database</span>;
   }
@@ -429,7 +432,11 @@ function App() {
     let seen = false;
     try { seen = localStorage.getItem('setupSeen') === '1'; } catch { /* not remembered */ }
     if (seen) return;
-    window.api.getPostgresConfig().then((c) => { if (!c || !c.host) setShowSetup(true); }).catch(() => {});
+    // (Nor when this PC keeps its fleet in the plugin's file: there is nothing to set up.)
+    window.api.getFleetLocation().then((where) => {
+      if (where && where.success && where.location === 'file') return;
+      return window.api.getPostgresConfig().then((c) => { if (!c || !c.host) setShowSetup(true); });
+    }).catch(() => {});
   }, []);
   const [trendsPreset, setTrendsPreset] = useState(null);
   const [trendDetail, setTrendDetail] = useState(null);

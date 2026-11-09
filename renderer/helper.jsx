@@ -24,6 +24,21 @@ function HelperView({ refreshKey, onOpenSettings, onNavigate }) {
   }, [refreshKey]);
 
   if (!overview) return <div className="status">Loading...</div>;
+  if (overview.file) {
+    return (
+      <div className="helper-view">
+        <HelperCard
+          title="The fleet file"
+          actions={<button onClick={() => onOpenSettings('general')}>This PC shows...</button>}
+        >
+          <div className="helper-line">
+            This PC keeps its fleet in the plugin's file (<code>{overview.file}</code>), not a shared database, so there is no
+            database for these tools to look after. To see the fleet here, choose the whole app in Settings &gt; General &gt; This PC shows.
+          </div>
+        </HelperCard>
+      </div>
+    );
+  }
   const conn = overview.connection;
   const last = backups && backups.success ? backups.last : null;
   const daily = backups && backups.success ? backups.settings : null;

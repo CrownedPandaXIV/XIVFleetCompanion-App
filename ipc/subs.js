@@ -439,7 +439,7 @@ ipcMain.handle('get-fleet-warnings', async () => {
     const result = await client.query(`
       SELECT c.cid, c.name, c.world, c.account_label, c.snapshot_at AS last_synced_at,
              c.repair_kits, c.ceruleum,
-             (SELECT COUNT(*) FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0) AS subs_built
+             (SELECT COUNT(*) FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0)::int AS subs_built
       FROM ${latestCharacter} c
       ORDER BY c.cid
     `);

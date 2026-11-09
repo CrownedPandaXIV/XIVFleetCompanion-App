@@ -31,6 +31,7 @@ node tests/db/verify-metric-window.js        # the Subs, Supplies and Income his
 node tests/db/verify-venture-totals.js       # venture rewards and their value worked out by the database (uses venture_totals_check)
 node tests/db/verify-fleet-views.js         # the views plugin 2.0 reads, against the app's own working out (uses fleet_views_check)
 node tests/db/verify-sqlite-views.js        # the same views on SQLite (db/sqlite/), row for row (uses fleet_sqlite_check; Node 22.13+)
+node tests/db/verify-file-pages.js          # the app on the fleet file: every page and edit as on PostgreSQL (uses fleet_file_pages; psql)
 MOVE_NEW_PORT=5433 node tests/db/verify-database-move.js   # moving the database between two servers (uses move_db* and move_app)
 node tests/db/verify-leftovers.js           # finding and removing what a move leaves behind (uses lo_*)
 REBUILD_NEW_PORT=5433 node tests/db/verify-rebuild.js  # restoring a backup onto a new PC's database (uses rebuild_*)

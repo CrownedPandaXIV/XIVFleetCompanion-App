@@ -8,6 +8,8 @@ const { isConnectionError, describeError, createConnectionTracker } = require('.
 const { ensureDatabase } = require('./apply-updates');
 const { followMove } = require('./database-move');
 const gameData = require('./game-data');
+const fleetStore = require('./fleet-store');
+const { SqliteClient } = require('./sqlite-client');
 
 // Give up on connecting after this long instead of the operating system's ~20 seconds, so a
 // refresh while the database cannot be reached fails quickly. keepAlive notices a connection that
@@ -61,7 +63,7 @@ const connection = createConnectionTracker({
   reconnectMs: Number(process.env.FLEET_RECONNECT_MS) || 30000,
   notify: (status) => {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('connection-status', status);
+      if (!win.isDestroyed()) win.webContents.send('connection-status', { ...status, file: fleetLocation() === 'file' });
     }
   },
   probe: async () => {
@@ -135,6 +137,70 @@ async function fillGameDataIfEmpty(client, result) {
   }
 }
 
+// ---- The fleet file (the plugin's "Just this PC") ----
+// When this PC keeps its fleet in the plugin's file (db/fleet-store.js), every call works on that file instead
+// (db/sqlite-client.js), with the game data in a file of the app's own beside its settings.
+const FLEET_FILE = () => process.env.XIV_FLEET_FILE || fleetStore.fleetFilePath(app.getPath('appData'));
+const GAME_DATA_FILE = () => process.env.XIV_FLEET_GAME_DATA || path.join(app.getPath('userData'), fleetStore.GAME_DATA_FILE);
+
+// 'file', 'database' or 'none'.
+function fleetLocation() {
+  return fleetStore.whereIsTheFleet({ fleetFile: FLEET_FILE(), hasDatabase: fs.existsSync(CREDENTIAL_FILE) });
+}
+
+function openFleetFile() {
+  return new SqliteClient(FLEET_FILE(), { gameData: GAME_DATA_FILE() });
+}
+
+// A connected client for wherever the fleet is (the caller ends it).
+async function openClient() {
+  if (fleetLocation() === 'file') return openFleetFile();
+  const client = createPgClient(loadPostgresConfig());
+  await client.connect();
+  return client;
+}
+
+// The file's problems in plain words.
+function describeFileError(err) {
+  const text = String(err && err.message || err);
+  if (/database is locked|SQLITE_BUSY/i.test(text)) return 'The fleet file is busy (a game is writing to it). Try again in a moment.';
+  if (/unable to open|SQLITE_CANTOPEN/i.test(text)) return `The fleet file could not be opened (${FLEET_FILE()}).`;
+  if (/malformed|SQLITE_CORRUPT|not a database/i.test(text)) return 'The fleet file is damaged. The plugin can check it and put a backup back (the Status page in the game).';
+  return text;
+}
+
+async function withFile(work, onError) {
+  let client = null;
+  try {
+    client = openFleetFile();
+    fillFileGameData();
+    const result = await work(client);
+    connection.markOnline();
+    return result;
+  } catch (err) {
+    const message = describeFileError(err);
+    const result = await onError(err, client || { dialect: 'sqlite', query: async () => ({ rows: [], rowCount: 0 }) });
+    if (result && typeof result === 'object' && result.error === err.message) result.error = message;
+    return result;
+  } finally {
+    if (client) await client.end();
+  }
+}
+
+// The game data (item names, sub parts, recipes...) for the file: downloaded once into the app's own game data
+// file, in the background, as for a new database (db/game-data-file.js).
+let fileGameData = null;
+function fillFileGameData() {
+  if (fileGameData || process.env.XIV_FLEET_SKIP_GAME_DATA_FILL) return;
+  fileGameData = require('./game-data-file').fillIfEmpty(GAME_DATA_FILE(), {
+    onState: (state) => setDatabaseState({ ok: true, file: true, ...state }),
+  }).catch((err) => {
+    console.error('Could not fill in the game data:', err.message);
+    setDatabaseState({ ok: true, file: true, gameData: 'failed', gameDataProblem: err.message });
+    setTimeout(() => { fileGameData = null; }, RETRY_DATABASE_CHECK_MS);
+  });
+}
+
 // Runs `work(client)` against a fresh, connected Postgres client and always
 // closes it. `onError(err, client)` supplies the handler's error result. Config is
 // loaded outside the try on purpose: a missing connection config still
@@ -143,6 +209,7 @@ async function fillGameDataIfEmpty(client, result) {
 // result is given the plain-language message instead (plus `offline: true` when the database could
 // not be reached, which lets the window keep showing what it last loaded).
 async function withClient(work, onError, hops = 0) {
+  if (fleetLocation() === 'file') return withFile(work, onError);
   const config = loadPostgresConfig();
   const client = createPgClient(config);
   try {
@@ -260,6 +327,8 @@ const SNAPSHOT_SOURCE_RECHECK_MS = 60 * 1000;
 let snapshotSourceState = { checkedAt: 0, useCurrent: false, hasCidIndex: false, hasFcIndex: false };
 
 async function snapshotFragments(client) {
+  // The fleet file always has the current-state table (the plugin writes nothing else).
+  if (client && client.dialect === 'sqlite') return buildSnapshotFragments({ useCurrent: true });
   const now = Date.now();
   if (now - snapshotSourceState.checkedAt > SNAPSHOT_SOURCE_RECHECK_MS) {
     let state = { useCurrent: false, hasCidIndex: false, hasFcIndex: false };
@@ -284,7 +353,9 @@ function savePostgresConfig(config) {
 
 module.exports = {
   createPgClient, loadPostgresConfig, savePostgresConfig, withClient, snapshotFragments, followMoveNow,
-  connectionStatus: () => connection.status(),
+  openClient, fleetLocation, fleetFile: FLEET_FILE, gameDataFile: GAME_DATA_FILE,
+  // (file: this PC's fleet is in the plugin's file, for the header)
+  connectionStatus: () => ({ ...connection.status(), file: fleetLocation() === 'file' }),
   databaseStatus: () => databaseState || (moveState ? { ok: true, move: moveState } : null),
   // After restoring a backup: check for database updates again on the next connection.
   recheckDatabase: () => { databaseCheck = null; },
