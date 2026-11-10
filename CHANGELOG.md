@@ -3,6 +3,13 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.1 - 2026-11-10
+
+- **Trends: salvage shows "Gained a day".** Salvage value and salvage items climb, then drop back when you sell, so "A
+  day on average" counted every sale as a loss and showed next to nothing. For salvage it's now "Gained a day": every
+  rise over the span added up, drops from selling left out. Everything else keeps "A day on average". The same as the
+  plugin's (2.3.1), on a database or the fleet file.
+
 ## 1.10.0 - 2026-11-08
 
 - **The app opens the plugin's fleet file.** A PC where the plugin keeps the fleet in a file ("Keep it on this PC",
