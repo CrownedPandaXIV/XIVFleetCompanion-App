@@ -79,24 +79,37 @@ function trendFormatTime(ms) {
 }
 
 // A line over its span (as the plugin's TrendsMath.Stats): now, at the start (its first recorded point), the change and
-// its share of the start, the change a day on average (between the first and last points with a value), lowest and highest.
+// its share of the start, the change a day on average (between the first and last points with a value), lowest and highest,
+// and what was gained a day (every rise added up, over the same days).
 function trendStats(values, timestamps) {
   let first = -1;
   let last = -1;
   values.forEach((v, i) => { if (v !== null) { if (first < 0) first = i; last = i; } });
-  if (first < 0) return { current: null, start: null, change: null, percent: null, perDay: null, low: null, high: null };
+  if (first < 0) return { current: null, start: null, change: null, percent: null, perDay: null, low: null, high: null, gainedPerDay: null };
   const current = values[last];
   const start = values[first];
   const change = current - start;
   const known = values.filter((v) => v !== null);
   const days = (timestamps[last] - timestamps[first]) / TREND_DAY;
+  let gained = 0;
+  for (let i = 1; i < known.length; i++) gained += Math.max(0, known[i] - known[i - 1]);
   return {
     current, start, change,
     percent: start !== 0 ? (change / Math.abs(start)) * 100 : null,
     perDay: days > 0 ? change / days : null,
     low: Math.min(...known), high: Math.max(...known),
+    gainedPerDay: days > 0 ? gained / days : null,
   };
 }
+
+// Values that climb and then drop back when they're sold (salvage): a day on average would count each sale as a loss, so
+// these show what was gained a day instead (as the plugin's TrendsMath.SoldOff).
+const trendSoldOff = (key) => key === 'salvage_value' || key === 'salvage_items';
+const trendRateLabel = (key) => (trendSoldOff(key) ? 'Gained a day' : 'A day on average');
+const trendRate = (key, st) => (trendSoldOff(key) ? st.gainedPerDay : st.perDay);
+const trendRateHint = (key) => (trendSoldOff(key)
+  ? "Every rise over this span added up, divided by the days between the first and last recorded values shown. Drops from selling aren't taken off."
+  : 'The change over this span, divided by the days between the first and last recorded values shown.');
 
 // Values that are gil (gil, salvage value) show in gil's gold, as everywhere else.
 const trendIsGil = (key) => key === 'gil' || key === 'salvage_value';
@@ -106,11 +119,11 @@ const trendTone = (n) => (n > 0 ? 'tone-good' : n < 0 ? 'tone-warn' : undefined)
 
 // Under a chart of several lines: each one's value now, its change over the span (and its share of the start), a day on
 // average, and its lowest and highest (as the plugin's).
-function TrendStatsTable({ timestamps, series }) {
+function TrendStatsTable({ metricKey, timestamps, series }) {
   return (
     <table className="trend-stats">
       <thead>
-        <tr><th>Line</th><th>Now</th><th>Change</th><th>Change %</th><th title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</th><th>Lowest</th><th>Highest</th></tr>
+        <tr><th>Line</th><th>Now</th><th>Change</th><th>Change %</th><th title={trendRateHint(metricKey)}>{trendRateLabel(metricKey)}</th><th>Lowest</th><th>Highest</th></tr>
       </thead>
       <tbody>
         {series.map((s, i) => {
@@ -121,7 +134,7 @@ function TrendStatsTable({ timestamps, series }) {
               <td>{trendFullNumber(st.current)}</td>
               <td className={trendTone(st.change)}>{trendSigned(st.change)}</td>
               <td className={trendTone(st.change)}>{st.percent === null ? '—' : `${st.percent > 0 ? '+' : ''}${st.percent.toFixed(1)}%`}</td>
-              <td>{trendSigned(st.perDay)}</td>
+              <td>{trendSigned(trendRate(metricKey, st))}</td>
               <td>{trendFullNumber(st.low)}</td>
               <td>{trendFullNumber(st.high)}</td>
             </tr>
@@ -596,8 +609,8 @@ function TrendsView({ refreshKey, preset }) {
                   </div>
                 </div>
                 <div>
-                  <div className="trend-summary-label" title="The change over this span, divided by the days between the first and last recorded values shown.">A day on average</div>
-                  <div className="trend-summary-value">{trendSigned(st.perDay)}</div>
+                  <div className="trend-summary-label" title={trendRateHint(metric.key)}>{trendRateLabel(metric.key)}</div>
+                  <div className="trend-summary-value">{trendSigned(trendRate(metric.key, st))}</div>
                 </div>
               </div>
             );
@@ -637,7 +650,7 @@ function TrendsView({ refreshKey, preset }) {
           )}
           {mode === 'table' && hasData && <div className="trend-note" style={{ marginTop: '4px' }}>Drag the bottom-right corner of the table to make it taller or shorter.</div>}
           {hasData && mode === 'chart' && <div className="trend-note" style={{ marginTop: '6px' }}>Drag across the chart to zoom into that span.</div>}
-          {hasData && chartSeries.length > 1 && <TrendStatsTable timestamps={result.timestamps} series={chartSeries} />}
+          {hasData && chartSeries.length > 1 && <TrendStatsTable metricKey={metric.key} timestamps={result.timestamps} series={chartSeries} />}
         </div>
       )}
     </div>

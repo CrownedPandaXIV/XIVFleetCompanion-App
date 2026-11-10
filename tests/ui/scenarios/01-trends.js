@@ -21,6 +21,9 @@ module.exports = async (t) => {
   // other values
   await setSelect('Value', 'salvage_value'); await sleep(300); await chartReady(); await sleep(300);
   check((await ev(`document.querySelector('.trend-summary-value').innerText`)).length > 0, 'salvage value (whole fleet) renders');
+  const salvageRate = await ev(`[...document.querySelectorAll('.trend-summary-label')].map(l => l.innerText.trim() + ': ' + l.nextElementSibling.innerText.trim())`);
+  check(salvageRate.some((t) => /^Gained a day: (\+[\d,]+|0|—)$/.test(t)) && !salvageRate.some((t) => /^A day on average/.test(t)),
+    "salvage, which drops back when it's sold, shows what was gained a day instead of a day on average: " + JSON.stringify(salvageRate));
   await shot('03-salvage-value-fleet');
   await setSelect('Value', 'fc_points'); await sleep(300); await chartReady();
   await clickText('.trend-segmented button', '1 year'); await sleep(300); await chartReady();

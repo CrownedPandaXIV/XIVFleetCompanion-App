@@ -16,7 +16,7 @@ const fleetFile = path.join(folder, 'fleet.db');
 const gameFile = path.join(folder, 'game-data.db');
 
 module.exports = async (t) => {
-  const { ev, waitFor, check, nav, shot } = t;
+  const { ev, waitFor, check, nav, shot, setSelect, chartReady } = t;
   const characters = new DatabaseSync(fleetFile).prepare('SELECT count(*) AS n FROM companion_character_current').get().n;
   const close = () => ev(`[...document.querySelectorAll('.modal-actions button')].find((b) => b.innerText === 'Close').click()`);
   const openTab = async (label) => {
@@ -38,6 +38,13 @@ module.exports = async (t) => {
     const error = await ev(`[...document.querySelectorAll('.error, .status')].map((e) => e.innerText).find((x) => /^(Error|Failed)|could not|no such/i.test(x)) || ''`);
     check(!error, `${page} opens on the file${error ? `: ${error}` : ''}`);
   }
+  // Trends on the file: salvage shows what was gained a day, as on the database.
+  await nav('Trends');
+  await chartReady();
+  await setSelect('Value', 'salvage_value'); await t.sleep(300); await chartReady(); await t.sleep(300);
+  const salvageRate = await ev(`[...document.querySelectorAll('.trend-summary-label')].map(l => l.innerText.trim() + ': ' + l.nextElementSibling.innerText.trim())`);
+  check(salvageRate.some((x) => /^Gained a day: \+[\d,]+$/.test(x)), 'Trends on the file: salvage shows what was gained a day: ' + JSON.stringify(salvageRate));
+
   await nav('Subs');
   await t.sleep(1500);
   await shot('subs-on-the-file');
