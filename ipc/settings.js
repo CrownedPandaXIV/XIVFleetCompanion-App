@@ -3,6 +3,7 @@
 const { app, ipcMain } = require('electron');
 const { createPgClient, loadPostgresConfig, savePostgresConfig, withClient, connectionStatus } = require('../db');
 const { DEMOLITION_DAYS, warnDaysSetting } = require('../characters/house-warning');
+const { autoRefreshSetting, autoRefreshProblem } = require('../auto-refresh');
 const { BEHIND_MINUTES_KEY, BEHIND_MINUTES_DEFAULT, BEHIND_MINUTES_LIMITS, behindMinutesSetting } = require('../characters/not-synced');
 
 // The app's version (from package.json), shown in Settings.
@@ -91,7 +92,7 @@ ipcMain.handle('settings:get-auto-refresh-interval', async () => {
     const result = await client.query(
       `SELECT setting_value FROM tier3_settings WHERE setting_key = 'auto_refresh_minutes'`
     );
-    const minutes = result.rows.length > 0 ? Number(result.rows[0].setting_value) : 5;
+    const minutes = autoRefreshSetting(result.rows.length > 0 ? result.rows[0].setting_value : null);
     return { success: true, minutes };
   }, (err) => {
     return { success: false, error: err.message, minutes: 5 };
@@ -99,6 +100,8 @@ ipcMain.handle('settings:get-auto-refresh-interval', async () => {
 });
 
 ipcMain.handle('settings:save-auto-refresh-interval', async (event, minutes) => {
+  const problem = autoRefreshProblem(minutes);
+  if (problem) return { success: false, error: problem };
   return withClient(async (client) => {
     await client.query(
       `INSERT INTO tier3_settings (setting_key, setting_value, updated_at)

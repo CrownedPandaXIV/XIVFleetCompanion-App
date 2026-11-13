@@ -48,7 +48,7 @@ const CREDENTIAL_FILE = path.join(app.getPath('userData'), 'pg-credentials.enc')
 function loadPostgresConfig() {
   if (!fs.existsSync(CREDENTIAL_FILE)) {
     throw new Error(
-      'No Postgres connection configured yet. Open Settings and fill in your connection details.'
+      'No database connection saved on this PC yet. Enter it in Settings → Database, or use Settings → Setup Help → Set up this PC.'
     );
   }
 
@@ -210,7 +210,14 @@ function fillFileGameData() {
 // not be reached, which lets the window keep showing what it last loaded).
 async function withClient(work, onError, hops = 0) {
   if (fleetLocation() === 'file') return withFile(work, onError);
-  const config = loadPostgresConfig();
+  // No connection saved yet (or one Windows can't read): every page says so, as for any other failure, instead of
+  // its call failing unanswered and the page staying on "Loading...".
+  let config;
+  try {
+    config = loadPostgresConfig();
+  } catch (err) {
+    return onError(err, { dialect: 'pg', query: async () => ({ rows: [], rowCount: 0 }) });
+  }
   const client = createPgClient(config);
   try {
     await client.connect();

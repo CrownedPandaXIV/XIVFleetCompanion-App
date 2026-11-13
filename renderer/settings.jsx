@@ -1005,6 +1005,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
                 <input
                   type="number"
                   min="1"
+                  max="1440"
+                  step="1"
                   value={refreshMinutes}
                   onChange={(e) => setRefreshMinutes(e.target.value)}
                   style={{ width: '60px' }}

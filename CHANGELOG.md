@@ -3,6 +3,22 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.3 - 2026-11-13
+
+- **No connection saved no longer leaves pages on "Loading..."**: with no database connection saved on this PC (setup
+  skipped, or a saved one Windows can't read), every page now says so and where to enter one, instead of most pages
+  loading for good.
+- **Inventory shows only what's chosen**: picking another character or Free Company while the last one was still loading
+  could show the earlier one's items. Only the answer for what's chosen now is shown.
+- **Auto-refresh is kept to whole minutes from 1 to 1440.** A value outside that (a negative number, or more than about
+  24 days) made every page reload nonstop. One saved before reads as the usual 5 minutes.
+- **The database tools check the port first**: New database, Move the database to this PC and Leftovers take a whole
+  number from 1 to 65535, and say so plainly otherwise, before anything starts (a move installs PostgreSQL on it). A
+  port box left empty or with letters no longer quietly becomes 5432. The same as the plugin's (2.4.2).
+- **Parts: the Sub Build Rules panel stays within the page**, however wide it was dragged or the window is now, so the
+  parts table always keeps its room.
+- Auto-refresh keeps going at 5 minutes if its setting can't be read, instead of stopping.
+
 ## 1.10.2 - 2026-11-13
 
 - **One window at a time.** Opening the app while it's already open (the desktop icon, the Start menu) brings the open

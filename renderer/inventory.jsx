@@ -152,7 +152,10 @@ function CharacterInventoryTab() {
       return;
     }
     setRows(null);
+    // Only the answer for what's chosen now is shown: an earlier, slower one is left out.
+    let current = true;
     window.api.getCharacterInventory(selectedCids).then((result) => {
+      if (!current) return;
       if (result.success) {
         setRows(result.rows);
         setError(null);
@@ -160,6 +163,7 @@ function CharacterInventoryTab() {
         setError(result.error);
       }
     });
+    return () => { current = false; };
   }, [selectedCids]);
 
   if (error) return <div className="error">Failed to load: {error}</div>;
@@ -346,7 +350,10 @@ function FcInventoryTab() {
       return;
     }
     setRows(null);
+    // Only the answer for what's chosen now is shown: an earlier, slower one is left out.
+    let current = true;
     window.api.getFcInventory(selectedFcIds).then((result) => {
+      if (!current) return;
       if (result.success) {
         setRows(result.rows);
         setError(null);
@@ -354,6 +361,7 @@ function FcInventoryTab() {
         setError(result.error);
       }
     });
+    return () => { current = false; };
   }, [selectedFcIds]);
 
   if (error) return <div className="error">Failed to load: {error}</div>;

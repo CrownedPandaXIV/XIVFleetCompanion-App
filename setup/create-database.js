@@ -16,6 +16,15 @@ function checkRequest({ database, user, password }) {
   return null;
 }
 
+// A port typed on a database tool (New database, Move, Leftovers): a whole number from 1 to 65535. PostgreSQL
+// is installed on it by a move, so a wrong one is refused before anything starts. (The plugin's
+// DatabaseAdmin.PortProblem is the same.)
+function portProblem(value) {
+  const text = String(value === null || value === undefined ? '' : value).trim();
+  const n = /^\d+$/.test(text) ? Number(text) : NaN;
+  return n >= 1 && n <= 65535 ? null : "The port must be a whole number from 1 to 65535 (PostgreSQL's usual one is 5432).";
+}
+
 // admin: a connected client logged in as PostgreSQL's administrator. Returns { ok: true } or { ok: false, error }.
 async function createDatabase(admin, request) {
   const problem = checkRequest(request);
@@ -44,4 +53,4 @@ async function createDatabase(admin, request) {
   return { ok: true };
 }
 
-module.exports = { checkRequest, createDatabase };
+module.exports = { portProblem, checkRequest, createDatabase };

@@ -218,7 +218,7 @@ function GameDataBanner() {
   const [notice, setNotice] = useState(null);
   const [phase, setPhase] = useState('idle'); // idle | checking | updating | done
   const [message, setMessage] = useState('');
-  const load = () => window.api.getGameDataNotice().then((r) => setNotice(r && r.success && r.available ? r : null));
+  const load = () => window.api.getGameDataNotice().then((r) => setNotice(r && r.success && r.available ? r : null)).catch(() => {});
   useEffect(() => {
     load();
     const timer = setInterval(load, GAME_DATA_NOTICE_EVERY_MS);
@@ -506,9 +506,10 @@ function App() {
     if (showSettings) return undefined;
     let intervalId;
     let stopped = false;
-    window.api.getAutoRefreshInterval().then((result) => {
+    // If the setting can't be read, it refreshes at the usual 5 minutes rather than not at all.
+    window.api.getAutoRefreshInterval().catch(() => ({})).then((result) => {
       if (stopped) return;
-      const minutes = result.minutes || 5;
+      const minutes = (result && result.minutes) || 5;
       intervalId = setInterval(() => {
         setRefreshKey((k) => k + 1);
       }, minutes * 60 * 1000);
