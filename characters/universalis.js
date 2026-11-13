@@ -15,6 +15,8 @@ const PARALLEL = 4; // requests at once
 // (with 20, a material needed in the thousands looked short when plenty more was for sale).
 const LISTINGS = 100;
 const KEEP_MS = 30 * 60 * 1000;
+// How long one request may take, answer included, before it counts as no answer (the plugin's too).
+const TIMEOUT_MS = 20 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
 
 const REGION_LABELS = { 'North-America': 'NA', Europe: 'EU', Japan: 'JP', Oceania: 'OCE', 中国: 'CN', 한국: 'KR' };
@@ -88,23 +90,31 @@ function sellingListings(listings, { exclude, world } = {}) {
     .sort((a, b) => a.price - b.price);
 }
 
-function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now() } = {}) {
+function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now(), timeoutMs = TIMEOUT_MS } = {}) {
   const cache = new Map(); // `${scope}|${id}` -> { at, listings }
   let places = null;
 
   // `missingOk`: a 404 answers null. Universalis answers 404 when no item asked for is on the market board
   // (one untradeable item, such as salvage, asked for on its own).
+  // A request that gets no answer in timeoutMs is given up, so a page doesn't wait on it for minutes.
   async function getJson(path, { missingOk = false } = {}) {
+    const signal = AbortSignal.timeout(timeoutMs);
+    const unreachable = (err) => new Error(`Universalis could not be reached (${signal.aborted ? `no answer in ${Math.round(timeoutMs / 1000)} seconds` : err.message}).`);
     let res;
     try {
-      res = await fetchImpl(`${baseUrl}${path}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } });
+      res = await fetchImpl(`${baseUrl}${path}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, signal });
     } catch (err) {
-      throw new Error(`Universalis could not be reached (${err.message}).`);
+      throw unreachable(err);
     }
     if (res.status === 404 && missingOk) return null;
     if (res.status === 429) throw new Error('Universalis is busy (too many requests). Try again in a minute.');
     if (!res.ok) throw new Error(`Universalis answered ${res.status}.`);
-    return res.json();
+    try {
+      return await res.json();
+    } catch (err) {
+      if (signal.aborted) throw unreachable(err);
+      throw err;
+    }
   }
 
   // World name -> { dc, region, regionLabel }: Universalis's list of data centers, or the built-in one.

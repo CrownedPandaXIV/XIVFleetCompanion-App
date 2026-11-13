@@ -90,6 +90,37 @@ test('many items are asked for 50 at a time; a busy or unreachable Universalis s
   await assert.rejects(down.marketFor(['Maduin'], [1]), /could not be reached \(ENOTFOUND\)/);
 });
 
+test('a Universalis that never answers, or stops part way, is given up after the time allowed', async () => {
+  const http = require('http');
+  const held = [];
+  // Never answers /api/v2/silent; starts the answer to anything else, then sends nothing more.
+  const server = http.createServer((req, res) => {
+    held.push(res);
+    if (!req.url.includes('silent')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.write('{"items":'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const started = Date.now();
+    const silent = createUniversalis({ baseUrl: `${baseUrl}/silent`, timeoutMs: 300 });
+    await assert.rejects(silent.marketFor(['Maduin'], [1]), /could not be reached \(no answer in 0 seconds\)/);
+    const stalls = createUniversalis({ baseUrl, timeoutMs: 300 });
+    await assert.rejects(stalls.marketFor(['Maduin'], [1]), /could not be reached \(no answer in 0 seconds\)/);
+    assert.ok(Date.now() - started < 5000, 'gave up in time');
+  } finally {
+    held.forEach((res) => res.destroy());
+    server.close();
+  }
+});
+
+test('requests are given up after 20 seconds unless told otherwise, the same as the plugin', async () => {
+  let signal;
+  const u = createUniversalis({ baseUrl: 'http://stub', fetchImpl: async (url, options) => { signal = options.signal; throw new Error('stop'); } });
+  await assert.rejects(u.marketFor(['Maduin'], [1]));
+  assert.ok(signal instanceof AbortSignal && !signal.aborted);
+  assert.match(require('fs').readFileSync(require.resolve('../characters/universalis.js'), 'utf8'), /const TIMEOUT_MS = 20 \* 1000;/);
+});
+
 test('a listing someone sells cheaper on its world is undercut; your own retainers do not count', () => {
   const market = new Map([['Maduin', { listings: {
     world: new Map([[5111, [listing(80, { retainerName: 'MyRet' }), listing(90), listing(70, { hq: true })]]]),

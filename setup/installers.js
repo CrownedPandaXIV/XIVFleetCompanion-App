@@ -119,12 +119,13 @@ async function sha256Of(file) {
 // the checksum. Throws with a plain message when the download fails or doesn't match; nothing is left behind.
 async function download({ url, sha256 }, dest, onProgress = () => {}, fetchImpl = fetch) {
   const partial = `${dest}.partial`;
+  let out = null;
   try {
     const res = await fetchImpl(url);
     if (!res.ok || !res.body) throw new Error(`the download site answered ${res.status}`);
     const total = Number(res.headers.get('content-length')) || 0;
     let got = 0;
-    const out = fs.createWriteStream(partial);
+    out = fs.createWriteStream(partial);
     for await (const chunk of res.body) {
       got += chunk.length;
       if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
@@ -136,6 +137,8 @@ async function download({ url, sha256 }, dest, onProgress = () => {}, fetchImpl 
     fs.renameSync(partial, dest);
     return dest;
   } catch (err) {
+    // The part-downloaded file is closed before it's removed (Windows may refuse to remove a file that's still open).
+    if (out && !out.closed) await new Promise((resolve) => { out.once('close', resolve); out.destroy(); });
     fs.rmSync(partial, { force: true });
     throw new Error(`Couldn't download ${path.basename(new URL(url).pathname)}: ${err.message}`);
   }

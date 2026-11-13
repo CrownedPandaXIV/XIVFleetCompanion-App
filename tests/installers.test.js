@@ -77,6 +77,29 @@ function server(body) {
   });
 }
 
+test('a download cut off part way closes the part-downloaded file, removes it and says so plainly', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dl-cut-'));
+  const opened = [];
+  const realCreate = fs.createWriteStream;
+  fs.createWriteStream = (...args) => { const out = realCreate(...args); opened.push(out); return out; };
+  try {
+    const cutOff = async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-length': '200000' }),
+      body: (async function* () { yield Buffer.alloc(65536, 1); throw new Error('the connection was reset'); })(),
+    });
+    await assert.rejects(inst.download({ url: 'https://example.invalid/setup.exe', sha256: '0'.repeat(64) }, path.join(dir, 'setup.exe'), () => {}, cutOff),
+      /^Error: Couldn't download setup\.exe: the connection was reset$/);
+    assert.strictEqual(opened.length, 1);
+    assert.ok(opened[0].closed, 'the part-downloaded file was closed');
+    assert.deepStrictEqual(fs.readdirSync(dir), [], 'nothing left behind');
+  } finally {
+    fs.createWriteStream = realCreate;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('downloads follow redirects, report progress, check the checksum, and leave nothing behind when wrong', async () => {
   const body = crypto.randomBytes(200000);
   const sha256 = crypto.createHash('sha256').update(body).digest('hex').toUpperCase();

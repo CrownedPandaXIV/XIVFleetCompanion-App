@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, screen } = require('electron');
 const path = require('path');
 const { chooseUserDataFolder } = require('./user-data-folder');
 
@@ -13,9 +13,26 @@ if (app.getPath('userData') === defaultUserData) {
 // PostgreSQL's backup tools, when Settings → Backups → Get the backup tools downloaded them (backups/get-tools.js).
 require('./backups/tools').useAppTools(path.join(app.getPath('userData'), 'postgres-tools'));
 
+// One window at a time: opening the app again (the desktop icon, the Start menu) brings the open one to the front
+// instead of starting a second copy, which would check for updates and keep the database up to date alongside it.
+// The runs without a window above (the daily backup, a permission prompt's run) aren't held back by it.
+const FIRST_COPY = ['--fleet-alerts', '--fleet-backup', '--fleet-setup'].some((a) => process.argv.includes(a))
+  || app.requestSingleInstanceLock();
+let mainWindow;
+if (!FIRST_COPY) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 // What the app prints also goes to logs\app.log in that folder (app-log.js). Not for Windows' permission-prompt
 // runs (--fleet-setup), which run as the administrator and report back to the app that started them.
-if (!process.argv.includes('--fleet-setup')) {
+if (FIRST_COPY && !process.argv.includes('--fleet-setup')) {
   const { createLog, captureConsole } = require('./app-log');
   const log = captureConsole(createLog(path.join(app.getPath('userData'), 'logs')), console);
   const mode = process.argv.includes('--fleet-backup') ? 'daily backup'
@@ -33,6 +50,7 @@ const gameData = require('./db/game-data');
 const { leaveRemovedOutOfTrends } = require('./db/trends-cleanup');
 const { withClient } = require('./db');
 const { startUpdates } = require('./updater');
+const { readWindowState, writeWindowState, windowOptions, MIN: WINDOW_MIN } = require('./window-state');
 
 // Each ipc/ file registers the calls the window can make for one area of the app.
 require('./ipc/trends');
@@ -62,8 +80,6 @@ require('./ipc/move-database');
 require('./ipc/leftovers');
 require('./ipc/fleet-file');
 
-let mainWindow;
-
 // Started with --fleet-alerts by the scheduled task of the Discord alerts (removed in 1.7.0) on a PC that
 // had them set up: remove that task and the alerts' files (setup/old-discord-alerts.js), then quit.
 const ALERTS_ONLY = process.argv.includes('--fleet-alerts');
@@ -76,15 +92,24 @@ const SETUP_ONLY = process.argv.includes('--fleet-setup');
 if (ALERTS_ONLY || BACKUP_ONLY || SETUP_ONLY) app.disableHardwareAcceleration();
 
 function createWindow() {
+  // Opens where it was left, at the size it was (window-state.js).
+  const stateFile = path.join(app.getPath('userData'), 'window.json');
+  const { bounds, maximized } = windowOptions(readWindowState(stateFile), screen.getAllDisplays().map((d) => d.workArea));
   mainWindow = new BrowserWindow({
     title: `XIV Fleet Companion v${app.getVersion()}`,
-    width: 1000,
-    height: 700,
+    ...bounds,
+    minWidth: WINDOW_MIN.width,
+    minHeight: WINDOW_MIN.height,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  if (maximized) mainWindow.maximize();
+  mainWindow.on('close', () => {
+    writeWindowState(stateFile, { ...mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() });
   });
 
   // Keep the version in the window title; otherwise the page's own <title> replaces it.
@@ -122,6 +147,7 @@ function createWindow() {
 
 
 app.whenReady().then(() => {
+  if (!FIRST_COPY) return;
   const removeOldAlerts = () => require('./setup/old-discord-alerts').removeOldDiscordAlerts(app.getPath('userData'))
     .then((r) => {
       if (r && (r.task || r.files.length)) console.log(`Discord alerts (removed in 1.7.0) cleaned up: ${r.task ? 'scheduled task removed; ' : ''}files removed: ${r.files.join(', ') || 'none'}.`);
