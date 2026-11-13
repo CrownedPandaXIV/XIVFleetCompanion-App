@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { app, ipcMain } = require('electron');
+const { portProblem } = require('../setup/create-database');
 const { createPgClient, loadPostgresConfig, savePostgresConfig } = require('../db');
 const { pcAddresses, homeNetworkCidrs, isThisPc } = require('../setup/help');
 const { rangesToAllow } = require('../setup/remote-access');
@@ -55,13 +56,15 @@ ipcMain.handle('move:run', async (event, input) => {
   const address = String(input.address || '').trim();
   const addresses = pcAddresses(os.networkInterfaces());
   if (![...addresses.tailscale, ...addresses.home].includes(address)) return { ok: false, error: 'Choose one of this PC\'s own addresses.' };
+  const badPort = portProblem(input.port);
+  if (badPort) return { ok: false, error: badPort };
   running = true;
   try {
     const installPostgres = !(await postgresHere());
     const result = await moveDatabase({
       config,
       address,
-      port: Number(input.port) || 5432,
+      port: Number(input.port),
       adminPassword: String(input.adminPassword || ''),
       installPostgres,
     }, {

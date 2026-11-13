@@ -9,7 +9,7 @@ const { createPgClient, loadPostgresConfig, savePostgresConfig, recheckDatabase 
 const { PLUGIN_REPO, REPORT_PROBLEM_URL, COMPANION_PLUGINS, pcAddresses, homeNetworkCidrs, connectionDetails, describeTestError } = require('../setup/help');
 const { rangesToAllow } = require('../setup/remote-access');
 const { letOtherPcsConnect } = require('../setup/elevated');
-const { createDatabase } = require('../setup/create-database');
+const { createDatabase, portProblem } = require('../setup/create-database');
 
 function savedConfig() {
   try { return loadPostgresConfig(); } catch { return {}; }
@@ -75,7 +75,9 @@ ipcMain.handle('setup:let-other-pcs-connect', async () => {
 // Makes the database and the app's login with PostgreSQL's administrator login, then switches this app to
 // it. The administrator password is used only here and never saved.
 ipcMain.handle('setup:create-database', async (event, input) => {
-  const port = Number(input.port) || 5432;
+  const badPort = portProblem(input.port);
+  if (badPort) return { success: false, error: badPort };
+  const port = Number(input.port);
   const admin = createPgClient({ host: 'localhost', port, database: 'postgres', user: input.adminUser || 'postgres', password: input.adminPassword || '', connectionTimeoutMillis: 5000 });
   try {
     await admin.connect();

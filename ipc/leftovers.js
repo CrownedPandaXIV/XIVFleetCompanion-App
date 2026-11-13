@@ -3,6 +3,7 @@
 // and never saved. The working out is in setup/leftovers.js.
 const os = require('os');
 const { app, ipcMain } = require('electron');
+const { portProblem } = require('../setup/create-database');
 const { createPgClient, loadPostgresConfig } = require('../db');
 const { pcAddresses, isThisPc, describeTestError } = require('../setup/help');
 const { runElevated, postgresServices } = require('../setup/elevated');
@@ -25,7 +26,9 @@ function currentHere(port) {
 
 // Runs work(admin, { connectTo, current, port }) logged in as PostgreSQL's administrator on this PC.
 async function asAdmin(input, work) {
-  const port = Number(input.port) || 5432;
+  const badPort = portProblem(input.port);
+  if (badPort) return { success: false, error: badPort };
+  const port = Number(input.port);
   const login = { host: 'localhost', port, user: 'postgres', password: String(input.adminPassword || ''), connectionTimeoutMillis: 5000 };
   const admin = createPgClient({ ...login, database: 'postgres' });
   try {

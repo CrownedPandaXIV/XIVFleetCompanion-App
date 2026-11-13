@@ -489,9 +489,16 @@ function PartsView({ refreshKey }) {
     const saved = localStorage.getItem('partsRulesPanelVisible');
     return saved === null ? true : saved === 'true';
   });
+  // The rules panel's width: at least 180px, and never so wide that the parts table has less than 320px left.
+  // (The room is the page's own, beside the app's sidebar; the window's width until the page is drawn.)
+  const pageRef = useRef(null);
+  const clampRulesWidth = (w) => {
+    const room = pageRef.current ? pageRef.current.clientWidth : window.innerWidth;
+    return Math.max(180, Math.min(Number.isFinite(w) ? w : 420, room - 320));
+  };
   const [rulesPanelWidth, setRulesPanelWidth] = useState(() => {
     const saved = localStorage.getItem('partsRulesPanelWidth');
-    return saved === null ? 420 : Number(saved);
+    return clampRulesWidth(saved === null ? 420 : Number(saved));
   });
   const draggingRef = useRef(false);
 
@@ -517,15 +524,17 @@ function PartsView({ refreshKey }) {
     return () => { current = false; };
   }, [refreshKey, aheadDays]);
 
-  // Plain mouse-drag resize, clamped so the panel can shrink enough to
-  // avoid pushing the page into horizontal scroll, but not so far it
-  // becomes unusable. In-memory only, resets to 420px on restart.
+  // Plain mouse-drag resize, clamped (clampRulesWidth) so neither the panel nor the parts table becomes unusable;
+  // remembered on this PC. A smaller window brings a wide panel back within the window.
   useEffect(() => {
     function handleMouseMove(e) {
       if (!draggingRef.current) return;
-      const newWidth = window.innerWidth - e.clientX;
-      setRulesPanelWidth(Math.max(newWidth, 180));
+      setRulesPanelWidth(clampRulesWidth(window.innerWidth - e.clientX));
     }
+    function handleResize() {
+      setRulesPanelWidth((w) => clampRulesWidth(w));
+    }
+    window.addEventListener('resize', handleResize);
     function handleMouseUp() {
       draggingRef.current = false;
     }
@@ -534,14 +543,21 @@ function PartsView({ refreshKey }) {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  // Once the page is drawn (after loading), its own room is known: bring a remembered width within it.
+  const drawn = rows !== null && !error;
+  useEffect(() => {
+    if (drawn) setRulesPanelWidth((w) => clampRulesWidth(w));
+  }, [drawn]);
 
   if (error) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+    <div ref={pageRef} style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="controls">
           <button onClick={() => setSubView('summary')} disabled={subView === 'summary'}>
