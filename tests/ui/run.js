@@ -7,6 +7,7 @@ const os = require('os');
 const path = require('path');
 const { connect } = require('./harness');
 const { Client } = require('pg');
+const { ensureDatabase } = require('../../db/apply-updates');
 
 // A scenario may export before(db) / after(db) to change the scratch database around its run, and
 // setup() / teardown() plus env() (extra environment for the app, read after setup) for anything else,
@@ -32,8 +33,26 @@ function startApp(profile, extraEnv = {}) {
   return child;
 }
 
+// The scratch database is made by db/schema.sql plus the fixtures, which add back the old snapshot table that
+// plugins before 0.4.0 wrote (scenarios 12 and 13 read it). With that table there and no version recorded, the app
+// won't update the database and shows a banner. A real database at this layout has its version recorded, so record
+// it here first, as the app would without the old table, and every scenario starts the same, alone or in a full run.
+async function recordDatabaseVersion() {
+  await withDb(async (db) => {
+    const { rows: [r] } = await db.query(`SELECT count(*)::int AS n FROM companion_schema_version`);
+    if (r.n > 0) return;
+    await db.query('ALTER TABLE companion_character_snapshot RENAME TO zz_hidden_snapshot');
+    try {
+      await ensureDatabase(db, { appVersion: require('../../package.json').version });
+    } finally {
+      await db.query('ALTER TABLE zz_hidden_snapshot RENAME TO companion_character_snapshot');
+    }
+  });
+}
+
 (async () => {
   let failed = 0;
+  await recordDatabaseVersion();
   for (const file of scenarios) {
     const scenario = require(path.join(dir, file));
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-ui-'));
