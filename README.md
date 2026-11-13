@@ -364,7 +364,7 @@ installed app (`%APPDATA%\XIV Fleet Companion`).
 - `backups/` is the backups, `updater.js` the automatic updates (`update-status.js`
   turns them into what Settings → General → Updates shows).
 - `app-log.js` writes the app's log (logs\app.log), and `user-data-folder.js` picks the folder the settings and
-  the log are kept in.
+  the log are kept in. `window-state.js` remembers the window's size and place (window.json in that folder).
 
 ### Changing the database
 

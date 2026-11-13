@@ -3,6 +3,18 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.2 - 2026-11-13
+
+- **One window at a time.** Opening the app while it's already open (the desktop icon, the Start menu) brings the open
+  window to the front instead of starting a second copy alongside it.
+- **The window opens where you left it**, at the same size, and maximized if it was. If that place is no longer on a
+  screen (a screen unplugged), it opens on the main screen instead.
+- **Live Market Prices give up after 20 seconds** when Universalis doesn't answer, and say so ("no answer in 20
+  seconds"), instead of a page waiting on it for up to 5 minutes. The same as the plugin's (2.4.1).
+- A download that's cut off part way during Set up this PC closes and removes the part-downloaded file before saying
+  what happened.
+- Electron 44.11.3, which has a security fix 44.9.0 didn't.
+
 ## 1.10.1 - 2026-11-10
 
 - **Trends: salvage shows "Gained a day".** Salvage value and salvage items climb, then drop back when you sell, so "A
