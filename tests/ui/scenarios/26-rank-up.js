@@ -1,4 +1,4 @@
-// Subs: Next Rank and Next Build. Bex Kitteh 1's subs are ranks 82-85 (10,000 experience per rank in the
+// Subs: Next rank and Next build. Bex Kitteh 1's subs are ranks 82-85 (10,000 experience per rank in the
 // test data), on route O-J: 3,000 experience a voyage, about 14.9 hours at their speed.
 //   Sub1 (rank 82, 1,000 in, back in about an hour): calculated, 9,000 more = 3 voyages, so about 1 hour +
 //        2 x 14.9 hours = "≈ in 1d 6h"
@@ -9,7 +9,7 @@
 //   Sub3 is set back an hour ago, waiting to be collected, for sorting by Status.
 // A Sub Rules rule for rank 88 (all Syldra) is added, so the next build for these subs is YYYY at 88.
 // Gus Kitteh 6's Sub4 is rank 90, the highest in the test data; Fight Club's all-Whale O-J-Z build pays more
-// than its own, so Next Build still says so (see 45-fight-club-next-build.js).
+// than its own, so Next build still says so (see 45-fight-club-next-build.js).
 const BEX = '18014498578000001';
 // Sub1's return time when the test data was made; it is set to an hour from now for the test (the answer
 // depends on it), and put back after.
@@ -27,7 +27,7 @@ module.exports = async (t) => {
   const heads = await ev(`[...document.querySelector('thead').querySelectorAll('th')].map(th => th.innerText.trim().toLowerCase().replace(/[\\u25B2\\u25BC]/g, '').trim())`);
   const iRank = heads.indexOf('next rank');
   const iBuild = heads.indexOf('next build');
-  check(iRank > 0 && iBuild === iRank + 1 && heads[iRank - 1] === 'rank', 'Next Rank and Next Build follow Rank: ' + heads.join(', '));
+  check(iRank > 0 && iBuild === iRank + 1 && heads[iRank - 1] === 'rank', 'Next rank and Next build follow Rank: ' + heads.join(', '));
 
   const subRow = (character, sub) => ev(`(() => {
     const group = [...document.querySelectorAll('.account-group')].find(g => {
@@ -53,7 +53,7 @@ module.exports = async (t) => {
   check(sub4 && /^≈ in 5d 1[345]h$/.test(sub4[iRank].text), 'out at sea: its experience comes when it is back, then a voyage at a time: ' + (sub4 && sub4[iRank].text));
   check(sub4 && /\(2 voyages\)\. Calculated from its route/.test(sub4[iRank].title), 'counted in voyages on hover: ' + (sub4 && sub4[iRank].title));
 
-  // Current Route: the map's number before the letters, its name on hover.
+  // Current route: the map's number before the letters, its name on hover.
   const iRoute = heads.indexOf('current route');
   check(sub1 && sub1[iRoute].text === '1 · O-J' && sub1[iRoute].title === 'Deep-sea Site', 'the route has its map: ' + (sub1 && `${sub1[iRoute].text} (${sub1[iRoute].title})`));
 

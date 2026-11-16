@@ -22,16 +22,19 @@ module.exports = async (t) => {
   await waitFor(`!!document.querySelector('.setup-run-button')`, 'the Set up this PC button', 10000);
   await ev(`document.querySelector('.setup-run-button').click()`);
   await waitFor(`!!${wiz} && !!${wiz}.querySelector('input[name=setup-role]')`, 'the setup screen', 10000);
-  check((await ev(`${wiz}.querySelectorAll('input[name=setup-role]').length`)) === 4, 'four kinds of PC to choose from');
+  const labels = await ev(`[...${wiz}.querySelectorAll('.setup-role strong')].map((s) => s.innerText)`);
+  check(JSON.stringify(labels) === JSON.stringify(['I play on one PC', 'This PC keeps the database for my other PCs', 'This PC uses a database on another PC', 'This PC only plays the game']),
+    `one PC first, then the three kinds of PC with a database, and no "Everything on this PC": ${JSON.stringify(labels)}`);
   check(await ev(`(${wiz}.querySelector('button.setup-next') || {}).disabled === true`), 'Next waits for a choice');
+  check(!(await ev(`!!${wiz}.querySelector('input[name=setup-app-mode]')`)), "setup doesn't ask full app or Database Helper (that's in Settings)");
+
+  // One PC: nothing to install, only where to click in the game.
+  await role('onepc-file');
+  check(/Nothing to install\. In the game, type \/xivfleet and click Keep it on this PC/.test(await text()) && !(await ev(`!!${wiz}.querySelector('button.setup-next')`)) && !/PostgreSQL/.test(await text()),
+    'one PC: says to click Keep it on this PC in the game, with nothing to install and no Next');
 
   await role('dbhost');
   check(/All my PCs are in the same house/.test(await text()), 'a database PC can skip Tailscale when every PC is at home');
-  // Afterwards, this PC shows: the whole app for a database PC, the Database Helper for one that only plays.
-  check(await ev(`${wiz}.querySelector('.setup-app-mode-fleet').checked`), 'a database PC opens the full app afterwards');
-  await role('plugin');
-  check(await ev(`${wiz}.querySelector('.setup-app-mode-tools').checked`), 'a PC that only plays suggests the Database Helper');
-  await role('dbhost');
   await click('Next');
   await waitFor(`!!${wiz}.querySelector('.setup-master')`, 'the passwords page', 10000);
   const plan = await ev(`[...${wiz}.querySelectorAll('.setup-plan li')].map((li) => li.innerText)`);

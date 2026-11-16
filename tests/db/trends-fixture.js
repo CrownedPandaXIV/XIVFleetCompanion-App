@@ -1,7 +1,7 @@
-// The Trends tab's answers for a made-up history, for the plugin's own Trends page to be checked against (plugin 2.0
+// The Trends page's answers for a made-up history, for the plugin's own Trends page to be checked against (plugin 2.0
 // Trends stage: the plugin reads companion_metric_history itself, with the same chart query as db/metric-series.js).
 // It writes made-up characters, Free Companies and their recorded values, then asks the app's own calls the way the
-// Trends tab, the Summary tiles and the charts on other tabs do (ipc/trends.js: get-metric-catalog,
+// Trends page, the Summary tiles and the charts on other tabs do (ipc/trends.js: get-metric-catalog,
 // get-metric-subjects, get-metric-series), and writes the rows and the answers to one file:
 //
 //   node tests/db/trends-fixture.js ../XIVFleetCompanion/tests/FleetWriterTests/trends-fixture.json
@@ -132,7 +132,7 @@ function latestOf(history) {
 const prices = { 22500: 8000, 22501: 9000, 22502: 10000, 22503: 13000, 22504: 27000, 22505: 28500, 22506: 30000, 22507: 34500 };
 const items = (weightOf, subjectType) => SALVAGE.map((id) => ({ metric: `item_qty:${id}`, subjectType, weight: weightOf(id) }));
 
-// The requests the Trends tab, the Summary tiles, the cards on other tabs and the detail panel make (renderer/trends.jsx).
+// The requests the Trends page, the Summary tiles, the cards on other tabs and the detail panel make (renderer/trends.jsx).
 function requests(now, firstRecorded, ids) {
   const ago = (ms) => new Date(now - ms).toISOString();
   const at = new Date(now).toISOString();

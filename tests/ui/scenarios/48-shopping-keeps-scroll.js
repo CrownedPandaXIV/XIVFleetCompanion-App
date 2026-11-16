@@ -4,7 +4,7 @@ module.exports = async (t) => {
   const { ev, waitFor, check, nav, clickText, sleep } = t;
   await ev(`window.localStorage.clear()`);
   await nav('Parts');
-  await waitFor(`[...document.querySelectorAll('.controls button')].some(b => b.innerText.trim() === 'Shopping List')`, 'the Parts tab', 20000);
+  await waitFor(`[...document.querySelectorAll('.controls button')].some(b => b.innerText.trim() === 'Shopping List')`, 'the Parts page', 20000);
   await clickText('.controls button', 'Shopping List');
   await waitFor(`!!document.querySelector('.shopping-gather')`, 'the shopping list', 30000);
 

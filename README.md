@@ -133,7 +133,7 @@ You never need to run anything on the database by hand.
 ### More than one account
 
 Give each game account its own setup of AutoRetainer and Fleet Companion (for example, separate XIVLauncher setups),
-with its own account label in the plugin's settings (the Roster and the PCs tab point out any without one). Each setup
+with its own account label in the plugin's settings (the Roster and the PCs page point out any without one). Each setup
 notes when a character logs in on it, and only the setup a character last logged in on syncs it (plugin 1.0.2 or
 newer), so an old copy of a character left in another setup's AutoRetainer can't overwrite it. There's no time limit:
 after a long break, each character still belongs to the setup it last logged in on.
@@ -146,15 +146,15 @@ The same goes for Allagan Tools, FC Tracker and Submarine Tracker: they keep the
 so a shared setup syncs all of it, under its one label. And a setup leaves alone their data too (bags, retainers' items,
 FC chests, house details, voyage loot) for any character that last logged in on another setup.
 
-The Roster's **Synced By** column names the setup each character last logged in on, and the PCs tab says how many
+The Roster's **Synced by** column names the setup each character last logged in on, and the PCs page says how many
 characters each setup left to another one. A character unticked in a setup's plugin settings never counts as that
 setup's, so unticking it on one PC (say, a laptop) never stops another PC that does sync it. If a character's setup
-keeps syncing but leaves it out (its AutoRetainer lost it), no setup sends it any more: the Roster and the PCs tab say
+keeps syncing but leaves it out (its AutoRetainer lost it), no setup sends it any more: the Roster and the PCs page say
 which character, and logging in as it once on the right setup fixes it.
 
 With an older plugin, or before a character has logged in since the update, each setup syncs every character its
 AutoRetainer knows, so if one setup's AutoRetainer still has an old copy of another account's character, the two setups
-keep overwriting that character's subs and label. The Summary and the PCs tab warn when that happens. To fix it,
+keep overwriting that character's subs and label. The Summary and the PCs page warn when that happens. To fix it,
 update every setup to plugin 1.0.2 or newer, then log in as the character once on the setup that plays it. If you'd
 rather not wait, on the setup that doesn't play the character, open AutoRetainer's settings → **Advanced → Character
 Synchronization** and click **Prune deleted characters** (AutoRetainer asks for the JustBackup plugin first, so it can
@@ -282,7 +282,7 @@ For when the database should live on a different PC, for example a new PC replac
 The app checks everything first, and says what to do if a PC's plugin needs updating. Then it pauses the plugins,
 copies everything across, and checks every table has the same number of rows. Only then does it leave the new address
 in the old database. Every app and plugin finds it at its next refresh or sync and switches by itself, keeping the
-same username and password. The PCs tab shows which PCs haven't switched yet.
+same username and password. The PCs page shows which PCs haven't switched yet.
 
 If anything goes wrong part way, everything stays on the old database as it was. The old database is never deleted
 by the move. Remember to turn on backups on the new PC and turn them off on the old one.
@@ -304,10 +304,10 @@ too, and keep the app.
   and what to change.
 - **"The database could not be updated":** usually the login in Settings isn't allowed to change the tables. Use the
   login that created the database.
-- **PCs tab says "Update the plugin":** that PC's plugin is older than this app needs. In the game, type `/xlplugins`
+- **PCs page says "Update the plugin":** that PC's plugin is older than this app needs. In the game, type `/xlplugins`
   and update XIV Fleet Companion.
 - **A retainer's items are missing:** Allagan Tools only sees a retainer's items after you've opened that retainer at a
-  summoning bell on a PC running the plugin. The Retainers tab lists any it hasn't seen yet.
+  summoning bell on a PC running the plugin. The Retainers page lists any it hasn't seen yet.
 - **A character you removed came back:** the plugin is still syncing it. Untick it in the plugin's Characters list
   first, then remove it from the Character Roster (the faint × at the start of its row).
 - **"The database moved to ..., but this PC can't reach it yet":** the database was moved to another PC, and this

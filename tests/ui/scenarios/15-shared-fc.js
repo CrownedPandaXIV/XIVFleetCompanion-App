@@ -5,7 +5,7 @@ let expected = null;
 module.exports = async (t) => {
   const { ev, waitFor, check, nav } = t;
   await nav('Salvage');
-  await waitFor(`document.querySelector('.main-pane').innerText.includes('Fleet Total')`, 'the Salvage tab');
+  await waitFor(`document.querySelector('.main-pane').innerText.includes('Fleet Total')`, 'the Salvage page');
   const text = await ev(`document.querySelector('.main-pane h2').innerText`);
   const shown = Number(text.replace(/[^0-9]/g, ''));
   check(shown === expected, `Fleet Total counts the shared chest once: shows ${shown.toLocaleString()}, expected ${expected.toLocaleString()}`);

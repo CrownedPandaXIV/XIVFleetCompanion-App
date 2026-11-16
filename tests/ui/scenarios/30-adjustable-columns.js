@@ -1,9 +1,9 @@
 // Every table on every tab has adjustable columns: resizable headers (and so movable and sortable ones from
 // the same column library) and a Columns menu nearby. Goes through each tab and its views and lists any table
-// without them. The Trends tab's table view is left out: its columns are the series chosen for the chart.
+// without them. The Trends page's table view is left out: its columns are the series chosen for the chart.
 // A PC, a voyage, a venture reward and a listing are added so those tables show.
 
-// The route added in before(), as the Income tab should show it.
+// The route added in before(), as the Income page should show it.
 let ranRoute = '';
 
 module.exports = async (t) => {

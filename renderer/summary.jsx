@@ -1,4 +1,4 @@
-// Summary tab: the fleet overview, warnings, and links to the other tabs.
+// Summary page: the fleet overview, warnings, and links to the other tabs.
 
 // Fleet-wide overview: FC houses nobody has entered for a while (the game
 // demolishes them at 45 days), low repair/ceruleum warnings (their
@@ -6,7 +6,7 @@
 // "needs attention" categories already built elsewhere in the app.
 // No LLM involved - everything here is real Postgres data, same as
 // every other view.
-// The Parts tab's rows grouped per sub: built subs whose rank now calls for different parts, and new subs to build in
+// The Parts page's rows grouped per sub: built subs whose rank now calls for different parts, and new subs to build in
 // an open slot (rank 0, isNew), as the plugin's Summary.
 function subsReadyForParts(partRows) {
   const subs = new Map();
@@ -22,9 +22,9 @@ const HOUSE_WARNING_COLUMN_DEFS = [
   { key: 'fc', label: 'Free Company', locked: true, cell: (h) => <>{h.fc_name ? <span className="fc-name">{h.fc_name}</span> : '—'}<WorldAfter world={h.fc_world} /></>, sort: (h) => h.fc_name },
   { key: 'account', label: 'Account', cell: (h) => h.account_label || '—', sort: (h) => h.account_label },
   { key: 'house', label: 'House', cell: (h) => <span className="address">{formatHouse(h)}</span>, sort: (h) => formatHouse(h) },
-  { key: 'last_entered', label: 'Last Entered', td: (h) => <td><HouseAge row={h} /></td>, sort: (h) => h.house_days },
+  { key: 'last_entered', label: 'Last entered', td: (h) => <td><HouseAge row={h} /></td>, sort: (h) => h.house_days },
   {
-    key: 'demolition', label: 'Demolition Possible In',
+    key: 'demolition', label: 'Can be demolished in',
     td: (h) => (
       <td className={`house-age ${h.house_level}`}>
         {h.demolition_in_days === null ? 'Unknown, check in game'
@@ -58,7 +58,7 @@ const READY_SUB_COLUMN_DEFS = [
 const LOW_SUPPLY_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (w) => <CharacterName name={w.character_name} world={w.world} />, sort: (w) => w.character_name },
   { key: 'account', label: 'Account', cell: (w) => w.account_label, sort: (w) => w.account_label },
-  { key: 'repair_kits', label: 'Repair Kits', cellStyle: (w) => ({ color: w.low_repair ? 'var(--danger)' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
+  { key: 'repair_kits', label: 'Repair kits', cellStyle: (w) => ({ color: w.low_repair ? 'var(--danger)' : undefined }), cell: (w) => w.repair_kits, sort: (w) => w.repair_kits },
   { key: 'ceruleum', label: 'Ceruleum', cellStyle: (w) => ({ color: w.low_ceruleum ? 'var(--danger)' : undefined }), cell: (w) => w.ceruleum, sort: (w) => w.ceruleum },
 ];
 const SUMMARY_CHARACTER_DUPLICATE_EXTRAS = ['x_world', 'x_account', 'x_ceruleum', 'x_repair_kits'];
@@ -83,8 +83,8 @@ function SummaryTile({ label, value, note, className = '', children }) {
   );
 }
 
-// Retainers right now (retainer-summary.js), venture income (Income tab) and listings unsold for a while
-// (Gil & Market tab). Shown when the player runs retainers (Settings → What do you run?).
+// Retainers right now (retainer-summary.js), venture income (Income page) and listings unsold for a while
+// (Gil & Market page). Shown when the player runs retainers (Settings → What do you run?).
 function RetainerSummarySection({ refreshKey, onNavigate }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -286,7 +286,7 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
       <SummaryTrendTiles refreshKey={refreshKey} onOpenTrend={onOpenTrend} uses={uses} />
 
       {uses.subs && (<React.Fragment>
-      <h2 style={{ padding: '8px 24px' }}>Low Repair Kits / Ceruleum</h2>
+      <h2 style={{ padding: '8px 24px' }}>Low Repair kits / Ceruleum</h2>
       {warnings === null && <div className="status">Loading...</div>}
       {warnings !== null && warnings.length === 0 && (
         <div className="status">No characters below the current thresholds.</div>

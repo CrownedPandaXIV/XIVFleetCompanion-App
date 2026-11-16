@@ -1,4 +1,4 @@
-// Subs: how close the Next Rank dates came, at the top of the tab. Parts: Look ahead.
+// Subs: how close the Next rank dates came, at the top of the tab. Parts: Look ahead.
 // Bex Kitteh 1's Sub2 went from rank 82 to 83 two hours ago; the date saved 28 hours before said 5 hours ago,
 // so it came 3 hours late: "within 3 hours on average over the last 1 rank-up".
 // For Look ahead, a Sub Rules rule gives Bex's Sub3 (rank 84, 3,000 into it, back in an hour) an all-Unkiu
@@ -16,7 +16,7 @@ module.exports = async (t) => {
   await nav('Subs');
   await waitFor(`!!document.querySelector('.forecast-accuracy')`, 'the forecast line', 20000);
   const line = await ev(`(() => { const e = document.querySelector('.forecast-accuracy'); return { text: e.innerText.trim(), title: e.title }; })()`);
-  check(line.text === 'Next Rank forecasts: within 3 hours on average over the last 1 rank-up', 'the average: ' + line.text);
+  check(line.text === 'Next rank forecasts: within 3 hours on average over the last 1 rank-up', 'the average: ' + line.text);
   check(/Sub2 \(Bex Kitteh 1\) rank 83: said .+, ranked up .+, 3 hours late; worked out 28 hours before/.test(line.title), 'each rank-up on hover: ' + line.title);
   const sameRow = await ev(`(() => { const e = document.querySelector('.forecast-accuracy'); return !!e.closest('.controls'); })()`);
   check(sameRow, 'on the line with the Columns button, not a column');
@@ -26,7 +26,7 @@ module.exports = async (t) => {
 
   // Parts → Detail: Now only, as before; then 3 days ahead.
   await nav('Parts');
-  await waitFor(`[...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Detail')`, 'the Parts tab', 20000);
+  await waitFor(`[...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Detail')`, 'the Parts page', 20000);
   await clickText('.controls button', 'Detail');
   const bexRows = () => ev(`(() => {
     const group = [...document.querySelectorAll('.account-group')].find(g => {
@@ -56,12 +56,12 @@ module.exports = async (t) => {
   check(await ev(`localStorage.getItem('partsLookAhead')`) === '3', 'remembered on this PC');
   await shot('parts-look-ahead-detail');
 
-  // Summary: Needed Now and Coming Up.
+  // Summary: Needed now and Coming up.
   await clickText('.controls button', 'Summary');
-  await waitFor(`[...document.querySelectorAll('thead th')].some(th => /coming up/i.test(th.innerText))`, 'the Coming Up column', 20000);
+  await waitFor(`[...document.querySelectorAll('thead th')].some(th => /coming up/i.test(th.innerText))`, 'the Coming up column', 20000);
   const unkiuRows = await ev(`(() => {
     const heads = [...document.querySelectorAll('thead th')].map(th => th.innerText.trim().replace(/[\\u25B2\\u25BC]/g, '').trim().toLowerCase());
-    return [...document.querySelectorAll('tbody tr')].map(tr => Object.fromEntries([...tr.children].map((td, i) => [heads[i], td.innerText.trim()]))).filter(r => r['needed class'] === 'Unkiu');
+    return [...document.querySelectorAll('tbody tr')].map(tr => Object.fromEntries([...tr.children].map((td, i) => [heads[i], td.innerText.trim()]))).filter(r => r['class needed'] === 'Unkiu');
   })()`);
   check(unkiuRows.length === 4 && unkiuRows.every((r) => r['needed now'] === '0' && Number(r['coming up']) >= 1), 'Unkiu parts counted as coming up: ' + JSON.stringify(unkiuRows));
   await shot('parts-look-ahead-summary');

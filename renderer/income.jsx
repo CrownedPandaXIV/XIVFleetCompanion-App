@@ -1,6 +1,6 @@
-// Income tab: each character's real net income from its subs over the last few days (salvage that came
+// Income page: each character's real net income from its subs over the last few days (salvage that came
 // in, at its vendor price, less the repair kits used) against what Fight Club says their routes should
-// earn (the Subs tab's Current Gil/Day). ipc/income.js and income.js do the working out. Characters in
+// earn (the Subs page's Current gil/day). ipc/income.js and income.js do the working out. Characters in
 // Roster order, grouped by account like other tabs.
 
 const incomeGil = (value) => (value === null || value === undefined ? '—' : Math.round(value).toLocaleString());
@@ -155,7 +155,7 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
       <h2 style={{ padding: '16px 24px 0' }}>Loot per Voyage</h2>
       <div className="supplies-note">
         What each voyage really brought back over the last {data.windowDays} days, from Submarine Tracker (items at what a vendor pays;
-        salvage at the Salvage tab's prices). {data.totals.voyages.toLocaleString()} voyage{data.totals.voyages === 1 ? '' : 's'},
+        salvage at the Salvage page's prices). {data.totals.voyages.toLocaleString()} voyage{data.totals.voyages === 1 ? '' : 's'},
         {' '}<span className="gil">{incomeGil(data.totals.gil)} gil</span>, <span className="gil">{incomeGil(data.totals.perDay)} gil</span> a day.
         {live && <> At market prices: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{incomeGil(data.market.loot[sc].perDay)}</span> a day ({MARKET_SCOPE_LABELS[sc]})</React.Fragment>)}.</>}
       </div>
@@ -294,7 +294,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
         Salvage: every piece that came into a character's bags or retainers over the last {data.windowDays} days, at its
         vendor price (selling or moving it is not counted). Repairs: repair kits used
         {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit cost in Settings to count them)'}.
-        Expected: the subs' Current Gil/Day from the Subs tab, for the routes they are on now.
+        Expected: the subs' Current gil/day from the Subs page, for the routes they are on now.
         {t.notEnough ? ` ${t.notEnough} character${t.notEnough === 1 ? ' has' : 's have'} less than a day of salvage history.` : ''}
         {data.withoutSubs ? ` ${data.withoutSubs} character${data.withoutSubs === 1 ? '' : 's'} with no subs built ${data.withoutSubs === 1 ? 'is' : 'are'} left out.` : ''}
       </div>

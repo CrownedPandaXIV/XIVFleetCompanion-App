@@ -1,13 +1,13 @@
-// The Parts tab's Sub Build Rules panel stays within the window: a remembered width wider than the window (or one
+// The Parts page's Sub Rules panel stays within the window: a remembered width wider than the window (or one
 // that isn't a number) is brought back, and dragging can't push the parts table off the page.
 module.exports = async (t) => {
   const { ev, waitFor, check, nav } = t;
-  const panel = `[...document.querySelectorAll('h2')].find((h) => h.innerText === 'Sub Build Rules').parentElement`;
+  const panel = `[...document.querySelectorAll('h2')].find((h) => h.innerText === 'Sub Rules').parentElement`;
   const widths = () => ev(`({ panel: ${panel}.getBoundingClientRect().width, window: window.innerWidth, table: ${panel}.previousElementSibling.previousElementSibling.getBoundingClientRect().width })`);
   const open = async () => {
     await nav('Summary');
     await nav('Parts');
-    await waitFor(`[...document.querySelectorAll('h2')].some((h) => h.innerText === 'Sub Build Rules')`, 'the Sub Build Rules panel', 20000);
+    await waitFor(`[...document.querySelectorAll('h2')].some((h) => h.innerText === 'Sub Rules')`, 'the Sub Rules panel', 20000);
   };
 
   await ev(`localStorage.setItem('partsRulesPanelVisible', 'true'); localStorage.setItem('partsRulesPanelWidth', '5000')`);

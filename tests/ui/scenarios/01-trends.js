@@ -4,7 +4,7 @@ module.exports = async (t) => {
   check((await ev(`[...document.querySelectorAll('.sidebar-button')].map(b=>b.innerText.trim()).includes('Trends')`)), 'Trends appears in the sidebar');
   await clickText('.sidebar-button', 'Trends');
   await chartReady(); await sleep(400);
-  check(await ev(`document.querySelector('h1').innerText`) === 'Trends', 'Trends tab opens');
+  check(await ev(`document.querySelector('h1').innerText`) === 'Trends', 'Trends page opens');
   check((await ev(`document.querySelector('.trend-summary-value').innerText`)).length > 0, 'summary shows a current value: ' + await ev(`document.querySelector('.trend-summary-value').innerText`));
   const perDay = await ev(`[...document.querySelectorAll('.trend-summary-label')].map(l => l.innerText.trim() + ': ' + l.nextElementSibling.innerText.trim())`);
   check(perDay.some((t) => /^A day on average: [+-]?[\d,]+$/.test(t)) && await ev(`!document.querySelector('table.trend-stats')`),

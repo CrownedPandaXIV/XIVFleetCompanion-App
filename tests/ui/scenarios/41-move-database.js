@@ -1,11 +1,11 @@
-// Moving the database to another PC: on the PC it moved to, the PCs tab says which PCs haven't switched over yet;
+// Moving the database to another PC: on the PC it moved to, the PCs page says which PCs haven't switched over yet;
 // Settings → Database → Move the database to this PC checks first, and refuses when the database is already here.
 const MOVED_FROM = '100.64.7.7';
 
 module.exports = async (t) => {
   const { ev, waitFor, check, nav } = t;
   await nav('PCs');
-  await waitFor(`!!document.querySelector('.pcs-moved')`, 'the moved note on the PCs tab', 15000);
+  await waitFor(`!!document.querySelector('.pcs-moved')`, 'the moved note on the PCs page', 15000);
   const note = await ev(`document.querySelector('.pcs-moved').innerText`);
   check(note.includes(`The database moved here from ${MOVED_FROM}`), `where it moved from: ${note}`);
   check(note.includes('UI-LAPTOP (Account 2)') && !note.includes('UI-DESKTOP'), `only the PC that hasn't synced since is listed: ${note}`);

@@ -1,4 +1,4 @@
-// A window of recorded values (companion_metric_history), as the Subs, Supplies and Income tabs read them:
+// A window of recorded values (companion_metric_history), as the Subs, Supplies and Income pages read them:
 // for each character or FC and metric, the last value at or before the window start, then the values in the
 // window. The plugin also records an unchanged value every hour as a reminder; those are left out here, in the
 // database, so only what changed travels to the app: within the window, a value is kept when it differs from

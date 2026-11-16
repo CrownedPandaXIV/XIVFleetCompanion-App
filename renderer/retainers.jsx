@@ -1,4 +1,4 @@
-// Retainers tab: venture status, gear item level against each retainer's target, gear suggestions.
+// Retainers page: venture status, gear item level against each retainer's target, gear suggestions.
 
 // Standard/Extravagant cell with a hover popup showing the real
 // per-item breakdown (name, qty, price each, subtotal) behind that
@@ -163,7 +163,7 @@ function AvgIlvlCell({ avgIlvl, gearSlots, jobAbbreviation, targetMode, targetVa
   );
 }
 
-// The Retainers tab's own columns. Target Mode / Value / Only Crafted / Actions edit the row's target, so they read
+// The Retainers page's own columns. Target mode / Value / Only Crafted / Actions edit the row's target, so they read
 // and change the row's working state, passed in as `ctx`.
 const RETAINER_COLUMN_DEFS = [
   // The owner once, on their first retainer (while the table isn't sorted by a column).
@@ -176,9 +176,9 @@ const RETAINER_COLUMN_DEFS = [
   { key: 'gil', label: 'Gil', td: (r) => <td className="num"><GilText gil={typeof r.gil === 'number' ? r.gil : null} /></td>, sort: (r) => (typeof r.gil === 'number' ? r.gil : null) },
   { key: 'avgIlvl', label: 'Avg ilvl', sort: (r) => (typeof r.avg_ilvl === 'number' ? r.avg_ilvl : null),
     td: (r) => <AvgIlvlCell avgIlvl={r.avg_ilvl} gearSlots={r.gear_slots} jobAbbreviation={r.job_abbreviation} targetMode={r.target_mode} targetValue={r.target_value} onlyCrafted={r.only_crafted} /> },
-  { key: 'ventureType', label: 'Venture Type', cell: (r) => r.venture_type || '—', sort: (r) => r.venture_type },
+  { key: 'ventureType', label: 'Venture type', cell: (r) => r.venture_type || '—', sort: (r) => r.venture_type },
   { key: 'status', label: 'Status', sortable: false, cell: (r) => <RetainerStatusCell hasVenture={r.has_venture} ventureEndsAt={r.venture_ends_at} hasJob={!!r.job_abbreviation} /> },
-  { key: 'targetMode', label: 'Target Mode', sort: (r) => r.target_mode,
+  { key: 'targetMode', label: 'Target mode', sort: (r) => r.target_mode,
     cell: (r, ctx) => (
       <select value={ctx.targetMode} onChange={(e) => ctx.setTargetMode(e.target.value)}>
         <option value="">—</option>
@@ -186,11 +186,11 @@ const RETAINER_COLUMN_DEFS = [
         <option value="ilvl">ilvl</option>
       </select>
     ) },
-  { key: 'targetValue', label: 'Target Value', sort: (r) => (typeof r.target_value === 'number' ? r.target_value : null),
+  { key: 'targetValue', label: 'Target value', sort: (r) => (typeof r.target_value === 'number' ? r.target_value : null),
     cell: (r, ctx) => (
       <input type="number" value={ctx.targetValue} onChange={(e) => ctx.setTargetValue(e.target.value)} style={{ width: '60px' }} disabled={!ctx.targetMode} />
     ) },
-  { key: 'onlyCrafted', label: 'Only Crafted?', sort: (r) => (r.only_crafted ? 1 : 0),
+  { key: 'onlyCrafted', label: 'Only crafted?', sort: (r) => (r.only_crafted ? 1 : 0),
     cell: (r, ctx) => <input type="checkbox" checked={ctx.onlyCrafted} onChange={(e) => ctx.setOnlyCrafted(e.target.checked)} /> },
   { key: 'actions', label: 'Actions', sortable: false,
     td: (r, ctx) => (
@@ -201,7 +201,7 @@ const RETAINER_COLUMN_DEFS = [
       </td>
     ) }
 ];
-// Master-list columns the Retainers tab already has of its own.
+// Master-list columns the Retainers page already has of its own.
 const RETAINER_DUPLICATE_EXTRAS = ['x_world'];
 
 // Target editing follows the same pattern as SubRuleRow - local draft

@@ -51,10 +51,10 @@ function placeLabel(stack) {
   return stack.containerName || `Container ${c}`;
 }
 
-// Roster order for places, the same as the Retainers tab: the character's saved Roster position (none
+// Roster order for places, the same as the Retainers page: the character's saved Roster position (none
 // last), then its name, then which character it is (several characters can share a name on different
 // worlds; their places are never mixed). Within a character: its own places (biggest first), then its
-// retainers in hiring order (then by name), then the FC chest it holds (the same member the Salvage tab
+// retainers in hiring order (then by name), then the FC chest it holds (the same member the Salvage page
 // counts the chest on).
 function compareRoster(a, b) {
   const aHas = a.sortIndex !== null && a.sortIndex !== undefined;

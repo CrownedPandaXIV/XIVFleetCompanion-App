@@ -13,7 +13,7 @@ ipcMain.handle('get-roster', async () => {
     const { latestCharacter } = await snapshotFragments(client);
 
     // Same thresholds and fully-unbuilt suppression logic as get-fleet-warnings,
-    // so Roster's Ceruleum/Repair Kits coloring always agrees with Summary's.
+    // so Roster's Ceruleum/Repair kits coloring always agrees with Summary's.
     const thresholdResult = await client.query(
       `SELECT setting_key, setting_value FROM fleet_economics_settings
        WHERE setting_key IN ('low_repair_kit_threshold', 'low_ceruleum_threshold')`
@@ -106,7 +106,7 @@ ipcMain.handle('update-sort-order', async (event, orderedCids) => {
   });
 });
 
-// Removes one character and what is stored for it: its current row, subs and their Craft? settings,
+// Removes one character and what is stored for it: its current row, subs and their Fight Club builds settings,
 // bags and retainers (and the retainers' gear targets), Free Company and house details, its place in
 // the roster order, and build rules made only for it. Its Free Company's chest goes too when no other
 // character is in that Free Company. Chart history is kept but left out of Trends: its rows in

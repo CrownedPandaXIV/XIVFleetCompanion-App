@@ -1,4 +1,4 @@
-// Subs tab: each submarine's status, build, rank and route, with the Craft? toggle.
+// Subs page: each submarine's status, build, rank and route, with the Fight Club builds toggle (once Craft?).
 
 function formatCountdown(secondsRemaining) {
   const clamped = Math.max(0, secondsRemaining);
@@ -183,7 +183,7 @@ function NextBuildCell({ sub }) {
   );
 }
 
-// The Subs tab's own columns. Character and World are "context" columns: shown automatically when the tab is
+// The Subs page's own columns. Character and World are "context" columns: shown automatically when the tab is
 // sorted (one flat table), and available to add in the per-character view.
 const SUB_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', locked: true, cell: (s) => s.sub_name, sort: (r) => r.sub_name },
@@ -191,23 +191,24 @@ const SUB_COLUMN_DEFS = [
   { key: 'status', label: 'Status', cell: (s) => <SubStatusCell returnTime={s.return_time} />, sort: (r) => (Number(r.return_time) > 0 ? Number(r.return_time) : null) },
   // The rank, with a thin bar for how far to the next.
   { key: 'rank', label: 'Rank', cell: (s) => <><RankBar pct={s.rank_progress_pct} rank={s.rank} />{formatRank(s.rank, s.rank_progress_pct)}</>, sort: (r) => r.rank + (Number(r.rank_progress_pct) || 0) / 100 },
-  { key: 'nextRank', label: 'Next Rank', cell: (s) => <NextRankCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextRankAt) || null },
-  { key: 'nextBuild', label: 'Next Build', cell: (s) => <NextBuildCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextBuild && r.rank_up.nextBuild.at) || null },
-  { key: 'currentSetup', label: 'Current Setup', cell: (s) => <BuildText build={s.current_setup} />, sort: (r) => r.current_setup },
+  { key: 'nextRank', label: 'Next rank', cell: (s) => <NextRankCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextRankAt) || null },
+  { key: 'nextBuild', label: 'Next build', cell: (s) => <NextBuildCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextBuild && r.rank_up.nextBuild.at) || null },
+  { key: 'currentSetup', label: 'Build', cell: (s) => <BuildText build={s.current_setup} />, sort: (r) => r.current_setup },
   { key: 'speed', label: 'Speed', cell: (s) => (s.speed === '' ? '—' : s.speed), sort: (r) => (r.speed === '' ? null : r.speed) },
   { key: 'range', label: 'Range', cell: (s) => (s.range === '' ? '—' : s.range), sort: (r) => (r.range === '' ? null : r.range) },
-  { key: 'currentRoute', label: 'Current Route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },
-  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
+  { key: 'currentRoute', label: 'Current route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },
+  { key: 'currentGilDay', label: 'Current gil/day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
   // Green when it's on it, amber when it isn't (Route Optimization lists those).
-  { key: 'targetRoute', label: 'Target Route', cell: (s) => (s.target_route
+  { key: 'targetRoute', label: 'Target route', cell: (s) => (s.target_route
     ? <span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span>
     : <span className="dim">—</span>), sort: (r) => r.target_route || null },
-  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
-  { key: 'craft', label: 'Craft?', cell: (s, ctx) => (
-      <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)} />
+  { key: 'targetGilDay', label: 'Target gil/day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
+  { key: 'craft', label: 'Fight Club builds', cell: (s, ctx) => (
+      <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)}
+        title="Ticked: from rank 85 this sub follows Fight Club's best build after repair kits (Parts, Route Optimization). Unticked: its Sub Rules." />
     ), sort: (r) => (r.craft_enabled ? 1 : 0) }
 ];
-// Master-list columns the Subs tab already has of its own.
+// Master-list columns the Subs page already has of its own.
 const SUB_DUPLICATE_EXTRAS = ['x_world'];
 
 function SubTable({ characterLabel, subs, cols, onToggleCraft, onSortClick }) {
@@ -243,7 +244,7 @@ function FlatSubTable({ rows, cols, sortColumn, sortDirection, onSortClick, onTo
   );
 }
 
-// "3 hours", "40 minutes", "2.5 days": how far a Next Rank date was off.
+// "3 hours", "40 minutes", "2.5 days": how far a Next rank date was off.
 function forecastOffText(ms) {
   const minutes = Math.round(Math.abs(ms) / 60000);
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
@@ -255,7 +256,7 @@ function forecastOffText(ms) {
   return `${Math.round((hours / 24) * 10) / 10} days`;
 }
 
-// The line at the top of the Subs tab: how close the Next Rank dates (worked out a day or more before) came to
+// The line at the top of the Subs page: how close the Next rank dates (worked out a day or more before) came to
 // the real rank-ups, with each recent rank-up on hover. ipc/subs.js saves the dates while the app is open.
 function ForecastAccuracy({ refreshKey }) {
   const [accuracy, setAccuracy] = useState(null);
@@ -270,13 +271,13 @@ function ForecastAccuracy({ refreshKey }) {
     return `${c.subName}${c.characterName ? ` (${c.characterName})` : ''} rank ${c.rank}: said ${when(c.predictedAt)}, ranked up ${when(c.at)}, ${off}; ` +
       `worked out ${forecastOffText(c.at - c.madeAt)} before`;
   });
-  const how = 'The app saves each sub\'s Next Rank date every hour while it is open. The average counts dates worked out a day or more ' +
+  const how = 'The app saves each sub\'s Next rank date every hour while it is open. The average counts dates worked out a day or more ' +
     'before the rank-up, early or late; a rank-up counts from when its voyage came back.';
   const title = lines.length ? `${how}\n\nRecent rank-ups:\n${lines.join('\n')}` : how;
   const text = accuracy.count
     ? `within ${forecastOffText(accuracy.averageOff)} on average over the last ${accuracy.count} rank-up${accuracy.count === 1 ? '' : 's'}`
     : 'no rank-ups to check yet';
-  return <span className="save-status forecast-accuracy" title={title}>Next Rank forecasts: {text}</span>;
+  return <span className="save-status forecast-accuracy" title={title}>Next rank forecasts: {text}</span>;
 }
 
 function SubmarinesView({ refreshKey }) {

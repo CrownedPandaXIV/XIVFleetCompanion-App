@@ -1,4 +1,4 @@
-// Supplies tab: days until each character runs out of ceruleum and repair kits, from how fast it used
+// Supplies page: days until each character runs out of ceruleum and repair kits, from how fast it used
 // them over the last few days (the history Trends charts), and how many to buy so they last a chosen
 // number of days. The working out is in supply-runway.js.
 const { ipcMain } = require('electron');

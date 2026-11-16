@@ -1,5 +1,5 @@
 // The oldest plugin this app works fully with. Raise it when an app version needs something only a newer
-// plugin sends (the changelog says so). The PCs tab flags each PC running an older one.
+// plugin sends (the changelog says so). The PCs page flags each PC running an older one.
 // 0.14.0: follows a database move (Settings → Database → Move the database to this PC) by itself.
 const MIN_PLUGIN_VERSION = '0.14.0';
 

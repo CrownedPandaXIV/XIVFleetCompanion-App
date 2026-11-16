@@ -13,7 +13,7 @@ module.exports = async (t) => {
   check(await ev(`document.body.innerText.includes('Trends, last 30 days')`), 'section heading is present');
   await shot('10-summary-trend-tiles');
 
-  // click through: Salvage value tile -> Trends tab with that value, whole fleet, 30 days
+  // click through: Salvage value tile -> Trends page with that value, whole fleet, 30 days
   await ev(`${tiles}[4].querySelector('button').click()`);
   await waitFor(`!!document.querySelector('.trend-chart-wrap canvas') && document.querySelector('.trend-chart-wrap').style.opacity==='1'`, 'trends chart');
   const sel = await ev(`JSON.stringify({h1:document.querySelector('h1').innerText, value:document.querySelector('.trend-field select').value, scope:document.querySelectorAll('.trend-field select')[1].value, range:document.querySelector('.trend-segmented button.active').innerText})`);

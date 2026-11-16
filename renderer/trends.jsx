@@ -657,7 +657,7 @@ function TrendsView({ refreshKey, preset }) {
   );
 }
 
-// ---- Summary tiles: a small trend line per fleet-wide value, for the Summary tab ----
+// ---- Summary tiles: a small trend line per fleet-wide value, for the Summary page ----
 
 const TREND_TILE_KEYS = ['gil', 'ceruleum', 'repair_kits', 'fc_points', 'salvage_value'];
 const TREND_TILE_DAYS = 30;

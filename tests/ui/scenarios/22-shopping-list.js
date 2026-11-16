@@ -1,4 +1,4 @@
-// Parts → Shopping List: the sub parts the Parts tab says to craft, turned into what to craft on the way
+// Parts → Shopping List: the sub parts the Parts page says to craft, turned into what to craft on the way
 // and the raw materials and crystals to gather or buy, less what is held. The sample recipes and held
 // items are in tests/ui/fixtures.sql: each Whale-class part is an FC workshop project needing, over its
 // two phases, 2 Test Ingot + 1 Test Lumber + 2 Fire Shard; Test Ingot = 3 Test Ore + 1 Fire Shard; Test
@@ -16,7 +16,7 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr').length > 0`, 'the Parts summary', 20000);
   const summaryTotal = await ev(`(() => {
     const heads = [...document.querySelector('thead').querySelectorAll('th')].map(th => th.innerText.trim().toLowerCase());
-    const i = heads.findIndex(h => h.startsWith('qty'));
+    const i = heads.findIndex(h => h === 'still needed');
     return [...document.querySelector('table').querySelectorAll('tbody tr')].reduce((sum, tr) => sum + Number(tr.children[i].innerText), 0);
   })()`);
 

@@ -174,7 +174,7 @@ ipcMain.handle('get-character-inventory', async (event, cids) => {
 });
 
 // Every distinct FC, with the character(s) who own/share it - shown as
-// "FC Name (Character1, Character2 — World)" in the picker, since FC
+// "FC name (Character1, Character2 — World)" in the picker, since FC
 // names are NOT unique (confirmed against real data: multiple distinct
 // FCs can share the same display name). Works for both the common
 // one-character-per-FC setup and genuine multi-character FCs.
@@ -207,7 +207,7 @@ ipcMain.handle('get-fc-list', async () => {
 });
 
 // Standalone FC tab data - completely independent of get-fc-list above
-// (which the Inventory tab's FC picker depends on and must stay untouched).
+// (which the Inventory page's FC picker depends on and must stay untouched).
 ipcMain.handle('get-fc-directory', async () => {
   return withClient(async (client) => {
     const { rows, warnDays } = await loadFcDirectory(client);
@@ -316,7 +316,7 @@ ipcMain.handle('get-fleet-inventory-summary', async () => {
   });
 });
 
-// "Where is it?" (Inventory tab): every held item whose name contains the search, with each place it
+// "Where is it?" (Inventory page): every held item whose name contains the search, with each place it
 // sits - every character's bags, saddlebags, crystals, equipped gear, armoury and so on, their
 // retainers (including what they have up for sale), and the Free Company chests. HQ copies (stored as
 // itemId + 1,000,000) count with the normal ones. Places come in Roster order with each character's

@@ -42,7 +42,7 @@ ipcMain.handle('database:speed-check', async () => {
   }
 });
 
-// The detail: the work behind the Income and Summary tabs (their sub loot and venture rewards, and Income's own
+// The detail: the work behind the Income and Summary pages (their sub loot and venture rewards, and Income's own
 // figures), with each database question timed, so the slowest one can be named. Only reads.
 ipcMain.handle('database:speed-detail', async () => {
   // Loaded here: these files need the database code above to be in place first.

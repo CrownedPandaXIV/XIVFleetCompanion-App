@@ -57,7 +57,7 @@ module.exports = async (t) => {
   await waitFor(`!!document.querySelector('.market-undercut')`, 'the undercut listings', 20000);
   const row = await ev(`[...document.querySelector('.market-undercut tbody tr').children].map(td => td.innerText.trim())`);
   const marketHeads = await ev(`[...document.querySelectorAll('.market-undercut thead th')].map(th => th.textContent.replace(/[▲▼]/g, '').trim())`);
-  check(marketHeads.slice(0, 5).join('|') === 'Item|Qty|Price each|Vendor price|Cheaper by', 'the vendor price beside your price: ' + JSON.stringify(marketHeads));
+  check(marketHeads.slice(0, 5).join('|') === 'Item|Quantity|Price each|Vendor price|Cheaper by', 'the vendor price beside your price: ' + JSON.stringify(marketHeads));
   check(row[0] === 'Test Item 5111' && row.includes('500') && row.includes('8,500') && row.includes('8,000 (Golem)') && row.includes('7,000 (Siren)'),
     'an undercut listing: cheaper by 500, cheapest on the world, data center (Golem) and region (Siren): ' + JSON.stringify(row));
   check(await ev(`document.querySelectorAll('.market-undercut tbody tr').length`) === 1, 'only the undercut listing (own retainers do not count, the cheaper one is not undercut)');

@@ -10,7 +10,7 @@ const GRACE_MS = 60 * 60 * 1000;
 const ACTIVE_MS = 24 * 60 * 60 * 1000;
 
 // characters: [{ cid, name, world, last_synced_at, login_pc, login_label }]; setups: [{ pc_name, account_label,
-// last_sync_at }] (the PCs tab's rows). Returns [{ cid, name, world, pc, label }] for each character whose setup
+// last_sync_at }] (the PCs page's rows). Returns [{ cid, name, world, pc, label }] for each character whose setup
 // is syncing without it, by name.
 function ownerSkips(characters, setups, now = Date.now()) {
   const lastSync = new Map(setups.map((s) => [`${s.pc_name}\u0000${s.account_label || ''}`, s.last_sync_at ? new Date(s.last_sync_at).getTime() : 0]));

@@ -14,7 +14,9 @@ const { stepsFor, runSetup } = require('../setup/run-setup');
 test('each kind of PC gets what it needs, and nothing already installed is downloaded again', () => {
   const p = (role, o) => inst.setupPlan(role, o);
   const pick = (x) => [x.installPostgres, x.installTailscale, x.createDatabase, x.openConnections, x.askConnection];
-  assert.deepStrictEqual(pick(p('onepc')), [true, false, true, false, false], 'one PC: PostgreSQL only');
+  // One PC keeps its fleet in the plugin's file: not a kind of PC with a database (the setup screen says where to click).
+  assert.strictEqual(p('onepc'), null);
+  assert.deepStrictEqual(Object.keys(inst.ROLES), ['dbhost', 'connect', 'plugin']);
   assert.deepStrictEqual(pick(p('dbhost')), [true, true, true, true, false], 'database PC: PostgreSQL, Tailscale, open to others');
   assert.deepStrictEqual(pick(p('dbhost', { sameNetwork: true })), [true, false, true, true, false], 'same house: no Tailscale');
   assert.deepStrictEqual(pick(p('connect')), [false, true, false, false, true], 'connecting PC: Tailscale only');

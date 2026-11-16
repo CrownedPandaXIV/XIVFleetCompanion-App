@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { app, ipcMain, shell } = require('electron');
 const { createPgClient, loadPostgresConfig, savePostgresConfig, recheckDatabase } = require('../db');
-const { PLUGIN_REPO, REPORT_PROBLEM_URL, COMPANION_PLUGINS, pcAddresses, homeNetworkCidrs, connectionDetails, describeTestError } = require('../setup/help');
+const { PLUGIN_REPO, REPORT_PROBLEM_URL, FIGHT_CLUB_URL, COMPANION_PLUGINS, pcAddresses, homeNetworkCidrs, connectionDetails, describeTestError } = require('../setup/help');
 const { rangesToAllow } = require('../setup/remote-access');
 const { letOtherPcsConnect } = require('../setup/elevated');
 const { createDatabase, portProblem } = require('../setup/create-database');
@@ -111,5 +111,9 @@ ipcMain.handle('help:open-log-folder', async () => {
 });
 ipcMain.handle('help:report-problem', async () => {
   await shell.openExternal(REPORT_PROBLEM_URL);
+  return { success: true };
+});
+ipcMain.handle('help:open-fight-club', async () => {
+  await shell.openExternal(FIGHT_CLUB_URL);
   return { success: true };
 });

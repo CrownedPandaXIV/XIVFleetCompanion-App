@@ -1,4 +1,4 @@
-// Gil & Market tab: gil held per account (characters and their retainers) and the retainers' market
+// Gil & Market page: gil held per account (characters and their retainers) and the retainers' market
 // listings that have sat unsold a long time (ipc/details.js, market.js). Listings need plugin 0.10.0
 // and database version 8. With live prices (Settings → Live Market Prices, universalis.js), each listing also shows
 // the cheapest someone else sells it for on its world, data center and region, and undercut listings are listed.
@@ -33,11 +33,11 @@ const MARKET_CHEAPEST_DEFS = ['world', 'dc', 'region'].map((scope) => ({
 
 const MARKET_LISTING_COLUMN_DEFS = [
   { key: 'item', label: 'Item', locked: true, cell: (l) => `${l.item_name}${l.hq ? ' (HQ)' : ''}`, sort: (l) => l.item_name },
-  { key: 'qty', label: 'Qty', cell: (l) => l.quantity, sort: (l) => l.quantity },
+  { key: 'qty', label: 'Quantity', cell: (l) => l.quantity, sort: (l) => l.quantity },
   { key: 'price', label: 'Price each', cell: (l) => marketGil(l.unit_price), sort: (l) => Number(l.unit_price) },
   {
     key: 'vendor', label: 'Vendor price',
-    td: (l) => <td className="market-vendor" title="What a vendor pays for one (game data; salvage at the Salvage tab's prices)">{l.vendor_price ? marketGil(l.vendor_price) : '—'}</td>,
+    td: (l) => <td className="market-vendor" title="What a vendor pays for one (salvage at the Salvage page's prices)">{l.vendor_price ? marketGil(l.vendor_price) : '—'}</td>,
     sort: (l) => l.vendor_price,
   },
   { key: 'total', label: 'Total', cell: (l) => marketGil(l.value), sort: (l) => l.value },

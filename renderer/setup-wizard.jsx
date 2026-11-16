@@ -1,16 +1,19 @@
 // "Set up this PC" (first start with no connection, or Settings → Setup Help): what the PC is for, then the
 // app downloads and installs what it needs (PostgreSQL, Tailscale), makes the database, signs in to Tailscale
-// and shows what to do next (ipc/setup-wizard.js). Pages: role → details → running → tailscale → finish.
+// and shows what to do next (ipc/setup-wizard.js). Pages: role → details → running → tailscale → finish. One PC needs
+// none of it: that answer only says where to click in the game.
 
 const SETUP_STEP_MARK = { waiting: '○', working: '…', done: '✓', failed: '✕' };
+
+// Not one of the kinds of PC that need a database (setup/installers.js ROLES): one PC keeps its fleet in the plugin's
+// file, so there's nothing to install, only where to click in the game.
+const ONE_PC = 'onepc-file';
 
 function SetupWizard({ onClose, firstRun = false }) {
   const [info, setInfo] = useState(null);
   const [page, setPage] = useState('role');
   const [role, setRole] = useState('');
   const [sameNetwork, setSameNetwork] = useState(false);
-  // What the app shows on this PC afterwards (shared/app-mode.js): each kind of PC suggests one until it's picked.
-  const [appModeChoice, setAppModeChoice] = useState(null);
   const [planned, setPlanned] = useState(null);
   const [form, setForm] = useState({ master: '', master2: '', app: '', app2: '', database: 'fleet', user: 'fleet_app' });
   const [shown, setShown] = useState({});
@@ -30,9 +33,7 @@ function SetupWizard({ onClose, firstRun = false }) {
   };
   const afterRun = (plan) => setPage(plan.tailscale ? 'tailscale' : 'finish');
 
-  const shownMode = appModeChoice || (chosen ? chosen.appMode : 'fleet');
   const toDetails = async () => {
-    await window.api.setAppMode(shownMode);
     const p = await window.api.getSetupPlan({ role, sameNetwork });
     setPlanned(p);
     setProblem('');
@@ -74,6 +75,10 @@ function SetupWizard({ onClose, firstRun = false }) {
             {firstRun && <p>Welcome! A few questions, and the app installs and sets up what this PC needs.</p>}
             <p>What is this PC for?</p>
             <div className="setup-roles">
+              <label className={`setup-role setup-role-onepc${role === ONE_PC ? ' active' : ''}`}>
+                <input type="radio" name="setup-role" value={ONE_PC} checked={role === ONE_PC} onChange={() => setRole(ONE_PC)} />
+                <span><strong>I play on one PC</strong><br /><span className="alerts-help">No database needed: the game keeps your fleet in one file on this PC.</span></span>
+              </label>
               {info.roles.map((r) => (
                 <label key={r.key} className={`setup-role${role === r.key ? ' active' : ''}`}>
                   <input type="radio" name="setup-role" value={r.key} checked={role === r.key} onChange={() => setRole(r.key)} />
@@ -87,21 +92,24 @@ function SetupWizard({ onClose, firstRun = false }) {
                 {' '}All my PCs are in the same house, on one network (or the database is online), so Tailscale isn't needed
               </label>
             )}
-            {chosen && (
-              <div className="setup-app-mode">
-                <p>Afterwards, this PC opens:</p>
-                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-fleet" checked={shownMode === 'fleet'} onChange={() => setAppModeChoice('fleet')} /> <strong>The full app</strong>: your fleet's pages and the database tools</label>
-                <label><input type="radio" name="setup-app-mode" className="setup-app-mode-tools" checked={shownMode === 'tools'} onChange={() => setAppModeChoice('tools')} /> <strong>The Database Helper</strong>: only the database tools (setup, backups, moving the database), no fleet pages</label>
-                <span className="alerts-help">Same app either way, and your fleet is in the game either way. Change it any time in Settings → General → This PC shows.</span>
+            {role === ONE_PC && (
+              <div className="setup-onepc-help">
+                <p><strong>Nothing to install.</strong> In the game, type <code>/xivfleet</code> and click <strong>Keep it on this PC</strong>.
+                  Once the game has synced, this app opens your fleet by itself.</p>
+                <p className="alerts-help">No plugin yet? Settings → Setup Help → The plugin shows how to install it, with the addresses to paste.</p>
               </div>
             )}
-            <p className="alerts-help">
+            {role !== ONE_PC && <p className="alerts-help">
               Already on this PC: {[info.installed.postgres && 'PostgreSQL', info.installed.tailscale && 'Tailscale'].filter(Boolean).join(' and ') || 'neither PostgreSQL nor Tailscale'}.
               Anything already installed is used as it is. Uninstalling the app never removes PostgreSQL or your database.
-            </p>
+            </p>}
             <div className="modal-actions">
-              <button onClick={() => onClose(false)}>{firstRun ? "Skip: I'll enter the connection in Settings" : 'Cancel'}</button>
-              <button className="setup-next" disabled={!role} onClick={toDetails}>Next</button>
+              {role === ONE_PC
+                ? <button className="setup-done setup-onepc-done" onClick={() => onClose(true)}>Done</button>
+                : <>
+                  <button onClick={() => onClose(false)}>{firstRun ? "Skip: I'll enter the connection in Settings" : 'Cancel'}</button>
+                  <button className="setup-next" disabled={!role} onClick={toDetails}>Next</button>
+                </>}
             </div>
           </>
         )}
@@ -244,10 +252,10 @@ function SetupWizardFinish({ role, onClose }) {
   if (!details) return <div className="status">Loading...</div>;
   return (
     <div className="setup-finish">
-      {(role === 'onepc' || role === 'dbhost') && (
+      {role === 'dbhost' && (
         <>
           <p><strong>This PC is set up.</strong> The database is ready and the app is connected to it.</p>
-          {role === 'dbhost' && <><p>On each of your other PCs, install the app and choose "This PC uses a database on another PC". Then type in these details:</p><SetupConnect details={details} /></>}
+          <><p>On each of your other PCs, install the app and choose "This PC uses a database on another PC". Then type in these details:</p><SetupConnect details={details} /></>
           <p>Next: install the plugin in the game, on every PC that plays, along with AutoRetainer (needed), Allagan Tools (recommended), and FC Tracker and Submarine Tracker (optional). Settings → Setup Help → The plugin shows how, step by step, with the addresses to paste.</p>
           <p className="alerts-help">The app now fills in the game data (item names, worlds, recipes) by itself. That takes a minute or two, and a note at the top says when it's done.</p>
           <div className="modal-actions"><button className="setup-done" onClick={() => onClose(true)}>Done</button></div>

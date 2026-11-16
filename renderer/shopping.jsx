@@ -1,4 +1,4 @@
-// Parts tab → Shopping List: the sub parts to craft, what to craft on the way, and the raw materials and
+// Parts page → Shopping List: the sub parts to craft, what to craft on the way, and the raw materials and
 // crystals to gather or buy, less what is held across the fleet (worked out in ipc/shopping.js).
 
 // "Bex Kitteh (Maduin): Retainer Amy (8), Bags (2)"
@@ -313,7 +313,7 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   if (error && list === null) return <div className="error">Failed to load the shopping list: {error}</div>;
   if (list === null) return <div className="status">Working out the shopping list...</div>;
   if (list.empty) {
-    return <div className="status">Nothing needs crafting - every need is either met, covered by a spare, or covered by a reused old part{aheadDays ? ', with no new build due in that time' : ''}.</div>;
+    return <div className="status">Nothing needs crafting: every part needed is covered by a spare or another sub's old part{aheadDays ? ', with no new build due in that time' : ''}.</div>;
   }
 
   function copy() {

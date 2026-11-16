@@ -226,7 +226,6 @@ function GameDataBanner() {
   }, []);
 
   const finish = (text) => { setMessage(text); setPhase('done'); load(); };
-  const plain = (tables) => tables.map((t) => t.table.replace(/^ffxiv_/, '')).join(', ');
   async function update() {
     setPhase('checking');
     const checked = await window.api.checkGameData();
@@ -243,7 +242,7 @@ function GameDataBanner() {
     if (!applied.success) return finish(`The game data couldn't be updated: ${applied.error}`);
     const updated = applied.results.filter((r) => r.status === 'updated');
     const failed = applied.results.filter((r) => r.status === 'failed').concat(blocked);
-    finish(`Game data updated (${updated.length} table${updated.length === 1 ? '' : 's'})${failed.length ? `, except ${plain(failed)}` : ''}.`
+    finish(`Game data updated (${updated.length} list${updated.length === 1 ? '' : 's'})${failed.length ? `, except ${failed.length} that couldn't be (Settings > Data > Game Data says which)` : ''}.`
       + ' The old game data was backed up first; Settings > Data > Game Data can put it back.');
   }
   const later = () => { window.api.gameDataNoticeLater(notice.newest); setNotice(null); };
@@ -441,7 +440,7 @@ function App() {
   const [trendsPreset, setTrendsPreset] = useState(null);
   const [trendDetail, setTrendDetail] = useState(null);
 
-  // Chart icons and cards elsewhere ask for a detail panel or the Trends tab by event.
+  // Chart icons and cards elsewhere ask for a detail panel or the Trends page by event.
   useEffect(() => {
     const openDetail = (e) => setTrendDetail(e.detail);
     const openTrends = (e) => { setTrendsPreset({ ...e.detail, at: Date.now() }); setTrendDetail(null); setCurrentView('trends'); };

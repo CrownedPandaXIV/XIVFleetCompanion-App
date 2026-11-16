@@ -1,4 +1,4 @@
-// Inventory tab: character, Free Company and whole-fleet inventories.
+// Inventory page: character, Free Company and whole-fleet inventories.
 
 // Multi-select character picker: type to search, click a match to add
 // it as a chip, click a chip's x to remove. Same search pattern as
@@ -86,7 +86,7 @@ function MultiCharacterPicker({ roster, selectedCids, onChange }) {
   );
 }
 
-// The Inventory tabs' own columns. (Rows are items, so the master list of character / FC columns does not apply.)
+// The Inventory pages' own columns. (Rows are items, so the master list of character / FC columns does not apply.)
 const CHAR_INV_COLUMN_DEFS = [
   { key: 'owner', label: 'Character', cell: (r) => `${r.owner_name} (${r.owner_world})`, sort: (r) => r.owner_name },
   { key: 'location', label: 'Location', cell: (r) => r.location, sort: (r) => r.location },
@@ -101,7 +101,7 @@ const FC_INV_COLUMN_DEFS = [
 ];
 const FLEET_INV_COLUMN_DEFS = [
   { key: 'item', label: 'Item', locked: true, cell: (r) => r.item_name, sort: (r) => r.item_name },
-  { key: 'quantity', label: 'Total Quantity', cell: (r) => r.total_quantity.toLocaleString(), sort: (r) => r.total_quantity }
+  { key: 'quantity', label: 'Total quantity', cell: (r) => r.total_quantity.toLocaleString(), sort: (r) => r.total_quantity }
 ];
 
 // "Hide equipped gear" (Characters, Fleet totals and Where is it?): leaves out gear being worn by the characters and
@@ -436,7 +436,7 @@ function FcInventoryTab() {
       {selectedFcIds.length === 0 && <div className="status">Select one or more FCs to browse their chest.</div>}
       {selectedFcIds.length > 0 && rows === null && <div className="status">Loading...</div>}
       {selectedFcIds.length > 0 && rows !== null && filtered.length === 0 && (
-        <div className="status">No items found - the chest may be empty, or Allagan Tools hasn't cached fresh data for it yet (only updates after the FC chest UI has actually been opened in-game).</div>
+        <div className="status">No items found. The chest may be empty, or Allagan Tools hasn't seen it yet: it only knows a Free Company chest once it has been opened in the game.</div>
       )}
       {selectedFcIds.length > 0 && rows !== null && filtered.length > 0 && aggregate && table(aggregatedRows, true)}
       {selectedFcIds.length > 0 && rows !== null && filtered.length > 0 && !aggregate && table(displayRows, false)}

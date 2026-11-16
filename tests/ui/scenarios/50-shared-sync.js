@@ -1,5 +1,5 @@
 // A character synced by two setups of the plugin: its account label keeps going back and forth (the database logs
-// each change), so the Summary and the PCs tab say so and how to fix it. Bex Kitteh 1 switches between Account 2 and
+// each change), so the Summary and the PCs page say so and how to fix it. Bex Kitteh 1 switches between Account 2 and
 // Account R; Cal Kitteh 2 was relabelled once, which is not this.
 const BEX = '18014498578000001';
 const BEX2 = '18014498578000002';
@@ -14,17 +14,17 @@ module.exports = async (t) => {
   check(/^Bex Kitteh 1 \(\w+\): Account 2 and Account R\./.test(summary), 'names the character and both labels: ' + summary.split('\n')[0]);
   const flat = summary.replace(/\s+/g, ' ');
   const steps = await ev(`[...document.querySelectorAll('.shared-sync ol > li')].map((li) => li.innerText.replace(/\\s+/g, ' '))`);
-  check(steps.length === 3 && /plugin 1\.0\.2 or newer on every setup/.test(steps[0]) && /^Log in as the character once on the setup that plays it/.test(steps[1]),
-    'first: plugin 1.0.2 on every setup, then log in once on the right setup: ' + JSON.stringify(steps));
-  check(/Advanced → Character Synchronization/.test(steps[2] || '') && /Prune deleted characters/.test(flat) && /JustBackup/.test(flat),
+  check(steps.length === 2 && /^Log in as the character once on the game that plays it/.test(steps[0]),
+    'first: log in once in the right game (no step about plugin 1.0.2, which everyone has): ' + JSON.stringify(steps));
+  check(/Advanced → Character Synchronization/.test(steps[1] || '') && /Prune deleted characters/.test(flat) && /JustBackup/.test(flat),
     "AutoRetainer's Character Synchronization as the quicker way");
   check(!/Only sync the characters I tick/.test(flat), 'no longer suggests syncing only ticked characters');
   check(!/Cal Kitteh 2/.test(summary), 'a label changed once is not counted');
   await shot('shared-sync-summary');
 
   await nav('PCs');
-  await waitFor(`!!document.querySelector('.pcs .shared-sync')`, 'the warning on the PCs tab', 20000);
-  check(/^Bex Kitteh 1 /.test(await text()), 'the same on the PCs tab');
+  await waitFor(`!!document.querySelector('.pcs .shared-sync')`, 'the warning on the PCs page', 20000);
+  check(/^Bex Kitteh 1 /.test(await text()), 'the same on the PCs page');
   await shot('shared-sync-pcs');
 };
 

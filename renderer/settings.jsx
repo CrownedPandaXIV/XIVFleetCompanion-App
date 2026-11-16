@@ -249,9 +249,9 @@ function GameDataSection() {
     <section className="settings-section">
       <h3>Game Data</h3>
       <div className="status" style={{ marginBottom: 8 }}>
-        Item, recipe, retainer task and other game tables, from the ffxiv-datamining repository on GitHub.
+        Item names, recipes, worlds and the rest of the game's own lists. A note at the top says when new ones are out; this checks now.
         {last
-          ? ` Last updated ${formatWhen(last.appliedAt)}${last.source && last.source.sha ? ` (source ${last.source.sha})` : ''}.`
+          ? ` Last updated ${formatWhen(last.appliedAt)}.`
           : ' No update has been made from here yet.'}
       </div>
       <button onClick={runCheck} disabled={phase === 'checking' || phase === 'applying' || busy}>
@@ -467,10 +467,9 @@ function FileGameDataSection() {
     <section className="settings-section">
       <h3>Game Data</h3>
       <div className="status" style={{ marginBottom: 8 }}>
-        Item, recipe, retainer task and other game tables, from the ffxiv-datamining repository on GitHub, kept by the app beside
-        its settings.
+        Item names, recipes, worlds and the rest of the game's own lists, filled in by themselves the first time. After a game patch, this updates them.
         {last
-          ? ` Last updated ${new Date(last.appliedAt).toLocaleString()}${last.source && last.source.sha ? ` (source ${last.source.sha})` : ''}.`
+          ? ` Last updated ${new Date(last.appliedAt).toLocaleString()}.`
           : ' Not loaded yet.'}
       </div>
       <button onClick={update} disabled={busy}>{busy ? 'Updating...' : 'Update now'}</button>
@@ -574,7 +573,7 @@ function PlayStyleSection() {
           <div className="alerts-help">
             {data.counts && `Your characters have ${data.counts.subs} sub${data.counts.subs === 1 ? '' : 's'} built and ${data.counts.retainers} retainer${data.counts.retainers === 1 ? '' : 's'} with a class. `}
             Showing: <strong className="play-style-now">{PLAY_STYLE_NAMES[data.style] || data.style}</strong>.
-            {' '}Tabs and Summary sections for what you do not run are left out. With subs only, the Retainers tab is left out;
+            {' '}Tabs and Summary sections for what you do not run are left out. With subs only, the Retainers page is left out;
             with retainers only, Salvage, Subs, Supplies, Parts and Route Optimization are.
           </div>
         </div>
@@ -700,8 +699,8 @@ function LivePricesSection() {
           <div className="alerts-help">
             Universalis (universalis.app) collects market board prices from players. With this on, the app asks it for the cheapest
             listing of each item on the character's home world, data center and region, and shows them next to the vendor prices: the
-            market value of loot and venture rewards on the Income tab, which of your listings someone sells cheaper on the
-            Gil &amp; Market tab, and what the parts and materials on the Parts tab's Shopping List cost to buy (from the world, data
+            market value of loot and venture rewards on the Income page, which of your listings someone sells cheaper on the
+            Gil &amp; Market page, and what the parts and materials on the Parts page's Shopping List cost to buy (from the world, data
             center or region you pick there). Only item numbers and world, data center or region names are sent. Prices are kept for 30 minutes. Items not sold on the market
             board (such as salvage) keep their vendor price.
           </div>
@@ -1136,7 +1135,14 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
             <>
         <section className="settings-section">
           <h3>Fight Club Data</h3>
-          <button onClick={() => setShowFightClubImport(true)}>Import Fight Club Data</button>
+          <p className="alerts-help fight-club-help">
+            Route Optimization, Parts and Income use Fight Club's route spreadsheet: the routes, what they make and the builds
+            they need. Open it, save it as an Excel file (File → Download → Microsoft Excel (.xlsx)), then import that file here.
+          </p>
+          <div className="settings-row">
+            <button className="fight-club-open" onClick={() => window.api.openFightClub()}>Open Fight Club's spreadsheet</button>
+            <button onClick={() => setShowFightClubImport(true)}>Import Fight Club Data</button>
+          </div>
           {showFightClubImport && (
             <FightClubImportModal onClose={() => setShowFightClubImport(false)} />
           )}

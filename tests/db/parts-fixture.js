@@ -1,4 +1,4 @@
-// The Parts tab's answers for made-up fleets, for the plugin's own working out to be checked against (plugin 2.0
+// The Parts page's answers for made-up fleets, for the plugin's own working out to be checked against (plugin 2.0
 // batch 4: the plugin works parts out itself, from the fleet_parts_* views, the same way as ipc/parts.js
 // computePartsNeeded). For each fleet it writes the views' rows (what the plugin reads) and the app's answers (what
 // the plugin must give) to one file:

@@ -1,5 +1,5 @@
-// Fight Club in the Subs tab (subs/submarine-builds.js): Target Route picks the most gil a day after repair
-// kits, and Next Build looks ahead to the first rank where a better-paying build unlocks.
+// Fight Club in the Subs page (subs/submarine-builds.js): Target route picks the most gil a day after repair
+// kits, and Next build looks ahead to the first rank where a better-paying build unlocks.
 const test = require('node:test');
 const assert = require('node:assert');
 const { bestFightClubOption, computeTargetRoute, nextFightClubBuild } = require('../subs/submarine-builds');
@@ -15,7 +15,7 @@ const rows = [
   { route: 'MROJZ', hours: 24, repair_times: '10', gil_sub_day: 320000, gil_hr: 13300, rec_build_notes: '90: WWWW' },
 ];
 
-test('Target Route: the most gil a day after repair kits, not the most an hour', () => {
+test('Target route: the most gil a day after repair kits, not the most an hour', () => {
   assert.deepStrictEqual(computeTargetRoute(85, rows, 5000, letters), { route: 'O-J', gilPerDay: 290000 });
   // With free repair kits, the modified build's extra gil wins.
   assert.deepStrictEqual(computeTargetRoute(85, rows, 0, letters), { route: 'O-J-Z', gilPerDay: 300000 });
@@ -24,7 +24,7 @@ test('Target Route: the most gil a day after repair kits, not the most an hour',
   assert.deepStrictEqual(bestFightClubOption(85, rows, 5000).parts, ['S', 'S', 'S', 'S']);
 });
 
-test('Next Build from Fight Club: the first rank where a different build makes more than the sub does now', () => {
+test('Next build from Fight Club: the first rank where a different build makes more than the sub does now', () => {
   const base = { top: 100, fightClubRows: rows, repairKitCost: 5000, validRouteLetters: letters };
   // A rank 85 sub on O-J with SSSS, making 290,000: nothing better until MROJZ at 90.
   assert.deepStrictEqual(nextFightClubBuild({ ...base, rank: 85, currentParts: ['S', 'S', 'S', 'S'], currentNet: 290000 }),

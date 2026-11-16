@@ -38,7 +38,6 @@ const DOWNLOADS = {
 
 // The kinds of PC, as the setup screen offers them.
 const ROLES = {
-  onepc: { label: 'Everything on this PC', detail: 'This PC plays and keeps the database. No other PC connects.', database: true, otherPcs: false },
   dbhost: { label: 'This PC keeps the database for my other PCs', detail: 'Your other PCs (playing or just viewing) connect to this one.', database: true, otherPcs: true },
   connect: { label: 'This PC uses a database on another PC', detail: 'The database PC is already set up. This one runs the app (and maybe the game).', database: false, otherPcs: true },
   plugin: { label: 'This PC only plays the game', detail: 'Only the plugin runs here, sending to a database on another PC.', database: false, otherPcs: true },

@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { readAppMode, writeAppMode, suggestedAppMode, DEFAULT_APP_MODE } = require('../shared/app-mode');
+const { readAppMode, writeAppMode, DEFAULT_APP_MODE } = require('../shared/app-mode');
 
 test('a PC that never chose shows the whole app, as before 1.9.0', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'app-mode-'));
@@ -24,10 +24,4 @@ test('the choice is kept, and only the two modes are accepted', () => {
   assert.strictEqual(readAppMode(file), 'fleet');
   assert.throws(() => writeAppMode(file, 'everything'));
   assert.strictEqual(readAppMode(file), 'fleet');
-});
-
-test('the first-run setup suggests the Database Helper only for a PC that just plays', () => {
-  const { ROLES } = require('../setup/installers');
-  assert.deepStrictEqual(Object.keys(ROLES).map((r) => [r, suggestedAppMode(r)]),
-    [['onepc', 'fleet'], ['dbhost', 'fleet'], ['connect', 'fleet'], ['plugin', 'tools']]);
 });

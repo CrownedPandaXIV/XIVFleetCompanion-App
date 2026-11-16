@@ -1,4 +1,4 @@
-// Retainers tab: retainers none of whose items are stored (AllaganTools has not seen them) are listed in
+// Retainers page: retainers none of whose items are stored (AllaganTools has not seen them) are listed in
 // one collapsed line above the table. In the test data most retainers have no items; Retainer 1-1 has
 // some (the shopping list fixtures). Giving Retainer 2-1 an item takes it off the list.
 const UNSEEN = `SELECT count(*)::int AS n FROM companion_retainer_lookup rl

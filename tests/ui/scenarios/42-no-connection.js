@@ -26,7 +26,7 @@ module.exports = async (t) => {
       if (/Loading\.\.\./.test(main)) stuck.push(page);
     }
     await ev(`[...document.querySelectorAll('.sidebar-button')].find((b) => b.innerText.trim() === 'Subs').click()`);
-    await waitFor(`/No database connection saved on this PC yet/.test(document.body.innerText)`, 'the Subs page to say why', 10000);
+    await waitFor(`/No fleet on this PC yet\\. Playing on one PC\\? In the game, type \\/xivfleet and click Keep it on this PC/.test(document.body.innerText)`, 'the Subs page to say why', 10000);
     check(true, 'a page says plainly that no connection is saved, and where to enter one');
     check(pages.length > 5, `went through every page (${pages.join(', ')})`);
     check(stuck.length === 0, `no page stays on "Loading..." with no connection saved${stuck.length ? `: ${stuck.join(', ')}` : ''}`);
