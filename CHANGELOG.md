@@ -3,6 +3,19 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.4 - 2026-11-16
+
+Simpler for new players: one clear way to do each thing, and nothing they don't need.
+
+- **The setup screen starts with "I play on one PC"**: nothing to install, only where to click in the game (**Keep it on
+  this PC**), after which the app opens the fleet by itself. "Everything on this PC", which installed a whole PostgreSQL
+  database for one PC, is gone. A database already set up that way keeps working.
+- **The setup screen no longer asks "full app or Database Helper?"**: it opens the full app. Settings → General → This
+  PC shows still switches.
+- **With no fleet yet**, the pages say how to get one for one PC as well as for a shared database.
+- **Fight Club Data has a link to Fight Club's spreadsheet** (Settings → Data), and says how to save it for the import.
+- **Game Data** is described in plain words, without the source's name and code.
+
 ## 1.10.3 - 2026-11-13
 
 - **No connection saved no longer leaves pages on "Loading..."**: with no database connection saved on this PC (setup

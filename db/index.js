@@ -48,7 +48,9 @@ const CREDENTIAL_FILE = path.join(app.getPath('userData'), 'pg-credentials.enc')
 function loadPostgresConfig() {
   if (!fs.existsSync(CREDENTIAL_FILE)) {
     throw new Error(
-      'No database connection saved on this PC yet. Enter it in Settings → Database, or use Settings → Setup Help → Set up this PC.'
+      'No fleet on this PC yet. Playing on one PC? In the game, type /xivfleet and click Keep it on this PC: the app opens ' +
+      'your fleet by itself once the game has synced. Sharing a database between PCs? Enter it in Settings → Database, ' +
+      'or use Settings → Setup Help → Set up this PC.'
     );
   }
 

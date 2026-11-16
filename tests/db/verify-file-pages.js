@@ -86,7 +86,9 @@ function differences(a, b, at = '', out = []) {
   const num = (x) => (typeof x === 'number' ? x : typeof x === 'string' && /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(x) ? Number(x) : null);
   if (a instanceof Date || b instanceof Date) {
     const ta = a instanceof Date ? a.getTime() : a; const tb = b instanceof Date ? b.getTime() : b;
-    if (!(a instanceof Date && b instanceof Date) || Math.abs(ta - tb) > 1) out.push(`${at}: PostgreSQL ${JSON.stringify(a)}, file ${JSON.stringify(b)}`);
+    // An edit's time (updated_at) is when each side made it, a few milliseconds apart (the tables' check leaves it out).
+    const within = /\.updated_at$/.test(at) ? 5000 : 1;
+    if (!(a instanceof Date && b instanceof Date) || Math.abs(ta - tb) > within) out.push(`${at}: PostgreSQL ${JSON.stringify(a)}, file ${JSON.stringify(b)}`);
     return out;
   }
   if (Buffer.isBuffer(a) || Buffer.isBuffer(b)) {

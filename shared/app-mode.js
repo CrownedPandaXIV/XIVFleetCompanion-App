@@ -1,4 +1,4 @@
-// What the app shows on this PC (Settings → General → This PC shows, or the first-run setup):
+// What the app shows on this PC (Settings → General → This PC shows):
 //   fleet  the whole app (the default, and what every PC had before 1.9.0);
 //   tools  the Database Helper: only the database tools (setup, the connection, moving it, backups and restore,
 //          Remove everything) and the PCs list, for a PC that keeps the database or only plays with the plugin.
@@ -23,8 +23,4 @@ function writeAppMode(file, mode, fsys = fs) {
   return mode;
 }
 
-// The first-run setup's suggestion for each kind of PC (setup/installers.js ROLES): a PC that only plays has the
-// app for setting up and the backups, so it starts on the Database Helper; the others start with the whole app.
-const suggestedAppMode = (role) => (role === 'plugin' ? 'tools' : 'fleet');
-
-module.exports = { APP_MODES, DEFAULT_APP_MODE, readAppMode, writeAppMode, suggestedAppMode };
+module.exports = { APP_MODES, DEFAULT_APP_MODE, readAppMode, writeAppMode };

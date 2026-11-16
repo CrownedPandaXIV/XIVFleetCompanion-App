@@ -2,7 +2,6 @@
 // kind of PC, running the setup with its progress sent to the window as 'setup:progress', and Tailscale's
 // sign-in. The working out is in setup/installers.js and setup/run-setup.js.
 const fs = require('fs');
-const { suggestedAppMode } = require('../shared/app-mode');
 const os = require('os');
 const { spawn } = require('child_process');
 const { app, ipcMain, shell } = require('electron');
@@ -26,7 +25,7 @@ async function detect() {
 ipcMain.handle('setup:wizard-info', async () => ({
   windows: process.platform === 'win32',
   installed: await detect(),
-  roles: Object.entries(ROLES).map(([key, r]) => ({ key, ...r, appMode: suggestedAppMode(key) })),
+  roles: Object.entries(ROLES).map(([key, r]) => ({ key, ...r })),
   downloads: { postgres: DOWNLOADS.postgres.name, tailscale: DOWNLOADS.tailscale.name },
 }));
 

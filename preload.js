@@ -178,6 +178,7 @@ contextBridge.exposeInMainWorld('api', {
   getProblemInfo: () => invoke('help:problem-info'),
   openLogFolder: () => invoke('help:open-log-folder'),
   reportProblem: () => invoke('help:report-problem'),
+  openFightClub: () => invoke('help:open-fight-club'),
   testSetupAddress: (address) => invoke('setup:test-address', address),
   checkFromHere: (address) => invoke('setup:check-from-here', address),
   letOtherPcsConnect: () => invoke('setup:let-other-pcs-connect'),

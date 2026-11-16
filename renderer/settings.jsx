@@ -249,9 +249,9 @@ function GameDataSection() {
     <section className="settings-section">
       <h3>Game Data</h3>
       <div className="status" style={{ marginBottom: 8 }}>
-        Item, recipe, retainer task and other game tables, from the ffxiv-datamining repository on GitHub.
+        Item names, recipes, worlds and the rest of the game's own lists. A note at the top says when new ones are out; this checks now.
         {last
-          ? ` Last updated ${formatWhen(last.appliedAt)}${last.source && last.source.sha ? ` (source ${last.source.sha})` : ''}.`
+          ? ` Last updated ${formatWhen(last.appliedAt)}.`
           : ' No update has been made from here yet.'}
       </div>
       <button onClick={runCheck} disabled={phase === 'checking' || phase === 'applying' || busy}>
@@ -467,10 +467,9 @@ function FileGameDataSection() {
     <section className="settings-section">
       <h3>Game Data</h3>
       <div className="status" style={{ marginBottom: 8 }}>
-        Item, recipe, retainer task and other game tables, from the ffxiv-datamining repository on GitHub, kept by the app beside
-        its settings.
+        Item names, recipes, worlds and the rest of the game's own lists, filled in by themselves the first time. After a game patch, this updates them.
         {last
-          ? ` Last updated ${new Date(last.appliedAt).toLocaleString()}${last.source && last.source.sha ? ` (source ${last.source.sha})` : ''}.`
+          ? ` Last updated ${new Date(last.appliedAt).toLocaleString()}.`
           : ' Not loaded yet.'}
       </div>
       <button onClick={update} disabled={busy}>{busy ? 'Updating...' : 'Update now'}</button>
@@ -1136,7 +1135,14 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
             <>
         <section className="settings-section">
           <h3>Fight Club Data</h3>
-          <button onClick={() => setShowFightClubImport(true)}>Import Fight Club Data</button>
+          <p className="alerts-help fight-club-help">
+            Route Optimization, Parts and Income use Fight Club's route spreadsheet: the routes, what they make and the builds
+            they need. Open it, save it as an Excel file (File → Download → Microsoft Excel (.xlsx)), then import that file here.
+          </p>
+          <div className="settings-row">
+            <button className="fight-club-open" onClick={() => window.api.openFightClub()}>Open Fight Club's spreadsheet</button>
+            <button onClick={() => setShowFightClubImport(true)}>Import Fight Club Data</button>
+          </div>
           {showFightClubImport && (
             <FightClubImportModal onClose={() => setShowFightClubImport(false)} />
           )}
