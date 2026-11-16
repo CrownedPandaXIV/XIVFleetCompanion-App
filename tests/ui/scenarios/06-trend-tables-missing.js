@@ -7,7 +7,7 @@ module.exports = async (t) => {
   check(await ev(`document.body.innerText.includes('Trends are unavailable right now')`), 'Summary shows a short "Trends are unavailable" note instead of tiles');
   check(await ev(`document.body.innerText.includes('Warnings: low repair kits: off') && !document.querySelector('.error')`), 'the rest of Summary still loads normally (no error page)');
   await nav('Trends'); await sleep(1500);
-  check(await ev(`document.body.innerText.includes('Could not load trend data')`), 'Trends tab says the data could not be loaded');
+  check(await ev(`document.body.innerText.includes('Could not load trend data')`), 'Trends page says the data could not be loaded');
   await nav('Character Roster'); await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster');
   check(await ev(`document.querySelectorAll('tbody tr[data-cid]').length`) === 80, 'Character Roster still lists all 80 rows');
   await sleep(1200);

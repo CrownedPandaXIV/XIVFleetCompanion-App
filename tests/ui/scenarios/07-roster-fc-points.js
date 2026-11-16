@@ -1,11 +1,11 @@
-// The Character Roster has an FC Points column that shows the Free Company's points and sorts.
+// The Character Roster has an FC points column that shows the Free Company's points and sorts.
 module.exports = async (t) => {
   const { ev, sleep, waitFor, shot, check, nav } = t;
   await nav('Character Roster');
   await waitFor(`document.querySelectorAll('tbody tr[data-cid]').length>0`, 'roster rows');
   const headers = await ev(`[...document.querySelector('thead').querySelectorAll('th')].map(th=>th.innerText.trim().toLowerCase())`);
   const col = headers.indexOf('fc points');
-  check(col > 0 && headers[col - 1] === 'fc', 'the roster has an FC Points column next to FC: ' + JSON.stringify(headers));
+  check(col > 0 && headers[col - 1] === 'fc', 'the roster has an FC points column next to FC: ' + JSON.stringify(headers));
   const cells = await ev(`[...document.querySelectorAll('tbody tr[data-cid]')].map(tr=>tr.children[${col}].innerText.trim())`);
   check(cells.length === 80 && cells.every((v) => /^\d{1,3}(,\d{3})+$/.test(v)), 'every row shows its points with thousands separators: ' + cells.slice(0, 3).join(' | '));
   // Sorting turns off the split into one table per account, so the whole roster is sorted together.

@@ -42,20 +42,20 @@ module.exports = async (t) => {
   await waitFor(`document.querySelector('h1')?.innerText==='Trends' && !!document.querySelector('.trend-chart-wrap canvas')`, 'trends tab');
   const st = await ev(`JSON.stringify({metric:document.querySelector('.trend-field select').value, scope:document.querySelectorAll('.trend-field select')[1].value, chip:document.querySelector('.trend-chip span:not(.trend-key)')?.innerText, range:document.querySelector('.trend-segmented button.active').innerText})`);
   const sj = JSON.parse(st);
-  check(sj.metric === 'gil' && sj.scope === 'characters' && sj.chip && sj.chip.startsWith(first), 'Open in Trends shows that character gil in the Trends tab: ' + st);
+  check(sj.metric === 'gil' && sj.scope === 'characters' && sj.chip && sj.chip.startsWith(first), 'Open in Trends shows that character gil in the Trends page: ' + st);
   await shot('15-opened-in-trends');
 
-  // ---- Salvage tab
+  // ---- Salvage page
   await nav('Salvage'); await waitFor(`document.querySelectorAll('tbody tr').length>0`, 'salvage rows'); await cardsReady(1);
-  check(await ev(`document.querySelector('.trend-card-title').innerText`) === 'Salvage value, whole fleet (gil)', 'the Salvage tab has its salvage-value chart');
+  check(await ev(`document.querySelector('.trend-card-title').innerText`) === 'Salvage value, whole fleet (gil)', 'the Salvage page has its salvage-value chart');
   check(await ev(`document.querySelectorAll('tbody .trend-link').length`) > 0, 'Salvage rows have the chart icon');
   await ev(`document.querySelector('tbody .trend-link').click()`); await waitFor(`!!document.querySelector('.trend-detail')`, 'panel'); await cardsReady(2);
   await shot('16-salvage-tab-panel');
   await ev(`[...document.querySelectorAll('.trend-detail button')].find(b=>b.innerText==='Close').click()`); await sleep(300);
 
-  // ---- Free Companies tab
+  // ---- Free Companies page
   await nav('Free Companies'); await waitFor(`document.querySelectorAll('tbody tr').length>0`, 'fc rows'); await cardsReady(1);
-  check(await ev(`document.querySelector('.trend-card-title').innerText`) === 'FC points, all Free Companies (total)', 'the Free Companies tab has its FC-points chart');
+  check(await ev(`document.querySelector('.trend-card-title').innerText`) === 'FC points, all Free Companies (total)', 'the Free Companies page has its FC-points chart');
   await ev(`document.querySelector('tbody .trend-link').click()`); await waitFor(`!!document.querySelector('.trend-detail')`, 'fc panel'); await cardsReady(3);
   check(await ev(`document.querySelectorAll('.trend-detail .trend-card').length`) === 3, 'the Free Company panel has three charts');
   await shot('17-fc-tab-panel');

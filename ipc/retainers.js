@@ -58,7 +58,7 @@ function computeGearStatus(jobAbbreviation, targetMode, targetValue, gearRow) {
 // any existing target row from retainer_gear_targets attached, plus average
 // current-gear ilvl and a per-slot breakdown for the hover tooltip. No row in
 // retainer_gear_targets means "no target set yet" - the UI just shows blank
-// fields, not an error. Only Crafted? is display/suggestion-only, doesn't
+// fields, not an error. Only crafted? is display/suggestion-only, doesn't
 // affect pass/fail (per Panda: it filters suggested alternatives to crafted-only,
 // gear can still be bought/crafted/traded and pass regardless). Average ilvl
 // includes every non-empty equipped slot as-is - job-agnostic by design (a
@@ -215,7 +215,7 @@ const SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES = {
 // Ranked gear suggestions for one slot: job-eligible (via
 // ffxiv_classjobcategory's real per-job column, same check as
 // computeGearStatus), at or below the target value, descending, capped at
-// 10. Only Crafted? filters to items that appear as some recipe's real
+// 10. Only crafted? filters to items that appear as some recipe's real
 // output (ffxiv_recipe.item_result) - confirmed against real data
 // (Bronze Hatchet positive test, Diadochos positive test - both are
 // genuinely craftable, contrary to an earlier wrong assumption that raid

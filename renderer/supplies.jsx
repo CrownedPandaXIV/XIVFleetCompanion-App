@@ -1,4 +1,4 @@
-// Supplies tab: days until each character runs out of ceruleum and repair kits, worked out from how
+// Supplies page: days until each character runs out of ceruleum and repair kits, worked out from how
 // fast it used them over the last few days (ipc/supplies.js, supply-runway.js), and how many to buy so
 // they last a chosen number of days. Characters in Roster order, grouped by account like other tabs.
 

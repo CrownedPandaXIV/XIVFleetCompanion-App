@@ -1,4 +1,4 @@
-// Market tab: gil held per account (characters and their retainers) and the retainers' market listings
+// Market page: gil held per account (characters and their retainers) and the retainers' market listings
 // that have sat unsold a long time (plugin 0.10.0 records when it first saw each listing). No Electron
 // or pg here, so it can be tested on its own (tests/market.test.js).
 

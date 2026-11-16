@@ -19,7 +19,7 @@ const COMPANION_PLUGINS = [
   { name: 'FC Tracker', by: 'erdelf', need: 'optional', repo: 'https://puni.sh/api/repository/erdelf',
     what: 'Free Company houses, and when each was last entered (for the house warnings).' },
   { name: 'Submarine Tracker', by: 'Infi', need: 'optional', repo: null,
-    what: "What every voyage brought back, for the Income tab's loot per voyage." },
+    what: "What every voyage brought back, for the Income page's loot per voyage." },
 ];
 
 // Tailscale gives every PC an address from 100.64.0.0 to 100.127.255.255.

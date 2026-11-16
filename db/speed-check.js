@@ -121,7 +121,7 @@ function speedFindings(measured, tabs = []) {
     out.push({ level: 'ok', text: "Characters are read from the plugin's current table, the fast way." });
   } else if (src && src.currentAt && src.historyAt) {
     const behind = minutesBetween(src.historyAt, src.currentAt);
-    out.push({ level: 'slow', text: `Characters are read the slow way, from the whole history, because the plugin's current table is ${behind} minutes behind its history. A PC with an old plugin, or one that stopped part-way through a sync, can cause this. Check every PC's plugin version on the PCs tab.` });
+    out.push({ level: 'slow', text: `Characters are read the slow way, from the whole history, because the plugin's current table is ${behind} minutes behind its history. A PC with an old plugin, or one that stopped part-way through a sync, can cause this. Check every PC's plugin version on the PCs page.` });
   } else if (src && !src.useCurrent) {
     out.push({ level: 'slow', text: `Characters are read the slow way, from the whole history${src.hasCidIndex ? '' : ', without the index that speeds that up'}.` });
   }

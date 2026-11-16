@@ -1,4 +1,4 @@
-// PCs tab: every PC running the plugin (0.10.0 and later, with database version 8), what it found and could not
+// PCs page: every PC running the plugin (0.10.0 and later, with database version 8), what it found and could not
 // see at its last sync, and its last "Check what I can see" result (ipc/details.js).
 
 const pcAgo = (at) => {
@@ -38,7 +38,7 @@ function PcProblemsCell({ problems }) {
 // ctx.newest: the newest plugin version any PC runs; ctx.minVersion: the oldest this app works fully with.
 // "12 (2 left out) (3 left to another setup)": the characters a setup synced, those unticked in its settings, and
 // those it left to the setup they last logged in on (plugin 1.0.2).
-const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another setup)` : ''}`;
+const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another game)` : ''}`;
 
 // Its last sync; a PC that has never synced but reads says so.
 const pcLastSync = (p) => (!p.last_sync_at && p.last_read_at ? `Only reads (seen ${pcAgo(p.last_read_at)})` : pcAgo(p.last_sync_at));
@@ -78,7 +78,7 @@ const PC_COLUMN_DEFS = [
     cell: (p) => pcCharacters(p),
     td: (p) => (
       <td title={p.characters_elsewhere
-        ? `${p.characters_elsewhere} of the characters this setup's AutoRetainer has last logged in on another setup, so that setup syncs them (the Roster's Synced By column says which).`
+        ? `${p.characters_elsewhere} of the characters this game's AutoRetainer has last played in another game, so that game syncs them (the Roster's Synced by column says which).`
         : undefined}>
         {pcCharacters(p)}
       </td>
@@ -126,7 +126,7 @@ function PcsView({ refreshKey }) {
   if (data.missing) {
     return (
       <div className="supplies-note pcs-missing" style={{ paddingTop: '16px' }}>
-        The database doesn't have the PCs table yet. The app adds it when it connects; if it couldn't, the banner at the top says why.
+        The database isn't up to date for this page yet. The app updates it when it connects; if it couldn't, the banner at the top says why.
         Each PC then reports here at its next sync.
       </div>
     );
@@ -165,7 +165,7 @@ function PcsView({ refreshKey }) {
           type /xlplugins, open Installed Plugins, and update XIV Fleet Companion.
         </div>
       )}
-      {data.pcs.length === 0 && <div className="status">No PC has reported yet: update the plugin to 0.10.0 and let it sync.</div>}
+      {data.pcs.length === 0 && <div className="status">No PC has reported yet. Each one appears here at its next sync.</div>}
       {data.pcs.length > 0 && (
         <React.Fragment>
           <div className="controls"><ColumnPicker cols={pcCols} /></div>

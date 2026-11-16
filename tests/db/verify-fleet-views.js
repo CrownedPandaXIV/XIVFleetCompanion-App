@@ -1,8 +1,8 @@
 // Checks the views plugin 2.0 reads (db/views.sql) against the app's own code
-// on a real Postgres: fleet_supplies_view against what the Supplies tab works out (ipc/supplies.js: metricWindow,
-// usageRate, runway, restockAmount), fleet_subs_view against the Subs tab's part letters and status, and
+// on a real Postgres: fleet_supplies_view against what the Supplies page works out (ipc/supplies.js: metricWindow,
+// usageRate, runway, restockAmount), fleet_subs_view against the Subs page's part letters and status, and
 // fleet_summary_view against counts made here; 2.x's Roster, Retainers and PCs views (fleet_roster_view against
-// characters/roster-warnings.js and the Roster's house text, the others against what their tabs read); and the Salvage, Income and venture views against the Salvage and Income tabs' own working out, run here (ipc/inventory.js, ipc/income.js). Hand-made cases first, then a few hundred random histories. Set
+// characters/roster-warnings.js and the Roster's house text, the others against what their tabs read); and the Salvage, Income and venture views against the Salvage and Income pages' own working out, run here (ipc/inventory.js, ipc/income.js). Hand-made cases first, then a few hundred random histories. Set
 // PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE for a scratch server, as its administrator: it makes and drops a
 // database named fleet_views_check.
 const fs = require('fs');
@@ -23,7 +23,7 @@ const { chestHolders } = require('../../characters/fc-chest');
 const { ventureTotals } = require('../../subs/loot');
 const Module = require('module');
 
-// The Salvage and Income tabs' own working out (ipc/inventory.js get-salvage, ipc/income.js loadIncome), run here on
+// The Salvage and Income pages' own working out (ipc/inventory.js get-salvage, ipc/income.js loadIncome), run here on
 // the check's database: Electron is stood in for (they register their calls with it when loaded) and their database
 // connection is the check's own.
 const handlers = new Map();
@@ -52,7 +52,7 @@ const NAME = 'fleet_views_check';
 const HOUR = 3600 * 1000;
 const close = (a, b) => (a === null || b === null ? a === b : Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b)));
 
-// What the Supplies tab shows for each character with subs (as ipc/supplies.js loadSupplies), by cid.
+// What the Supplies page shows for each character with subs (as ipc/supplies.js loadSupplies), by cid.
 async function appSupplies(client, windowDays, targetDays) {
   const characters = (await client.query(`
     SELECT c.cid::text AS cid, c.last_synced_at, c.ceruleum, c.repair_kits FROM companion_character_current c
@@ -113,7 +113,7 @@ async function fcHistory(client, rows) {
   [rows.map((r) => r.fc), rows.map((r) => r.metric), rows.map((r) => r.at), rows.map((r) => r.value)]);
 }
 
-// What the Income tab works out for each character with subs (ipc/income.js loadIncome; the view leaves out its Fight
+// What the Income page works out for each character with subs (ipc/income.js loadIncome; the view leaves out its Fight
 // Club expected figures), by cid.
 async function appIncome(client) {
   appClient = client;
@@ -168,7 +168,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
   try {
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'schema.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'views.sql'), 'utf8'));
-    // The game data columns the Salvage and Income tabs read (a new database has the tables, empty, without them); the
+    // The game data columns the Salvage and Income pages read (a new database has the tables, empty, without them); the
     // views read none of them.
     await client.query(`ALTER TABLE ffxiv_item ADD COLUMN name text, ADD COLUMN pricelow text;
       ALTER TABLE ffxiv_submarineexploration ADD COLUMN location text;
@@ -177,13 +177,13 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
     const now = Date.now();
     const ago = (h) => now - h * HOUR;
 
-    await scenario('part letters match the Subs tab for every part, and anything else shows as its number', async () => {
+    await scenario('part letters match the Subs page for every part, and anything else shows as its number', async () => {
       const ids = [...Object.keys(SUB_PART_CLASS).map(Number), 1, 21791, 24368, 0];
       const { rows } = await client.query('SELECT id, fleet_part_letter(id) AS letter FROM unnest($1::int[]) AS id', [ids]);
       for (const r of rows) assert.strictEqual(r.letter, partLetter(r.id), `part ${r.id}`);
     });
 
-    await scenario('supplies: hand-made cases give what the Supplies tab gives', async () => {
+    await scenario('supplies: hand-made cases give what the Supplies page gives', async () => {
       await clear();
       // 1. Bags only, over 5 days: 100 a day used, one restock ignored; the base point is before the window.
       await character(client, 1, { ceruleum: 300, repairKits: 40, syncedHoursAgo: 1 });
@@ -233,7 +233,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       await compareSupplies(client, 14, 30);
     });
 
-    await scenario('supplies: 300 random histories (drops, restocks, hourly reminders, late syncs) match the Supplies tab', async () => {
+    await scenario('supplies: 300 random histories (drops, restocks, hourly reminders, late syncs) match the Supplies page', async () => {
       await clear();
       let seed = 42;
       // mulberry32: 32-bit integer steps, so JavaScript's numbers never lose digits (which would make it repeat).
@@ -284,7 +284,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
         ['Out', 'Aki', 3, 60, 'W-W-W-W', 'out'],
       ]);
       const app = (r) => [r.part1, r.part2, r.part3, r.part4].map(partLetter).join('-');
-      assert.strictEqual(rows[1].build, app({ part1: 24348, part2: 24353, part3: 23904, part4: 21796 }), 'as the Subs tab joins them');
+      assert.strictEqual(rows[1].build, app({ part1: 24348, part2: 24353, part3: 23904, part4: 21796 }), 'as the Subs page joins them');
     });
 
     await scenario('summary: subs, retainers, low supplies and the soonest to run out', async () => {
@@ -370,7 +370,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       await client.query('INSERT INTO character_sort_order (cid, sort_index) VALUES (1, 2), (2, 0)');
       const rows = (await client.query('SELECT * FROM fleet_roster_view ORDER BY cid')).rows;
 
-      // What the Roster tab makes of the same rows (ipc/roster.js, renderer formatHouse).
+      // What the Roster page makes of the same rows (ipc/roster.js, renderer formatHouse).
       const chars = (await client.query(`SELECT c.cid::text AS cid, c.account_label, c.last_synced_at, c.ceruleum, c.repair_kits,
         (SELECT count(*) FROM companion_submarine_snapshot s WHERE s.cid = c.cid AND s.level > 0) AS subs_built FROM companion_character_current c`)).rows;
       const app = new Map(rosterWarnings(chars, notSyncedCharacters(chars, 30), { ceruleum: 100, repairKits: 10 }).map((r) => [r.cid, r]));
@@ -413,13 +413,13 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
         [11, 'Aki', 'Empty', 1, 90, false, null, null, null, false, true, 4],
         [12, 'Aki', 'Unseen', 0, null, null, null, null, null, false, false, 4],
         [13, null, 'Orphan', 10, 5, false, null, null, null, false, false, null],
-      ], 'as the Retainers tab reads them (ipc/retainers.js get-retainer-targets): items seen when stored or seen holding nothing');
+      ], 'as the Retainers page reads them (ipc/retainers.js get-retainer-targets): items seen when stored or seen holding nothing');
       assert.strictEqual(Number(rows[0].venture_ends_at), 1800000000);
       const gear = (await client.query('SELECT retainer_id, item_id FROM fleet_retainer_gear_view ORDER BY item_id')).rows;
       assert.deepStrictEqual(gear.map((g) => [Number(g.retainer_id), g.item_id]), [[10, 40000], [10, 40001]], 'only what it wears (container 11000), as the Avg ilvl');
     });
 
-    await scenario('PCs: every setup as the PCs tab reads it, with what it couldn\'t see one per line', async () => {
+    await scenario('PCs: every setup as the PCs page reads it, with what it couldn\'t see one per line', async () => {
       await clear();
       await client.query(`INSERT INTO companion_pc_status (pc_name, account_label, plugin_version, last_sync_at, autoretainer_ready, allagantools_ready,
           fctracker_found, submarinetracker_found, venture_stats_found, characters_synced, characters_left_out, characters_elsewhere, problems, check_text, check_to_fix, check_at) VALUES
@@ -453,7 +453,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.deepStrictEqual([s.retainers, s.ventures_done, s.retainers_idle], [5, 1, 2], 'the summary counts the same');
     });
 
-    await scenario('Free Companies: as the Free Companies tab (characters/fc-directory-rows.js), houses and bid eligibility', async () => {
+    await scenario('Free Companies: as the Free Companies page (characters/fc-directory-rows.js), houses and bid eligibility', async () => {
       await clear();
       await setting(client, 'house_warn_days', 7);
       await client.query('ALTER TABLE ffxiv_world ADD COLUMN IF NOT EXISTS name text');
@@ -539,7 +539,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.deepStrictEqual([nameless.who, nameless.owner_name], ['Free Company 12', 'Cal'], 'no FC name; the only member holds it');
       assert.strictEqual(rows.find((r) => String(r.owner_cid) === '77').who, 'Character 77', 'a character not in the Roster');
 
-      // Fleet totals, as the Inventory tab's (ipc/inventory.js get-fleet-inventory-summary): bags except the character's
+      // Fleet totals, as the Inventory page's (ipc/inventory.js get-fleet-inventory-summary): bags except the character's
       // gil, plus every FC chest, by item as stored (HQ apart).
       const app = new Map();
       for (const r of (await client.query(`SELECT item_id, SUM(quantity) AS q FROM companion_inventory_snapshot WHERE quantity > 0 AND sorted_container != 2000 GROUP BY item_id
@@ -549,7 +549,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       const totals = (await client.query('SELECT * FROM fleet_item_totals_view')).rows;
       assert.deepStrictEqual(new Map(totals.map((t) => [t.item_id + (t.hq ? 1000000 : 0), Number(t.total)])), app);
     });
-    await scenario('salvage: what the Salvage tab counts for each character, FC chests on the member it counts them on', async () => {
+    await scenario('salvage: what the Salvage page counts for each character, FC chests on the member it counts them on', async () => {
       await clear();
       await character(client, 1, { name: 'Aki', label: 'A' });
       await character(client, 2, { name: 'Bex', label: 'B' });
@@ -580,7 +580,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.strictEqual(Number(view.get('2').extravagant), 2, 'Bex leads Kittehs, so its chest is counted on Bex');
     });
 
-    await scenario('income: hand-made cases give what the Income tab gives (chest, first-stored, kits, short history)', async () => {
+    await scenario('income: hand-made cases give what the Income page gives (chest, first-stored, kits, short history)', async () => {
       await clear();
       const at = (h) => ago(h) - 7 * 60 * 1000; // a few minutes off the hour, away from the window's edge
       await character(client, 1, { name: 'Aki' });
@@ -627,7 +627,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       await compareIncome(client);
     });
 
-    await scenario('income: 200 random histories (rises, drops, chest moves, first-time items, late syncs) match the Income tab', async () => {
+    await scenario('income: 200 random histories (rises, drops, chest moves, first-time items, late syncs) match the Income page', async () => {
       await clear();
       let seed = 7;
       const random = () => {
@@ -712,7 +712,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.deepStrictEqual(aki.filter((r) => r.item_id === 5111).map((r) => [Number(r.quantity), Number(r.hq_quantity)]), [[5, 2]], 'high quality counted apart');
     });
 
-    await scenario('gil and market: gil per account and every listing\'s age as the Gil & Market tab (Live Market Prices off)', async () => {
+    await scenario('gil and market: gil per account and every listing\'s age as the Gil & Market page (Live Market Prices off)', async () => {
       await clear();
       await character(client, 1, { name: 'Aki', label: 'A' });
       await character(client, 2, { name: 'Bex', label: '' });

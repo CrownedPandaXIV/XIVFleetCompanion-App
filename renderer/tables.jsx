@@ -548,7 +548,7 @@ function NotSyncedTag({ behindMs }) {
   );
 }
 
-// Characters two setups of the plugin keep overwriting (characters/shared-sync.js), on the Summary and the PCs tab:
+// Characters two setups of the plugin keep overwriting (characters/shared-sync.js), on the Summary and the PCs page:
 // what is happening and the two ways to fix it. characters: [{ cid, name, world, labels }].
 function SharedSyncWarning({ characters }) {
   if (!characters || characters.length === 0) return null;
@@ -558,19 +558,18 @@ function SharedSyncWarning({ characters }) {
   return (
     <div className="pcs-update-plugin shared-sync" role="status">
       <strong>
-        {one ? `${line(characters[0])}.` : `${characters.length} characters are synced by more than one setup of the plugin.`}
+        {one ? `${line(characters[0])}.` : `${characters.length} characters are synced by more than one game.`}
       </strong>
-      {one ? ' This character is synced by more than one setup of the plugin.' : ''} Each setup overwrites the
-      other's subs and account label for {one ? 'it' : 'them'}, usually because one setup's AutoRetainer still has an
+      {one ? ' This character is synced by more than one game.' : ''} Each game overwrites the
+      other's subs and account label for {one ? 'it' : 'them'}, usually because one game's AutoRetainer still has an
       old copy of {one ? 'it' : 'them'}. To fix it:
       <ol>
-        <li>Update Fleet Companion to plugin 1.0.2 or newer on every setup.</li>
         <li>
-          Log in as {one ? 'the character' : 'each character'} once on the setup that plays it. From then on, only
-          the setup a character last logged in on syncs it, so the old copy is left alone.
+          Log in as {one ? 'the character' : 'each character'} once on the game that plays it. From then on, only
+          the game a character last logged in on syncs it, so the old copy is left alone.
         </li>
         <li>
-          If you'd rather not wait, tidy AutoRetainer on the setup that doesn't play {one ? 'the character' : 'a character'}: in
+          If you'd rather not wait, tidy AutoRetainer on the game that doesn't play {one ? 'the character' : 'a character'}: in
           AutoRetainer's settings, open Advanced → Character Synchronization and click Prune deleted characters
           (AutoRetainer asks for the JustBackup plugin first, so it can keep a backup).
         </li>
@@ -586,17 +585,17 @@ function SharedSyncWarning({ characters }) {
   );
 }
 
-// Characters, or setups of the plugin (PCs tab), with no account label: the app can't tell which account they are
-// on, setups on one PC share a row on the PCs tab, and two setups syncing the same character can't be spotted.
+// Characters, or setups of the plugin (PCs page), with no account label: the app can't tell which account they are
+// on, setups on one PC share a row on the PCs page, and two setups syncing the same character can't be spotted.
 function NoLabelNote({ characters = 0, setups = 0 }) {
   if (!characters && !setups) return null;
   const what = setups
-    ? `${setups} setup${setups === 1 ? '' : 's'} of the plugin ${setups === 1 ? 'has' : 'have'} no account label`
+    ? `${setups} game${setups === 1 ? '' : 's'} ${setups === 1 ? 'has' : 'have'} no account label`
     : `${characters} character${characters === 1 ? ' has' : 's have'} no account label`;
   return (
     <div className="supplies-note no-label-note">
       <span className="note-warn">{what},</span> so the app can't tell which account {setups ? (setups === 1 ? 'it syncs' : 'they sync') : (characters === 1 ? 'it is on' : 'they are on')} or
-      spot two setups syncing the same character. In each setup's Fleet Companion plugin settings, fill in Account Label,
+      spot two games syncing the same character. In each game's Fleet Companion plugin settings, fill in Account Label,
       for example with the account's name.
     </div>
   );
@@ -611,10 +610,10 @@ function NotSyncedAnywhereNote({ characters }) {
   const one = characters.length === 1;
   return (
     <div className="supplies-note not-synced-anywhere">
-      <span className="note-warn">{one ? '1 character isn\'t' : `${characters.length} characters aren't`} synced by any setup of the plugin:</span>{' '}
-      {characters.map((c) => `${c.name} (${c.world}, last logged in on ${setup(c)})`).join('; ')}. Only the setup a character last
-      logged in on syncs it, and {one ? 'that setup is' : 'those setups are'} syncing without {one ? 'it' : 'them'}, usually because
-      its AutoRetainer no longer has {one ? 'it' : 'them'}. Log in as {one ? 'it' : 'each'} once on the setup that
+      <span className="note-warn">{one ? '1 character isn\'t' : `${characters.length} characters aren't`} synced by any game:</span>{' '}
+      {characters.map((c) => `${c.name} (${c.world}, last logged in on ${setup(c)})`).join('; ')}. Only the game a character last
+      logged in on syncs it, and {one ? 'that game is' : 'those games are'} syncing without {one ? 'it' : 'them'}, usually because
+      its AutoRetainer no longer has {one ? 'it' : 'them'}. Log in as {one ? 'it' : 'each'} once on the game that
       should sync {one ? 'it' : 'them'}.
     </div>
   );

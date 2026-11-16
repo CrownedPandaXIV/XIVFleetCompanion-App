@@ -1,11 +1,11 @@
-// Route Optimization tab: subs whose current route is not the best one for their rank.
+// Route Optimization page: subs whose current route is not the best one for their rank.
 
 // Route Optimization: subs at rank 85+ whose current route doesn't
-// match their computed Target Route. Route mismatch is the primary
+// match their computed Target route. Route mismatch is the primary
 // signal (not just a gil/day comparison), since a sub can be on a
 // suboptimal route even with no Fight Club data for its current route
 // (current_gil_day blank) - it should still show up here as worth
-// switching. Gil/Day Gain is shown when both values are computable,
+// switching. Gil/day gain is shown when both values are computable,
 // otherwise left blank rather than guessed.
 // Shared with SummaryView's count, so the two never disagree - subs at
 // rank 85+ whose current route doesn't match their computed Target
@@ -25,16 +25,16 @@ function computeSuboptimalSubs(rows) {
     });
 }
 
-// The Route Optimization tab's own columns (rows are subs that are not on their Target Route).
+// The Route Optimization page's own columns (rows are subs that are not on their Target route).
 const ROUTE_OPT_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
-  { key: 'currentRoute', label: 'Current Route', cell: (r) => r.current_route || '—', sort: (r) => r.current_route || null },
-  { key: 'currentGilDay', label: 'Current Gil/Day', cell: (r) => <GilDay value={r.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
-  { key: 'targetRoute', label: 'Target Route', cell: (r) => r.target_route, sort: (r) => r.target_route || null },
-  { key: 'targetGilDay', label: 'Target Gil/Day', cell: (r) => <GilDay value={r.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
+  { key: 'currentRoute', label: 'Current route', cell: (r) => r.current_route || '—', sort: (r) => r.current_route || null },
+  { key: 'currentGilDay', label: 'Current gil/day', cell: (r) => <GilDay value={r.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
+  { key: 'targetRoute', label: 'Target route', cell: (r) => r.target_route, sort: (r) => r.target_route || null },
+  { key: 'targetGilDay', label: 'Target gil/day', cell: (r) => <GilDay value={r.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   // Green for more gil a day, red for less (as the plugin).
-  { key: 'gain', label: 'Gil/Day Gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
+  { key: 'gain', label: 'Gil/day gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
     : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain >= 0 ? '+' : '−'}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain }
 ];
 const ROUTE_OPT_DUPLICATE_EXTRAS = ['x_world'];
@@ -107,7 +107,7 @@ function RouteOptimizationView({ refreshKey }) {
       </div>
 
       {suboptimal.length === 0 && (
-        <div className="status">Every rank-85+ sub is already on its Target Route.</div>
+        <div className="status">Every rank-85+ sub is already on its Target route.</div>
       )}
 
       {suboptimal.length > 0 && routeOptSort.sortColumn && table(routeOptSorted)}

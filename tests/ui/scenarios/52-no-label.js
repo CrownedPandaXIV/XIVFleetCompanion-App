@@ -1,4 +1,4 @@
-// Characters and setups of the plugin with no account label: the Roster and the PCs tab say so and where to fill
+// Characters and setups of the plugin with no account label: the Roster and the PCs page say so and where to fill
 // it in (each setup's plugin settings, Account Label). Two of the test characters and one PC have none.
 const BEX = '18014498578000001';
 const CAL = '18014498578000002';
@@ -16,8 +16,8 @@ module.exports = async (t) => {
   await shot('no-label-roster');
 
   await nav('PCs');
-  await waitFor(`!!document.querySelector('.pcs .no-label-note')`, 'the note on the PCs tab', 20000);
-  check(/^1 setup of the plugin has no account label,/.test(await note()), 'counts the setups: ' + await note());
+  await waitFor(`!!document.querySelector('.pcs .no-label-note')`, 'the note on the PCs page', 20000);
+  check(/^1 game has no account label,/.test(await note()), 'counts the games: ' + await note());
 };
 
 module.exports.before = async (db) => {

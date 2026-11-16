@@ -49,7 +49,7 @@ test('stacks are grouped per item and per place, in Roster order', () => {
   assert.strictEqual(items[0].places[5].account, 'Account 1', 'the FC chest goes with the member holding it');
 });
 
-test('characters sharing a name on different worlds are kept apart, retainers like the Retainers tab', () => {
+test('characters sharing a name on different worlds are kept apart, retainers like the Retainers page', () => {
   const stack = (world, ownerKey, kind, container, qty, extra = {}) => ({
     itemId: 5530, name: 'Coke', who: "No'wa Sugu'ya", world, owner: "No'wa Sugu'ya", ownerKey, sortIndex: null, kind, container, qty, ...extra,
   });

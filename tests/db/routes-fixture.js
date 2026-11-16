@@ -1,4 +1,4 @@
-// The Subs tab's route answers for made-up fleets, for the plugin's own working out to be checked against (plugin 2.0
+// The Subs page's route answers for made-up fleets, for the plugin's own working out to be checked against (plugin 2.0
 // routes stage: the plugin works out each sub's route, gil a day, speed and range, rank-up dates and next build itself,
 // from the fleet_route_* views and the game's own files, the same way as ipc/subs.js loadSubmarinesWithRankUps). For
 // each fleet it writes the views' rows and the game data (what the plugin reads) and the app's answers (what the

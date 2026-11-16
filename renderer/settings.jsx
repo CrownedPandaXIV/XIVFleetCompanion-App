@@ -573,7 +573,7 @@ function PlayStyleSection() {
           <div className="alerts-help">
             {data.counts && `Your characters have ${data.counts.subs} sub${data.counts.subs === 1 ? '' : 's'} built and ${data.counts.retainers} retainer${data.counts.retainers === 1 ? '' : 's'} with a class. `}
             Showing: <strong className="play-style-now">{PLAY_STYLE_NAMES[data.style] || data.style}</strong>.
-            {' '}Tabs and Summary sections for what you do not run are left out. With subs only, the Retainers tab is left out;
+            {' '}Tabs and Summary sections for what you do not run are left out. With subs only, the Retainers page is left out;
             with retainers only, Salvage, Subs, Supplies, Parts and Route Optimization are.
           </div>
         </div>
@@ -699,8 +699,8 @@ function LivePricesSection() {
           <div className="alerts-help">
             Universalis (universalis.app) collects market board prices from players. With this on, the app asks it for the cheapest
             listing of each item on the character's home world, data center and region, and shows them next to the vendor prices: the
-            market value of loot and venture rewards on the Income tab, which of your listings someone sells cheaper on the
-            Gil &amp; Market tab, and what the parts and materials on the Parts tab's Shopping List cost to buy (from the world, data
+            market value of loot and venture rewards on the Income page, which of your listings someone sells cheaper on the
+            Gil &amp; Market page, and what the parts and materials on the Parts page's Shopping List cost to buy (from the world, data
             center or region you pick there). Only item numbers and world, data center or region names are sent. Prices are kept for 30 minutes. Items not sold on the market
             board (such as salvage) keep their vendor price.
           </div>

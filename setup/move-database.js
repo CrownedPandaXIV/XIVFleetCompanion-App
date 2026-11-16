@@ -35,7 +35,7 @@ function addressChoices(oldHost, addresses) {
   return isTailscaleAddress(oldHost) || !home.length ? [...tailscale, ...home] : [...home, ...tailscale];
 }
 
-// The PCs tab's rows (companion_pc_status) against what a move needs: every PC that synced in the last
+// The PCs page's rows (companion_pc_status) against what a move needs: every PC that synced in the last
 // RECENT_DAYS runs plugin MOVE_PLUGIN_VERSION or newer (which also reports its login) and uses the app's own
 // login. Returns { blocking: [sentences], notes: [sentences] }.
 function checkPcs(pcs, user, now = new Date()) {

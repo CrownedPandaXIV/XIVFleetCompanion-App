@@ -1,6 +1,6 @@
-// Income tab: each character's real net income from its subs over the last few days (salvage that came
-// in, less the repair kits used) against what Fight Club says their routes should earn (the Subs tab's
-// Current Gil/Day). The working out is in income.js.
+// Income page: each character's real net income from its subs over the last few days (salvage that came
+// in, less the repair kits used) against what Fight Club says their routes should earn (the Subs page's
+// Current gil/day). The working out is in income.js.
 const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
 const { WINDOW_CHOICES } = require('../subs/supply-runway');
@@ -23,7 +23,7 @@ async function loadIncome(client, days = null) {
   const windowDays = days || (WINDOW_CHOICES.includes(Number(byKey[WINDOW_KEY])) ? Number(byKey[WINDOW_KEY]) : DEFAULT_WINDOW_DAYS);
   const kitCost = Number(byKey.repair_kit_cost) || 0;
 
-  // The subs' Current Gil/Day, added up per character.
+  // The subs' Current gil/day, added up per character.
   const subsByCid = new Map();
   for (const sub of await loadSubmarines(client)) {
     const key = String(sub.cid);
@@ -44,7 +44,7 @@ async function loadIncome(client, days = null) {
   const withSubs = characters.filter((c) => subsByCid.has(c.cid));
 
   // Each character's salvage and repair kit history in the window, plus the last value at or before
-  // its start (as on the Supplies tab), and the same for their FC chests' salvage.
+  // its start (as on the Supplies page), and the same for their FC chests' salvage.
   const now = Date.now();
   const windowStart = new Date(now - windowDays * DAY);
   const points = await metricWindow(client, 'character', METRICS, windowStart, withSubs.map((c) => c.cid));

@@ -1,6 +1,6 @@
 // FC houses nobody has entered for a while: the game demolishes an FC house after 45 days without a member
 // entering. The sample houses were entered a few hours ago except four (tests/ui/fixtures.sql): 9 days, 33 days,
-// 50 days, and one FCTracker has no date for. The Free Companies tab shows how long ago each house was entered,
+// 50 days, and one FCTracker has no date for. The Free Companies page shows how long ago each house was entered,
 // and the Summary lists the ones past the warning setting (7 days unless changed in Settings → General).
 module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, clickText } = t;
@@ -16,7 +16,7 @@ module.exports = async (t) => {
       return { text: cell.innerText.trim(), level: span ? span.className.replace('house-age', '').trim() : '' }; });
   })()`);
   const count = (text) => ages.filter((a) => a.text === text).length;
-  check(ages.length === 80, 'the Free Companies tab has a Last Entered column: ' + ages.length + ' rows');
+  check(ages.length === 80, 'the Free Companies page has a Last entered column: ' + ages.length + ' rows');
   check(count('Today') === 22, 'houses entered a few hours ago show "Today": ' + count('Today'));
   check(count('—') === 54, 'FCs without a house show a dash: ' + count('—'));
   const find = (text) => ages.find((a) => a.text === text) || {};
@@ -85,7 +85,7 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('tbody tr').length > 0`, 'fc rows again');
   await sleep(500);
   check(await ev(`[...document.querySelectorAll('.house-age')].find((s) => s.innerText === '9 days ago').className.includes('ok')`),
-    'the Free Companies tab uses the new setting too');
+    'the Free Companies page uses the new setting too');
 };
 
 module.exports.after = async (db) => {

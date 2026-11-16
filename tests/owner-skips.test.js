@@ -21,5 +21,5 @@ test('not counted: synced along with its setup, its setup not syncing lately, or
   assert.deepStrictEqual(ownerSkips([character('A Bit Behind', 50, 'DESKTOP-1', 'Account 2')], setups, now), [], 'less than an hour behind');
   assert.deepStrictEqual(ownerSkips([character('Taking A Break', 9000, 'DESKTOP-1', 'Account R')], setups, now), [], 'its setup has not synced for days (game not played)');
   assert.deepStrictEqual(ownerSkips([{ ...character('No Login', 9000, null, null) }], setups, now), [], 'no login: every setup syncs it as before');
-  assert.deepStrictEqual(ownerSkips([character('Unknown Setup', 600, 'LAPTOP', 'Account 2')], setups, now), [], 'a setup the PCs tab has no row for');
+  assert.deepStrictEqual(ownerSkips([character('Unknown Setup', 600, 'LAPTOP', 'Account 2')], setups, now), [], 'a setup the PCs page has no row for');
 });

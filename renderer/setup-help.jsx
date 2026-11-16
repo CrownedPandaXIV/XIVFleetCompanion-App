@@ -76,7 +76,7 @@ function SetupProblem() {
         <li>
           This app's version: <SetupLine text={summary} />
         </li>
-        <li>The plugin's version on each PC: on the PCs tab, or in the title of the plugin's window in the game.</li>
+        <li>The plugin's version on each PC: on the PCs page, or in the title of the plugin's window in the game.</li>
         <li>For something about the plugin or the game: type <code>/xivfleet check</code> in the game, click
           <strong> Copy results</strong> and paste them in.</li>
         <li>The app's log: <code>app.log</code> in the log folder. It says what the app did and any errors, and never
@@ -485,7 +485,7 @@ function MoveDatabaseSection({ onMoved }) {
       {result && !result.ok && <div className="setup-test-status setup-problem move-status">{result.error}</div>}
       {result && result.ok && (
         <div className="move-status">
-          <p><strong>Moved.</strong> This app now uses the database on this PC. Your other PCs switch to {result.to} by themselves at their next refresh or sync; the PCs tab shows which have.</p>
+          <p><strong>Moved.</strong> This app now uses the database on this PC. Your other PCs switch to {result.to} by themselves at their next refresh or sync; the PCs page shows which have.</p>
           <ul>
             <li>Turn on daily backups here (Backups tab), and turn them off on {info && info.from ? info.from.host : 'the old PC'}, since this PC has the data now.</li>
             <li>The old database stays on {info && info.from ? info.from.host : 'the old PC'}, unused. Once every PC has switched, you can remove it there: Settings → Database → Leftovers from moving the database.</li>

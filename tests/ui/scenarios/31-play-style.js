@@ -25,7 +25,7 @@ module.exports = async (t) => {
   await nav('Summary');
   await waitFor(`!!document.querySelector('.summary-retainers .retainers-idle-tile')`, 'the Summary retainers section', 20000);
   check((await tabs()).includes('Salvage') && (await tabs()).includes('Retainers'), 'with subs and retainers, every tab shows');
-  check(await ev(`document.body.innerText.includes('Fleet-Wide Salvage Total') && document.body.innerText.includes('Low Repair Kits / Ceruleum')`),
+  check(await ev(`document.body.innerText.includes('Fleet-Wide Salvage Total') && document.body.innerText.includes('Low Repair kits / Ceruleum')`),
     'the Summary shows the subs sections');
   await waitFor(`!document.querySelector('.retainers-idle-tile').innerText.includes('—')`, 'the retainer counts');
   const idle = await ev(`document.querySelector('.retainers-idle-tile').innerText`);
@@ -39,18 +39,18 @@ module.exports = async (t) => {
     'retainers only: the sub tabs are left out: ' + JSON.stringify(r));
   await nav('Summary');
   await waitFor(`!!document.querySelector('.summary-retainers')`, 'the Summary');
-  check(await ev(`!document.body.innerText.includes('Fleet-Wide Salvage Total') && !document.body.innerText.includes('Low Repair Kits') && !document.querySelector('.ready-subs')`),
+  check(await ev(`!document.body.innerText.includes('Fleet-Wide Salvage Total') && !document.body.innerText.includes('Low Repair kits') && !document.querySelector('.ready-subs')`),
     'the Summary leaves out the subs sections');
   await shot('summary-retainers');
   await nav('Income');
-  await waitFor(`!!document.querySelector('.income-loot')`, 'the Income tab');
+  await waitFor(`!!document.querySelector('.income-loot')`, 'the Income page');
   check(await ev(`document.body.innerText.includes('Retainer Ventures') && !document.body.innerText.includes('Loot per Voyage') && !document.querySelector('.supplies-summary')`),
     'Income shows only venture income');
 
   // Subs only.
   check(await choose('subs') === 'subs only', 'Settings saves "Subs only"');
   const s = await tabs();
-  check(!s.includes('Retainers') && s.includes('Salvage') && s.includes('Subs'), 'subs only: the Retainers tab is left out: ' + JSON.stringify(s));
+  check(!s.includes('Retainers') && s.includes('Salvage') && s.includes('Subs'), 'subs only: the Retainers page is left out: ' + JSON.stringify(s));
   await nav('Summary');
   await waitFor(`document.body.innerText.includes('Fleet-Wide Salvage Total')`, 'the Summary');
   check(await ev(`!document.querySelector('.summary-retainers')`), 'the Summary leaves out the retainers section');
@@ -58,7 +58,7 @@ module.exports = async (t) => {
   await waitFor(`!!document.querySelector('.market-accounts')`, 'Gil & Market');
   check(await ev(`!document.body.innerText.includes('Listings Unsold for a While')`), 'Gil & Market leaves out the listings');
   await nav('Income');
-  await waitFor(`!!document.querySelector('.income-table')`, 'the Income tab');
+  await waitFor(`!!document.querySelector('.income-table')`, 'the Income page');
   check(await ev(`!document.body.innerText.includes('Retainer Ventures')`), 'Income leaves out venture income');
 
   // A tab that is left out while open goes back to the Summary.

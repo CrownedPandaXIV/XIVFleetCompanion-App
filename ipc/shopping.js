@@ -1,4 +1,4 @@
-// The crafting shopping list on the Parts tab: the sub parts that need crafting, everything to craft on
+// The crafting shopping list on the Parts page: the sub parts that need crafting, everything to craft on
 // the way, and the raw materials and crystals to gather or buy, less what is held across every
 // character's bags, saddlebags and crystals, their retainers, and the Free Company chests. The working
 // out is in shopping-list.js. From the game tables loaded in Settings → Data:
@@ -269,10 +269,10 @@ async function withMarketPrices(client, list, { scope, recipes, vendor, ids, nam
 }
 
 // options: { buyFromVendors, aheadDays, priceScope } - buy whatever a vendor sells instead of crafting or gathering it;
-// Look ahead on the Parts tab; where market board prices are from (withMarketPrices).
+// Look ahead on the Parts page; where market board prices are from (withMarketPrices).
 ipcMain.handle('get-shopping-list', async (event, options = {}) => {
   return withClient(async (client) => {
-    // The sub parts the Parts tab says to craft (no spare, no old part to reuse). Ticks made with another
+    // The sub parts the Parts page says to craft (no spare, no old part to reuse). Ticks made with another
     // look-ahead are checked against that look-ahead's list (shopping-progress.js), so parts are worked out
     // once for the longest needed and each shorter list is the part of it due soon enough.
     const ahead = lookAheadDays(options && options.aheadDays);

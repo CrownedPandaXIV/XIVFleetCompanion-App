@@ -31,20 +31,20 @@ module.exports = async (t) => {
     },
     {
       name: 'Subs', nav: 'Subs',
-      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'current setup', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'craft?'],
+      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'fight club builds'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
     {
       name: 'Retainers', nav: 'Retainers',
       default: ['owner', 'retainer', 'class/level', 'gil', 'avg ilvl', 'venture type', 'status', 'target mode', 'target value', 'only crafted?', 'actions'],
-      move: ['gil', 'retainer'], remove: 'Venture Type', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
+      move: ['gil', 'retainer'], remove: 'Venture type', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       editTarget: true,
     },
     {
       name: 'Parts summary', nav: 'Parts',
-      default: ['needed class', 'slot', 'qty still needed'],
-      move: ['qty still needed', 'slot'], remove: 'Slot',
+      default: ['class needed', 'slot', 'still needed'],
+      move: ['still needed', 'slot'], remove: 'Slot',
     },
     {
       name: 'Parts detail', nav: 'Parts', prepare: async () => { await pressWhenThere('Detail'); },
@@ -60,7 +60,7 @@ module.exports = async (t) => {
     {
       name: 'Inventory (Fleet)', nav: 'Inventory', prepare: async () => { await pressWhenThere('Fleet'); },
       default: ['item', 'total quantity'],
-      move: ['total quantity', 'item'], remove: 'Total Quantity',
+      move: ['total quantity', 'item'], remove: 'Total quantity',
     },
     {
       name: 'Inventory (Character)', nav: 'Inventory', prepare: async () => { await pressWhenThere('Character'); await sleep(400); await pickFirst('Search characters'); },

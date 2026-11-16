@@ -1,4 +1,4 @@
-// Free Companies tab: every Free Company with its members and house.
+// Free Companies page: every Free Company with its members and house.
 
 function HouseCell({ row }) {
   const [hovering, setHovering] = useState(false);
@@ -36,17 +36,17 @@ function HouseCell({ row }) {
   );
 }
 
-// The Free Companies tab's own columns. Anything else (members' totals, the FC chest, ...) comes from the master list.
+// The Free Companies page's own columns. Anything else (members' totals, the FC chest, ...) comes from the master list.
 const FC_COLUMN_DEFS = [
-  { key: 'fcName', label: 'FC Name', locked: true, cell: (r) => <>{r.fc_name ? <span className="fc-name">{r.fc_name}</span> : <span className="dim">—</span>}<WorldAfter world={r.fc_world} />{r.fc_id && <TrendDetailLink kind="fc" id={r.fc_id} name={r.fc_name || 'Free Company'} />}</>, sort: (r) => r.fc_name },
+  { key: 'fcName', label: 'FC name', locked: true, cell: (r) => <>{r.fc_name ? <span className="fc-name">{r.fc_name}</span> : <span className="dim">—</span>}<WorldAfter world={r.fc_world} />{r.fc_id && <TrendDetailLink kind="fc" id={r.fc_id} name={r.fc_name || 'Free Company'} />}</>, sort: (r) => r.fc_name },
   { key: 'leader', label: 'Leader', cell: (r) => r.fc_master || '—', sort: (r) => r.fc_master },
-  { key: 'points', label: 'FC Points', td: (r) => <td className="num fc-points">{typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'}</td>, sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
+  { key: 'points', label: 'FC points', td: (r) => <td className="num fc-points">{typeof r.fc_points === 'number' ? r.fc_points.toLocaleString() : '—'}</td>, sort: (r) => (typeof r.fc_points === 'number' ? r.fc_points : null) },
   { key: 'members', label: 'Members', td: (r) => <td className="num">{typeof r.total_members === 'number' ? r.total_members : '—'}</td>, sort: (r) => (typeof r.total_members === 'number' ? r.total_members : null) },
   { key: 'house', label: 'House', td: (r) => <HouseCell row={r} />, sort: (r) => (r.has_house ? 1 : 0) },
   // Unknown dates sort as the oldest, since they are the ones to check.
-  { key: 'lastEntered', label: 'Last Entered', cell: (r) => <HouseAge row={r} />, sort: (r) => (!r.has_house ? null : (r.house_days ?? 9999)) }
+  { key: 'lastEntered', label: 'Last entered', cell: (r) => <HouseAge row={r} />, sort: (r) => (!r.has_house ? null : (r.house_days ?? 9999)) }
 ];
-// Master-list columns the Free Companies tab already has of its own: none (the "Rank" and "Account" ones are new here).
+// Master-list columns the Free Companies page already has of its own: none (the "Rank" and "Account" ones are new here).
 const FC_DUPLICATE_EXTRAS = [];
 
 function FCDirectoryView({ refreshKey }) {

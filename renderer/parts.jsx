@@ -1,4 +1,4 @@
-// Parts tab: parts still needed for each sub's target build, the summary of what to craft, and build rules.
+// Parts page: parts still needed for each sub's target build, the summary of what to craft, and build rules.
 
 function needsLabel(row) {
   return row.needed_modified ? `Modified ${row.needed_class}` : row.needed_class;
@@ -50,7 +50,7 @@ function PartDue({ need }) {
   if (need.due_at === null || need.due_at === undefined) return <span title="Needed for the build it should have at its rank now.">now</span>;
   const date = new Date(need.due_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric' });
   const until = formatTimeUntil(need.due_at);
-  const title = `For its next build at rank ${need.rank} (the Subs tab's Next Build)${until === 'now' ? ', which it can switch to already.' : `, about ${date}. An estimate: see Next Rank forecasts on the Subs tab for how close these come.`}`;
+  const title = `For its next build at rank ${need.rank} (the Subs page's Next build)${until === 'now' ? ', which it can switch to already.' : `, about ${date}. An estimate: see Next rank forecasts on the Subs page for how close these come.`}`;
   return <span title={title}>{until === 'now' ? 'now' : `${until} (${date})`}</span>;
 }
 const PARTS_DETAIL_DUPLICATE_EXTRAS = ['x_world'];
@@ -95,15 +95,15 @@ const SLOT_DISPLAY_ORDER = ['Hull', 'Stern', 'Bow', 'Bridge'];
 // the whole fleet, not split by account/character - the point of this
 // view is "how many of each part do I actually need to craft."
 const PARTS_SUMMARY_COLUMN_DEFS = [
-  { key: 'neededClass', label: 'Needed Class', locked: true, cell: (e) => e.needed, sort: (e) => e.needed },
+  { key: 'neededClass', label: 'Class needed', locked: true, cell: (e) => e.needed, sort: (e) => e.needed },
   { key: 'slot', label: 'Slot', cell: (e) => e.slot, sort: (e) => e.slot },
-  { key: 'qty', label: 'Qty Still Needed', cell: (e) => e.qty, sort: (e) => e.qty }
+  { key: 'qty', label: 'Still needed', cell: (e) => e.qty, sort: (e) => e.qty }
 ];
 // With Look ahead on: what is needed now and what builds coming up need, side by side.
 const PARTS_SUMMARY_AHEAD_COLUMN_DEFS = [
   ...PARTS_SUMMARY_COLUMN_DEFS.slice(0, 2),
-  { key: 'qty', label: 'Needed Now', cell: (e) => e.qty, sort: (e) => e.qty },
-  { key: 'ahead', label: 'Coming Up', cell: (e) => e.ahead, sort: (e) => e.ahead }
+  { key: 'qty', label: 'Needed now', cell: (e) => e.qty, sort: (e) => e.qty },
+  { key: 'ahead', label: 'Coming up', cell: (e) => e.ahead, sort: (e) => e.ahead }
 ];
 
 function PartsSummaryTable({ rows, aheadDays }) {
@@ -131,7 +131,7 @@ function PartsSummaryTable({ rows, aheadDays }) {
       });
 
   if (entries.length === 0) {
-    return <div className="status">Nothing needs crafting - every need is either met or covered by a spare.</div>;
+    return <div className="status">Nothing needs crafting: every part needed is covered by a spare or another sub's old part.</div>;
   }
 
   return (
@@ -265,12 +265,12 @@ function CharacterOverrideInput({ roster, cid, onChange }) {
 // The Sub Rules table's columns; each row draws its own editable cells (SubRuleRow), in the order chosen.
 const SUB_RULE_COLUMN_DEFS = [
   { key: 'rank', label: 'Rank', locked: true },
-  { key: 'appliesTo', label: 'Applies To' },
+  { key: 'appliesTo', label: 'Applies to' },
   { key: 'hull', label: 'Hull' },
   { key: 'stern', label: 'Stern' },
   { key: 'bow', label: 'Bow' },
   { key: 'bridge', label: 'Bridge' },
-  { key: 'characterOverride', label: 'Character Override' },
+  { key: 'characterOverride', label: 'Character override' },
 ];
 
 function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
@@ -455,7 +455,7 @@ const LOOK_AHEAD_CHOICES = [
   { days: 7, label: '7 days' },
   { days: 14, label: '14 days' }
 ];
-const LOOK_AHEAD_HELP = 'Also list the parts of each sub\'s next build (the Subs tab\'s Next Build) when it is due within this many days, ' +
+const LOOK_AHEAD_HELP = 'Also list the parts of each sub\'s next build (the Subs page\'s Next build) when it is due within this many days, ' +
   'so they can be bought or crafted ahead of time. Spares go to what is needed now first. Applies to Summary, Detail and the Shopping List.';
 
 function PartsView({ refreshKey }) {
@@ -644,7 +644,7 @@ function PartsView({ refreshKey }) {
             style={{ width: '6px', alignSelf: 'stretch', cursor: 'col-resize', background: 'var(--border-strong)', flexShrink: 0 }}
           />
           <div style={{ width: `${rulesPanelWidth}px`, minWidth: '180px', flexShrink: 0, overflowX: 'auto' }}>
-            <h2 style={{ padding: '0 0 8px' }}>Sub Build Rules</h2>
+            <h2 style={{ padding: '0 0 8px' }}>Sub Rules</h2>
             <SubRulesPanel />
           </div>
         </React.Fragment>

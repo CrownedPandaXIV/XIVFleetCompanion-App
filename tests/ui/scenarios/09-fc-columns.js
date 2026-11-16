@@ -1,4 +1,4 @@
-// The Free Companies tab: its own columns can be moved, and columns from the master list (members' totals,
+// The Free Companies page: its own columns can be moved, and columns from the master list (members' totals,
 // the FC chest, ...) can be added, which the tab did not have before.
 module.exports = async (t) => {
   const { call, ev, sleep, waitFor, check, nav } = t;

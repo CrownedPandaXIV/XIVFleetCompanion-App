@@ -1,4 +1,4 @@
-// Submarines: the Subs view (routes, gil/day, speed/range), low fuel/repair warnings, Craft? toggle.
+// Submarines: the Subs view (routes, gil/day, speed/range), low fuel/repair warnings, Fight Club builds toggle.
 const { ipcMain } = require('electron');
 const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
 const { loadSharedCharacters } = require('../characters/shared-sync');
@@ -18,9 +18,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const quote = (name) => `"${name.replace(/"/g, '""')}"`;
 
 // Real, plugin-written submarine data - no n8n involved. Adds the full
-// economics engine on top: Current Route (decoded from raw points),
-// Target Route + Target Gil/Day (Fight Club's best-Gil/Hr
-// recommendation at this rank), Current Gil/Day (actual installed
+// economics engine on top: Current route (decoded from raw points),
+// Target route + Target gil/day (Fight Club's best-Gil/Hr
+// recommendation at this rank), Current gil/day (actual installed
 // route/parts matched against Fight Club), and Speed/Range (base-at-
 // rank + installed part bonuses). Port of the old n8n Parse Submarine
 // Dashboard economics engine.
@@ -78,7 +78,7 @@ async function loadSubmarines(client) {
       account_label: row.account_label,
       fc_id: row.fc_id,
       part_letters: partLetters,
-      // Fight Club's next more profitable build, for Next Build when the Sub Rules have nothing ahead.
+      // Fight Club's next more profitable build, for Next build when the Sub Rules have nothing ahead.
       fc_next_build: nextFightClubBuild({
         rank, top: topRank, currentParts: partLetters, currentNet: currentGilDay === '' ? null : currentGilDay,
         fightClubRows, repairKitCost, validRouteLetters,
@@ -242,7 +242,7 @@ async function addRankUps(client, subs) {
     const returnAt = Number(sub.return_time) > 0 ? Number(sub.return_time) * 1000 : null;
 
     const buildAt = (rank) => targetBuildAt({ rank, slot: sub.slot, cid, craftEnabled: sub.craft_enabled, rules, fightClubRows, repairKitCost });
-    // The Sub Rules (or, for a Craft? sub, Fight Club's build at each rank); when they have nothing ahead,
+    // The Sub Rules (or, for a sub with Fight Club builds ticked, Fight Club's build at each rank); when they have nothing ahead,
     // Fight Club's next more profitable build.
     const fromRules = rankUp.nextBuildRank(sub.rank, top, buildAt);
     const fightClub = !fromRules && sub.fc_next_build && sub.fc_next_build.rank <= top ? sub.fc_next_build : null;
@@ -315,9 +315,9 @@ async function addRankUps(client, subs) {
   return subs;
 }
 
-// Saves each sub's Next Rank date, at most once an hour (whichever copy of the app gets there first), so
+// Saves each sub's Next rank date, at most once an hour (whichever copy of the app gets there first), so
 // get-forecast-accuracy can later compare it with the real rank-up. Dates older than 30 days are dropped.
-// Never stops the Subs tab: a database without the table (or a login that may not write) is skipped, and
+// Never stops the Subs page: a database without the table (or a login that may not write) is skipped, and
 // said once in the app's log.
 let forecastSaveWarned = false;
 async function saveForecasts(client, subs) {
@@ -338,12 +338,12 @@ async function saveForecasts(client, subs) {
   } catch (err) {
     if (err.code !== '42P01' && !forecastSaveWarned) {
       forecastSaveWarned = true;
-      console.warn(`Could not save the Next Rank dates (the Subs tab's forecast line needs them): ${err.message}`);
+      console.warn(`Could not save the Next rank dates (the Subs page's forecast line needs them): ${err.message}`);
     }
   }
 }
 
-// How close the saved Next Rank dates came to the real rank-ups (forecast-accuracy.js), with each sub's and
+// How close the saved Next rank dates came to the real rank-ups (forecast-accuracy.js), with each sub's and
 // character's name: { count, averageOff, checks }, or null before the database has the table.
 async function loadForecastAccuracy(client) {
   let saved;
@@ -385,18 +385,18 @@ async function loadForecastAccuracy(client) {
   return accuracy.summarize(checks);
 }
 
-// Saves this hour's Next Rank dates without a window open: the nightly backup (backups/app.js) calls this,
+// Saves this hour's Next rank dates without a window open: the nightly backup (backups/app.js) calls this,
 // so the forecast line gets at least one set a day. Never throws.
 async function saveForecastsNow() {
   try {
     await withClient(async (client) => saveForecasts(client, await loadSubmarinesWithRankUps(client)),
-      (err) => console.warn(`Could not save the Next Rank dates: ${err.message}`));
+      (err) => console.warn(`Could not save the Next rank dates: ${err.message}`));
   } catch (err) {
-    console.warn(`Could not save the Next Rank dates: ${err.message}`);
+    console.warn(`Could not save the Next rank dates: ${err.message}`);
   }
 }
 
-// Every sub with its rank-up dates and next build (the Subs tab's rows; Look ahead on the Parts tab).
+// Every sub with its rank-up dates and next build (the Subs page's rows; Look ahead on the Parts page).
 async function loadSubmarinesWithRankUps(client) {
   return addRankUps(client, await loadSubmarines(client));
 }

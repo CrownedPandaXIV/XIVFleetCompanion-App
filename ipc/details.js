@@ -1,5 +1,5 @@
-// What plugin 0.10.0 adds with database version 8: the PCs tab (each PC's status and last "Check what I can
-// see"), loot per voyage and venture income (Income tab) and gil and market listings (Market tab). Every
+// What plugin 0.10.0 adds with database version 8: the PCs page (each PC's status and last "Check what I can
+// see"), loot per voyage and venture income (Income page) and gil and market listings (Market page). Every
 // handler answers { missing: true } until the database has version 8, so the app works as before.
 const { ipcMain } = require('electron');
 const { MIN_PLUGIN_VERSION } = require('../shared/plugin-version');
@@ -41,7 +41,7 @@ async function withDetails(work) {
   }, (err) => ({ success: false, error: err.message }));
 }
 
-// What a vendor pays for each item (Map id -> gil): salvage at the Salvage tab's prices, everything
+// What a vendor pays for each item (Map id -> gil): salvage at the Salvage page's prices, everything
 // else at the game data's PriceLow (after a Settings → Game Data update; 0 until then).
 async function itemPrices(client, ids) {
   const prices = new Map();
@@ -127,7 +127,7 @@ ipcMain.handle('remove-pc', (event, pcName, accountLabel) => withDetails(async (
   return { success: true, removed: rowCount };
 }));
 
-// ---- Loot per voyage and venture income (Income tab) ----
+// ---- Loot per voyage and venture income (Income page) ----
 
 // Venture rewards since $1, added up by the database per character, item and quality (normal or HQ), so one row
 // per item travels instead of every reward: the same totals (subs/loot.js ventureTotals does the same in
@@ -177,7 +177,7 @@ async function ventureValues(client, since, windowDays) {
   return [...byOwner.values()];
 }
 
-// Loot per voyage and venture income over `windowDays` (the Income tab's choice by default), with market
+// Loot per voyage and venture income over `windowDays` (the Income page's choice by default), with market
 // values when `universalis` (universalis.js) is given.
 async function loadLoot(client, { universalis = null, windowDays: days = null } = {}) {
   const windowDays = days || await incomeWindowDays(client);
@@ -323,7 +323,7 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
 
 ipcMain.handle('get-loot', () => withDetails(async (client) => loadLoot(client, { universalis: await liveUniversalis(client) })));
 
-// ---- Gil and market listings (Market tab) ----
+// ---- Gil and market listings (Market page) ----
 
 async function staleDays(client) {
   const { rows } = await client.query(`SELECT setting_value FROM fleet_economics_settings WHERE setting_key = $1`, [STALE_KEY]);

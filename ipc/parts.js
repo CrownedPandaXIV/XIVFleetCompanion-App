@@ -29,7 +29,7 @@ for (const [cls, base] of Object.entries(SPARE_PART_MODIFIED_BASE_IDS)) {
 
 // Letter -> full class name, matching the class names used by the spare
 // parts lookup (Shark/Unkiu/Whale/Coelacanth/Syldra) so a sub_build_rules
-// or Target Route letter can be checked directly against the spare pool.
+// or Target route letter can be checked directly against the spare pool.
 const SPARE_LETTER_TO_CLASS = { S: 'Shark', U: 'Unkiu', W: 'Whale', C: 'Coelacanth', Y: 'Syldra' };
 const SLOT_KEYS = ['Hull', 'Stern', 'Bow', 'Bridge'];
 const SLOT_COLUMN = { Hull: 'hull', Stern: 'stern', Bow: 'bow', Bridge: 'bridge' };
@@ -69,7 +69,7 @@ async function repairKitCostFrom(client) {
 const FIGHT_CLUB_COLUMNS = 'route, hours, repair_times, gil_sub_day, gil_hr, rec_build_notes, unmod_min_rank, min_rank_build';
 
 // The build a sub should have at a rank, as [hull, stern, bow, bridge] letters ('' where a rule leaves a
-// slot alone), or null when nothing applies. A sub marked Craft? from rank 85 follows Fight Club's best
+// slot alone), or null when nothing applies. A sub with Fight Club builds ticked from rank 85 follows Fight Club's best
 // route build; otherwise the highest Sub Rules rule at or below the rank for its slot (and character).
 function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, repairKitCost }) {
   if (craftEnabled && rank >= 85) {
@@ -91,7 +91,7 @@ function targetBuildAt({ rank, slot, cid, craftEnabled, rules, fightClubRows, re
 // they were made), so the same fleet always gets the same answers, and the plugin, which works this out the same way
 // from the fleet_parts_* views (PartsPlanner.cs), gets them too (tests/db/parts-fixture.js checks the two).
 // Computes crafting needs for every character (used by get-parts-needed and the shopping list): current build vs target
-// (Target Route if Craft?+rank85 and a valid match exists, else the
+// (Target route if Fight Club builds+rank85 and a valid match exists, else the
 // sub_build_rules ladder), checked against each character's own spare
 // pool (personal + retainer inventory, plus their FC chest) before being
 // flagged as an actual craft need. Port of the old n8n Parse Parts
@@ -268,7 +268,7 @@ async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
         }
       });
 
-      // Look ahead: its next build (the Subs tab's Next Build), when that is due within the window.
+      // Look ahead: its next build (the Subs page's Next build), when that is due within the window.
       const next = upcoming.get(`${cidStr}|${slot}`);
       if (next) {
         SLOT_KEYS.forEach((slotKey, i) => {
@@ -346,7 +346,7 @@ async function computePartsNeeded(client, { aheadDays = 0 } = {}) {
   return results;
 }
 
-// Look ahead on the Parts tab: each sub's next build (the Subs tab's Next Build column) that is due within
+// Look ahead on the Parts page: each sub's next build (the Subs page's Next build column) that is due within
 // `aheadDays`: Map "cid|slot" -> { rank, parts: [hull, stern, bow, bridge] ('' leaves a part), dueAt (ms) }.
 // One the sub can switch to already (a Fight Club build at its rank) is due now.
 async function upcomingBuilds(client, aheadDays) {
@@ -364,11 +364,11 @@ async function upcomingBuilds(client, aheadDays) {
   return out;
 }
 
-// How far the Parts tab may look ahead: 0 (now only), 3, 7 or 14 days.
+// How far the Parts page may look ahead: 0 (now only), 3, 7 or 14 days.
 const LOOK_AHEAD_DAYS = [0, 3, 7, 14];
 const lookAheadDays = (value) => (LOOK_AHEAD_DAYS.includes(Number(value)) ? Number(value) : 0);
 
-// options: { aheadDays } - Look ahead on the Parts tab.
+// options: { aheadDays } - Look ahead on the Parts page.
 ipcMain.handle('get-parts-needed', async (event, options = {}) => {
   return withClient(async (client) => {
     return { success: true, rows: await computePartsNeeded(client, { aheadDays: lookAheadDays(options && options.aheadDays) }) };
@@ -384,7 +384,7 @@ function partItemId(cls, slot, modified) {
   return base && offset >= 0 ? base + offset : null;
 }
 
-// Sub Build Rules CRUD - full read/write access from the Parts view's
+// Sub Rules CRUD - full read/write access from the Parts view's
 // rules panel. rank/cid_override are stored as their real types;
 // cid_override is nullable (blank = general rule, applies to everyone).
 ipcMain.handle('get-sub-build-rules', async () => {

@@ -15,6 +15,12 @@ Simpler for new players: one clear way to do each thing, and nothing they don't 
 - **With no fleet yet**, the pages say how to get one for one PC as well as for a shared database.
 - **Fight Club Data has a link to Fight Club's spreadsheet** (Settings → Data), and says how to save it for the import.
 - **Game Data** is described in plain words, without the source's name and code.
+- **Clearer names on the pages**, the same as the plugin's: the Subs page's **Craft?** is now **Fight Club builds**
+  (ticked: from rank 85 the sub follows Fight Club's best build, as its hover says), the Parts page's **Sub Build
+  Rules** are **Sub Rules**, pages are called pages (not tabs), and "setup" is now "game" (as in "synced by another
+  game"). Column names are written one way throughout (Next build, Target route, Quantity).
+- No more mentions of plugin versions everyone already has (0.10.0, 1.0.2). Plainer messages on an empty Inventory, when
+  nothing needs crafting, and after a game data update.
 
 ## 1.10.3 - 2026-11-13
 

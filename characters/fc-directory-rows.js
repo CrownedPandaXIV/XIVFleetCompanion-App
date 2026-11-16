@@ -1,4 +1,4 @@
-// The Free Companies tab's rows, without Electron or pg, so the in-game Free Companies (db/views.sql fleet_fcs_view)
+// The Free Companies page's rows, without Electron or pg, so the in-game Free Companies (db/views.sql fleet_fcs_view)
 // can be checked against them (tests/db/verify-fleet-views.js). fcDirectorySql gives the query (latestFcMember from
 // snapshotFragments), fcDirectoryRows adds bid eligibility and the house's age to what it returns.
 const { withHouseAge } = require('./house-warning');

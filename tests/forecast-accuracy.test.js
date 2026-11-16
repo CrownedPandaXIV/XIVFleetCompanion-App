@@ -1,5 +1,5 @@
-// How close the Next Rank dates came (subs/forecast-accuracy.js): rank-ups from the recorded rank and the
-// voyages' return times, the saved date worked out about a day before each, and the average on the Subs tab.
+// How close the Next rank dates came (subs/forecast-accuracy.js): rank-ups from the recorded rank and the
+// voyages' return times, the saved date worked out about a day before each, and the average on the Subs page.
 const test = require('node:test');
 const assert = require('node:assert');
 const { rankUps, checkSub, summarize } = require('../subs/forecast-accuracy');

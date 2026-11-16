@@ -1,4 +1,4 @@
-// Salvage tab: salvage counts and gil value per character.
+// Salvage page: salvage counts and gil value per character.
 
 function SalvageBreakdownCell({ total, breakdown }) {
   const [hovering, setHovering] = useState(false);
@@ -58,14 +58,14 @@ function SalvageBreakdownCell({ total, breakdown }) {
   );
 }
 
-// The Salvage tab's own columns (rows are characters).
+// The Salvage page's own columns (rows are characters).
 const SALVAGE_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <>{r.character_name}<WorldAfter world={r.world} /><TrendDetailLink kind="character" id={r.cid} name={r.character_name} /></>, sort: (r) => r.character_name },
   { key: 'standard', label: 'Standard Salvage', td: (r) => <SalvageBreakdownCell total={r.standard_total} breakdown={r.standard_breakdown} />, sort: (r) => r.standard_total },
   { key: 'extravagant', label: 'Extravagant Salvage', td: (r) => <SalvageBreakdownCell total={r.extravagant_total} breakdown={r.extravagant_breakdown} />, sort: (r) => r.extravagant_total },
   { key: 'value', label: 'Value', td: (r) => <td className="num"><GilText gil={r.calculated_gil} /></td>, sort: (r) => Number(r.calculated_gil) }
 ];
-// Master-list columns the Salvage tab already has of its own.
+// Master-list columns the Salvage page already has of its own.
 const SALVAGE_DUPLICATE_EXTRAS = ['x_world'];
 
 function SalvageView({ refreshKey }) {

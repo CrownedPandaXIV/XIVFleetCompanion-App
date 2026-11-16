@@ -1,5 +1,5 @@
 // App 0.20.0: Summary's subs ready for new parts, ceruleum from FC credits (Supplies), loot per voyage
-// and venture income (Income), the Gil & Market tab, the PCs tab, Shopping List progress,
+// and venture income (Income), the Gil & Market page, the PCs page, Shopping List progress,
 // the not-synced setting in Settings → General → Warnings, and right-click → Copy table / CSV on any table.
 // The database version 8 tables are in the scratch database (db/schema.sql); this run adds two PCs, two
 // voyages and three venture rewards for a character with subs, and two market listings (one up for 10
@@ -11,7 +11,7 @@ module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, clickText, shot } = t;
   await ev(`window.localStorage.clear()`);
 
-  // ---- Summary: subs whose rank calls for new parts (the Parts tab's needs at rank above 0) ----
+  // ---- Summary: subs whose rank calls for new parts (the Parts page's needs at rank above 0) ----
   await nav('Summary');
   await waitFor(`!!document.querySelector('.ready-subs') || /No sub has reached/.test(document.body.innerText)`, 'the ready subs section', 20000);
   await sleep(500);
@@ -123,8 +123,8 @@ module.exports = async (t) => {
   await nav('Summary');
   await nav('PCs');
   await waitFor(`!!document.querySelector('.pcs-missing')`, 'the note about the missing table', 20000);
-  check(/The app adds it when it connects; if it couldn't, the banner at the top says why/.test(await ev(`document.querySelector('.pcs-missing').innerText`)),
-    'without the PCs table, the PCs tab says the app adds it, not to run SQL');
+  check(/The app updates it when it connects; if it couldn't, the banner at the top says why/.test(await ev(`document.querySelector('.pcs-missing').innerText`)),
+    'without the PCs table, the PCs page says the app updates the database, not to run SQL');
   await t.query('ALTER TABLE zz_pc_status RENAME TO companion_pc_status');
 
   // ---- Shopping List progress ----

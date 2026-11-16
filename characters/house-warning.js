@@ -5,7 +5,7 @@
 // (tests/house-warning.test.js).
 
 const DEMOLITION_DAYS = 45;
-// From here the Free Companies tab shows the age in red, whatever the warning setting is.
+// From here the Free Companies page shows the age in red, whatever the warning setting is.
 const DANGER_DAYS = 30;
 // The Summary warns from this many days unless changed there (the house_warn_days setting).
 const DEFAULT_WARN_DAYS = 7;
