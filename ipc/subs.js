@@ -68,7 +68,8 @@ async function loadSubmarines(client) {
 
     const nextLevelExp = Number(row.next_level_exp) || 0;
     const currentExp = Number(row.current_exp) || 0;
-    const rankProgressPct = nextLevelExp > 0 ? Math.round((currentExp / nextLevelExp) * 100) : null;
+    // At most 99: 99.6% isn't the next rank yet (it would show as "68.100" and sort as 69).
+    const rankProgressPct = nextLevelExp > 0 ? Math.min(99, Math.round((currentExp / nextLevelExp) * 100)) : null;
 
     return {
       cid: row.cid,

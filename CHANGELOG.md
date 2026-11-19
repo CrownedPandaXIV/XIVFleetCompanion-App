@@ -3,6 +3,11 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.5 - 2026-11-19
+
+- **A sub almost at its next rank shows 99%, not 100%**, on the Subs page: it showed "68.100" and sorted as if it were
+  already the next rank. The plugin now shows the rank the same way (68.81).
+
 ## 1.10.4 - 2026-11-16
 
 Simpler for new players: one clear way to do each thing, and nothing they don't need.
