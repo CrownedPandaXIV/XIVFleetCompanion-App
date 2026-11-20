@@ -97,8 +97,8 @@ function RemoveCharacterButton({ row, onRemove }) {
   return (
     <RemoveButton what={`${row.name} (${row.world})`} title={`Remove ${row.name} from the app`} onRemove={() => onRemove(row)}>
       <p>
-        This removes the character and what is stored for it: subs, retainers, inventory and Free Company
-        details. Its chart history is kept but left out of Trends.
+        This removes the character and what is stored for it: subs, retainers (and their market listings),
+        inventory and Free Company details. Its chart history and venture rewards are kept but don't show.
       </p>
       <p>
         If the plugin still syncs it, it comes back at the next sync (with its chart history), so untick it

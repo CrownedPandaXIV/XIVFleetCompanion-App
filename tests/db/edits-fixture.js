@@ -51,6 +51,19 @@ const TABLES = {
   tier3_settings: `SELECT setting_key, CASE WHEN setting_key = 'shopping_progress' THEN setting_value::jsonb::text ELSE setting_value END AS setting_value
                    FROM tier3_settings ORDER BY setting_key COLLATE "C"`,
   companion_pc_status: 'SELECT pc_name, account_label, plugin_version FROM companion_pc_status ORDER BY pc_name COLLATE "C", account_label COLLATE "C"',
+  // Removing a character (remove-character): what goes, and the history that stays.
+  companion_character_current: 'SELECT cid::text AS cid, name, fc_id::text AS fc_id FROM companion_character_current ORDER BY cid',
+  companion_retainer_lookup: 'SELECT retainer_id::text AS retainer_id, owner_cid::text AS owner_cid, name FROM companion_retainer_lookup ORDER BY retainer_id',
+  companion_inventory_snapshot: 'SELECT owner_cid::text AS owner_cid, retainer_id::text AS retainer_id, sorted_container, sorted_slot_index FROM companion_inventory_snapshot ORDER BY 1, 2, 3, 4',
+  companion_market_listing: 'SELECT retainer_id::text AS retainer_id, owner_cid::text AS owner_cid, slot, item_id FROM companion_market_listing ORDER BY 1, 3',
+  companion_submarine_snapshot: 'SELECT cid::text AS cid, sub_name FROM companion_submarine_snapshot ORDER BY cid, sub_name COLLATE "C"',
+  companion_character_housing: 'SELECT cid::text AS cid, fc_id::text AS fc_id FROM companion_character_housing ORDER BY 1',
+  companion_fc_inventory_snapshot: 'SELECT fc_id::text AS fc_id, sorted_container, sorted_slot_index, item_id FROM companion_fc_inventory_snapshot ORDER BY 1, 2, 3',
+  companion_metric_latest: 'SELECT subject_type, subject_id::text AS subject_id, metric FROM companion_metric_latest ORDER BY subject_type COLLATE "C", subject_id, metric COLLATE "C"',
+  companion_metric_history: 'SELECT subject_type, subject_id::text AS subject_id, metric, value::text AS value FROM companion_metric_history ORDER BY subject_type COLLATE "C", subject_id, metric COLLATE "C", recorded_at',
+  companion_venture_result: 'SELECT owner_cid::text AS owner_cid, retainer_name, item_id, quantity FROM companion_venture_result ORDER BY owner_cid, retainer_name COLLATE "C", item_id',
+  companion_rankup_forecast: 'SELECT cid::text AS cid, slot, rank FROM companion_rankup_forecast ORDER BY 1, 2, 3',
+  companion_character_login: 'SELECT cid::text AS cid, pc_name FROM companion_character_login ORDER BY 1',
 };
 
 // The starting rows: three characters, their retainers, two Sub Rules, a Craft? setting, a gear target, part of a
@@ -70,6 +83,30 @@ const SEED = `
   INSERT INTO fleet_economics_settings (setting_key, setting_value) VALUES ('market_stale_days', 7), ('income_window_days', 7);
   INSERT INTO tier3_settings (setting_key, setting_value) VALUES ('shopping_progress', '{"24348":{"made":1,"outOf":3},"21794":{"made":2,"outOf":2,"ahead":7}}');
   INSERT INTO companion_pc_status (pc_name, account_label, plugin_version) VALUES ('DESKTOP-1', 'A', '2.0.0'), ('LAPTOP', '', '1.0.3'), ('LAPTOP', 'B', '2.0.0');
+  -- For removing Cy: a retainer with bags and listings, a sub, a forecast, a login, latest values and history, venture
+  -- rewards, its own Free Company (chest and points go: nobody else is in it) and an old house row naming Ann's (kept).
+  UPDATE companion_character_current SET fc_id = 9000000000000001 WHERE cid = 18014498578000001;
+  UPDATE companion_character_current SET fc_id = 9000000000000003 WHERE cid = 18014498578000003;
+  INSERT INTO companion_retainer_lookup (retainer_id, owner_cid, name) VALUES (33777097243660304, 18014498578000003, 'Dot');
+  INSERT INTO companion_inventory_snapshot (owner_cid, retainer_id, sorted_container, sorted_slot_index, item_id, quantity)
+    VALUES (18014498578000003, 33777097243660304, 10000, 0, 5111, 3), (18014498578000003, 0, 0, 1, 5111, 1),
+           (18014498578000001, 33777097243660301, 10000, 0, 5111, 2);
+  INSERT INTO companion_market_listing (retainer_id, owner_cid, slot, item_id, quantity, hq, unit_price)
+    VALUES (33777097243660304, 18014498578000003, 0, 5111, 3, false, 900), (33777097243660301, 18014498578000001, 0, 5111, 2, false, 950);
+  INSERT INTO companion_submarine_snapshot (cid, sub_name, level) VALUES (18014498578000003, 'Cy-1', 40);
+  INSERT INTO companion_character_housing (cid, fc_id) VALUES (18014498578000001, 9000000000000001), (18014498578000003, 9000000000000001);
+  INSERT INTO companion_fc_inventory_snapshot (fc_id, sorted_container, sorted_slot_index, item_id, quantity)
+    VALUES (9000000000000001, 20000, 0, 22500, 4), (9000000000000003, 20000, 0, 22501, 6);
+  INSERT INTO companion_metric_latest (subject_type, subject_id, metric, value, recorded_at)
+    VALUES ('character', 18014498578000003, 'gil', 500, now()), ('character', 18014498578000001, 'gil', 700, now()),
+           ('fc', 9000000000000003, 'fc_points', 10, now()), ('fc', 9000000000000001, 'fc_points', 20, now());
+  INSERT INTO companion_metric_history (recorded_at, subject_type, subject_id, metric, value)
+    VALUES (now() - interval '1 day', 'character', 18014498578000003, 'gil', 400), (now(), 'character', 18014498578000003, 'gil', 500),
+           (now(), 'fc', 9000000000000003, 'fc_points', 10);
+  INSERT INTO companion_venture_result (owner_cid, retainer_name, received_at, item_id, hq, quantity)
+    VALUES (18014498578000003, 'Dot', now() - interval '1 hour', 5111, false, 3), (18014498578000001, 'Amy', now() - interval '1 hour', 5111, false, 2);
+  INSERT INTO companion_rankup_forecast (cid, slot, rank, made_at, predicted_at) VALUES (18014498578000003, 0, 41, now(), now() + interval '1 day');
+  INSERT INTO companion_character_login (cid, pc_name, account_label, logged_in_at) VALUES (18014498578000003, 'LAPTOP', 'B', now());
 `;
 
 // The edits, in order, as the window makes them (tests/db/edits-list.js).

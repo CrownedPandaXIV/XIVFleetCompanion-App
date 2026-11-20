@@ -146,15 +146,24 @@ function report(name, problems) {
 const UNORDERED = new Set(['get-character-inventory', 'get-fc-inventory', 'get-supplies', 'get-income']);
 const sortRows = (r) => (r && Array.isArray(r.rows) ? { ...r, rows: [...r.rows].sort((x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1)) } : r);
 
+// Both are asked at the same moment: the clock (Date.now) stands still while they answer, so what's worked out from
+// "now" (Supplies' use per day, and so how many to buy, rounded up) can't differ by the few milliseconds between them.
 async function both(pg, file, call, args) {
   const fn = handlers.get(call);
   assert.ok(fn, `no call named ${call}`);
-  current = pg;
-  watching = true;
-  const a = await fn({}, ...args).finally(() => { watching = false; });
-  current = file;
-  const b = await fn({}, ...args);
-  return UNORDERED.has(call) ? [sortRows(a), sortRows(b)] : [a, b];
+  const realNow = Date.now;
+  const frozen = realNow();
+  Date.now = () => frozen;
+  try {
+    current = pg;
+    watching = true;
+    const a = await fn({}, ...args).finally(() => { watching = false; });
+    current = file;
+    const b = await fn({}, ...args);
+    return UNORDERED.has(call) ? [sortRows(a), sortRows(b)] : [a, b];
+  } finally {
+    Date.now = realNow;
+  }
 }
 
 // The calls that need the fleet's own ids, and the charts, as the window makes them.

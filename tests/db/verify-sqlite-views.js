@@ -82,14 +82,20 @@ const same = (a, b) => {
   return a === b;
 };
 
-// How much to buy is rounded up. When the amount before rounding is within a millionth of a whole number, the two
-// databases' arithmetic (PostgreSQL's numeric, SQLite's floating point) can round it either way: a difference of 1
-// there is not a difference in the working out. Anything else still has to match.
+// How much to buy is rounded up, from the use per day, which each database works out from its own clock ("now"). The
+// two are asked a moment apart, so their use per day can differ in the last few digits, and when the amount before
+// rounding sits at a whole number they round to either side of it (one tank apart). A difference of 1 is allowed only
+// then: both uses per day the same to a millionth, and the whole number between them lying between the two amounts
+// before rounding (each database's own). Anything else still has to match.
 function roundingTie(view, col, pgRow, liteRow) {
   const m = /^(ceruleum|repair_kits)_restock$/.exec(col);
   if (view !== 'fleet_supplies_view' || !m || Math.abs(pgRow[col] - liteRow[col]) !== 1) return false;
-  const exact = pgRow[`${m[1]}_per_day`] * pgRow.target_days - pgRow[m[1]];
-  return Math.abs(exact - Math.round(exact)) < 1e-6;
+  const perDay = `${m[1]}_per_day`;
+  if (!same(pgRow[perDay], liteRow[perDay])) return false;
+  const exactPg = pgRow[perDay] * pgRow.target_days - pgRow[m[1]];
+  const exactLite = liteRow[perDay] * liteRow.target_days - liteRow[m[1]];
+  const between = Math.min(pgRow[col], liteRow[col]);
+  return between >= Math.min(exactPg, exactLite) - 1e-6 && between <= Math.max(exactPg, exactLite) + 1e-6;
 }
 
 async function compare(pg, lite, view, key) {

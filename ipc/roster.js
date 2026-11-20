@@ -107,7 +107,7 @@ ipcMain.handle('update-sort-order', async (event, orderedCids) => {
 });
 
 // Removes one character and what is stored for it: its current row, subs and their Fight Club builds settings,
-// bags and retainers (and the retainers' gear targets), Free Company and house details, its place in
+// bags and retainers (and the retainers' gear targets and market listings), Free Company and house details, its place in
 // the roster order, and build rules made only for it. Its Free Company's chest goes too when no other
 // character is in that Free Company. Chart history is kept but left out of Trends: its rows in
 // companion_metric_latest (which Trends uses to find what to chart) are removed, so they no longer
@@ -141,6 +141,7 @@ ipcMain.handle('remove-character', async (event, cid) => {
       for (const sql of [
         'DELETE FROM companion_retainer_lookup WHERE owner_cid = $1',
         'DELETE FROM companion_inventory_snapshot WHERE owner_cid = $1',
+        'DELETE FROM companion_market_listing WHERE owner_cid = $1',
         'DELETE FROM companion_submarine_snapshot WHERE cid = $1',
         'DELETE FROM sub_craft_toggle WHERE cid = $1',
         'DELETE FROM sub_build_rules WHERE cid_override = $1',
