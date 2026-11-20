@@ -2,8 +2,8 @@
 // answers to these (tests/db/edits-fixture.js), and the app on the fleet file against the app on PostgreSQL
 // (tests/db/verify-file-pages.js). Some are refused on purpose (out of range, unknown).
 const EDITS = [
-  ['add-sub-build-rule', { rank: 30, cid_override: null, sub_filter: 'Sub2', hull: 'U', stern: 'U', bow: '', bridge: 'W' }],
   ['add-sub-build-rule', { rank: 100, cid_override: '18014498578000003', sub_filter: '', hull: 'S+', stern: 'S+', bow: 'U+', bridge: 'U+' }],
+  ['add-sub-build-rule', { rank: 30, cid_override: null, sub_filter: 'Sub2', hull: 'U', stern: 'U', bow: '', bridge: 'W' }],
   ['update-sub-build-rule', { id: 2, rank: 90, cid_override: '', sub_filter: 'Sub1,Sub2,Sub3,Sub4', hull: 'W', stern: 'W', bow: 'C', bridge: null }],
   ['delete-sub-build-rule', 1],
   ['delete-sub-build-rule', 99],
@@ -54,6 +54,8 @@ const EDITS = [
   ['save-play-style', 'subs'],
   ['save-play-style', 'auto'],
   ['save-play-style', 'everything'],
+  ['remove-character', 'x'],
+  ['remove-character', '18014498578000003'],
 ];
 
 module.exports = { EDITS };

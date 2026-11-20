@@ -84,7 +84,7 @@ module.exports = async (t) => {
   await openConfirm();
   await waitFor(`!!${dialog}`, 'the confirmation');
   await t.shot('remove-confirm');
-  check(await ev(`${dialog}.innerText.includes('Remy Removeme') && ${dialog}.innerText.includes('chart history is kept but left out of Trends') && ${dialog}.innerText.includes("plugin's Characters list")`), 'the confirmation names the character and says what is removed and what is kept');
+  check(await ev(`${dialog}.innerText.includes('Remy Removeme') && ${dialog}.innerText.includes('chart history and venture rewards are kept but don') && ${dialog}.innerText.includes("plugin's Characters list")`), 'the confirmation names the character and says what is removed and what is kept');
   await clickInDialog('No');
   await sleep(300);
   check(await ev(`!!${row} && !${dialog}`), '"No" closes it and leaves the character as it was');

@@ -346,6 +346,9 @@ async function loadMarket(client, { universalis = null } = {}) {
       SELECT l.retainer_id::text AS retainer_id, l.owner_cid::text AS owner_cid, l.slot, l.item_id, l.quantity, l.hq, l.unit_price, l.first_seen_at,
              r.name AS retainer_name
       FROM companion_market_listing l LEFT JOIN companion_retainer_lookup r ON r.retainer_id = l.retainer_id`)).rows;
+    // Only characters on the roster: a removed character's listings (left from before Remove deleted them) don't show.
+    const onRoster = new Set(characters.map((c) => c.cid));
+    listings = listings.filter((l) => onRoster.has(l.owner_cid));
   } catch (err) {
     if (err.code !== UNDEFINED_TABLE) throw err;
   }

@@ -3,6 +3,14 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.10.6 - 2026-11-20
+
+- **Removing a character on the Character Roster also removes its market listings.** Before, its retainers' listings
+  stayed on Gil & Market, getting older and showing as unsold for a while.
+- **Gil & Market shows only the listings of characters on the roster**, so listings left from a character removed
+  before this version don't show either.
+- The plugin (2.4.6) can now remove characters too, from its own Character Roster.
+
 ## 1.10.5 - 2026-11-19
 
 - **A sub almost at its next rank shows 99%, not 100%**, on the Subs page: it showed "68.100" and sorted as if it were
