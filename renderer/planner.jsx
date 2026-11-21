@@ -134,7 +134,9 @@ function PlannerView({ refreshKey }) {
               <div><span>Range used</span><b className={over ? 'tone-danger' : ''}>{plannerN(plan.range)} / {plannerN(stats.range)}</b>
                 {over && <div className="tone-danger">Out of range: needs {plannerN(plan.range - stats.range)} more range</div>}</div>
               <div><span>Voyage</span><b>{plannerHours(plan.hours)}</b></div>
-              <div><span>Experience</span><b>{plannerN(plan.exp)}</b><div className="dim">before bonuses</div></div>
+              <div><span>Experience</span><b>{plannerN(plan.expSure)}</b>
+                <div className="dim" title="Bonus experience, from Pepper's FFXIV Ship Guide: optimal retrieval +25% (sure once its breakpoint is met); T2 loot +25%, T3 loot +50%, HQ materials +25% and a double dip +25% (luck); at most +100% a sector">
+                  {plan.expSure > plan.exp ? `${plannerN(plan.exp)} + sure bonus; ` : ''}up to {plannerN(plan.expBest)} with luck</div></div>
               <div><span>Ceruleum</span><b>{plannerN(plan.tanks)} tank{plan.tanks === 1 ? '' : 's'}</b></div>
             </div>
           )}
@@ -157,14 +159,14 @@ function PlannerView({ refreshKey }) {
             </div>
             <div className="account-group supply-card">
               <div className="supply-card-label">Experience per day</div>
-              <div className="supply-card-value">{plannerN(plan.expPerDay)}</div>
-              <div className="supply-card-note">before bonuses</div>
+              <div className="supply-card-value">{plannerN(plan.expSure * plan.voyagesPerDay)}</div>
+              <div className="supply-card-note">with the bonus it's sure of; up to {plannerN(plan.expBest * plan.voyagesPerDay)} with luck</div>
             </div>
             <div className="account-group supply-card">
               <div className="supply-card-label">Repairs</div>
               <div className="supply-card-value">{plan.kitsPerVoyage === null ? '—' : `${plannerN(plan.kitsPerVoyage * plan.voyagesPerDay, 1)} kits a day`}</div>
               <div className="supply-card-note">
-                {plan.repairGilPerDay ? `${plannerN(plan.repairGilPerDay)} gil a day at ${plannerN(plan.repairKitCost)} a kit; ` : 'Set the repair kit price in Settings for the gil; '}
+                {plan.repairGilPerDay ? `${plannerN(plan.repairGilPerDay)} gil a day at ${plannerN(plan.repairKitCost)} a kit; ` : 'Set the repair kit price on the Supplies page for the gil; '}
                 parts last {plan.wear.every(Boolean) ? `${Math.min(...plan.wear.map((w) => w.voyagesLasting ?? Infinity))} voyages` : '—'}
               </div>
             </div>
@@ -174,12 +176,12 @@ function PlannerView({ refreshKey }) {
             <h2>What this build reaches <span className="count">amber: the sources differ, so it might not</span></h2>
             <table>
               <thead><tr><th>Sector</th><th>Loot tier</th><th>Retrieval</th><th>Double dip</th>
-                <th className="num">T2 / T3 at</th><th className="num">Normal / Optimal at</th><th className="num">Favor at</th></tr></thead>
+                <th className="num">T2 / T3 at</th><th className="num">Normal / Optimal at</th><th className="num">Favor at</th><th className="num">Bonus exp</th></tr></thead>
               <tbody>
                 {plan.sectors.map((s) => (
                   <tr key={s.id}>
                     <td>{s.letter}: {s.name}</td>
-                    {!s.hasData ? <td colSpan="6" className="dim">No XIVStats data for this sector yet.</td> : (
+                    {!s.hasData ? <td colSpan="7" className="dim">No XIVStats data for this sector yet.</td> : (
                       <React.Fragment>
                         <td><PlannerPill sure={s.result.tierSure}>Tier {s.result.tier}</PlannerPill>
                           {s.result.tier < 3 ? <div className="dim">{plannerN(s.result.need.t3)} more surveillance for T3</div>
@@ -193,6 +195,8 @@ function PlannerView({ refreshKey }) {
                         <td className="num">{plannerRange(s.breakpoints[0])} / {plannerRange(s.breakpoints[1])}</td>
                         <td className="num">{plannerRange(s.breakpoints[2])} / {plannerRange(s.breakpoints[3])}</td>
                         <td className="num">{plannerRange(s.breakpoints[4])}</td>
+                        <td className="num" title={`${plannerN(s.exp)} experience before bonuses`}>
+                          {s.bonus.sure > 0 ? `+${s.bonus.sure}% sure, ` : ''}up to +{s.bonus.best}%</td>
                       </React.Fragment>
                     )}
                   </tr>
@@ -223,7 +227,7 @@ function PlannerView({ refreshKey }) {
       <div className="planner-foot dim">
         Loot and breakpoints: XIVStats (updated {base.about.xivstats.updated ? new Date(base.about.xivstats.updated).toLocaleDateString() : '—'})
         {base.about.pepper ? ", checked against Pepper's FFXIV Ship Guide" : ''}. Range, voyage time and wear as Submarine Tracker works them out.
-        Expected loot counts a breakpoint only when both sources agree it's met.
+        Expected loot counts a breakpoint only when both sources agree it's met. Bonus experience as Pepper's guide gives it.
       </div>
     </div>
   );

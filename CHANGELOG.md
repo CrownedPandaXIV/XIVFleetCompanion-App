@@ -16,6 +16,9 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     Pepper's guide disagree, and how much more of a stat it needs;
   - the loot it can bring back, gil per voyage and per day, experience per day, and repair kits a day (parts' wear
     as Submarine Tracker predicts it).
+  - bonus experience as Pepper's guide gives it: what the build is sure of (optimal retrieval's +25%) and the most
+    luck can add (T2/T3 loot, HQ materials, a double dip; up to +100% a sector).
+- **The repair kit price is set on the Supplies page**, beside what to buy, instead of in Settings.
 - **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
   retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
   release reads them again, so new findings arrive with updates. Nothing shows it yet: the Sub Calculator pages

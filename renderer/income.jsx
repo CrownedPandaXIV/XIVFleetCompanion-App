@@ -298,7 +298,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-note">
         Salvage: every piece that came into a character's bags or retainers over the last {data.windowDays} days, at its
         vendor price (selling or moving it is not counted). Repairs: repair kits used
-        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit cost in Settings to count them)'}.
+        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit price on the Supplies page to count them)'}.
         Expected: the subs' Current gil/day from the Subs page, for the routes they are on now.
         {t.notEnough ? ` ${t.notEnough} character${t.notEnough === 1 ? ' has' : 's have'} less than a day of salvage history.` : ''}
         {data.withoutSubs ? ` ${data.withoutSubs} character${data.withoutSubs === 1 ? '' : 's'} with no subs built ${data.withoutSubs === 1 ? 'is' : 'are'} left out.` : ''}

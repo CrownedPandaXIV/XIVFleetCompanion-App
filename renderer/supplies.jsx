@@ -147,12 +147,18 @@ function SuppliesView({ refreshKey }) {
   const [targetInput, setTargetInput] = useState('');
   const [saveError, setSaveError] = useState(null);
   const typing = useRef(false);
+  // The price of a Magitek repair material (repair kit): for the gil of what to buy here, Fight Club's gil a day after
+  // repairs and the Planner's repair cost. Saved when the box is left.
+  const [kitInput, setKitInput] = useState('');
+  const [kitError, setKitError] = useState(null);
+  const typingKit = useRef(false);
 
   function load() {
     window.api.getSupplies().then((result) => {
       if (result.success) {
         setData(result);
         if (!typing.current) setTargetInput(String(result.targetDays));
+        if (!typingKit.current) setKitInput(result.repairKitCost ? String(result.repairKitCost) : '');
         setError(null);
       } else {
         setError(result.error);
@@ -172,6 +178,14 @@ function SuppliesView({ refreshKey }) {
       setTargetInput(String(data.targetDays));
     }
     return result;
+  }
+
+  async function saveKitCost() {
+    typingKit.current = false;
+    const gil = Number(kitInput) || 0;
+    if (gil === (Number(data.repairKitCost) || 0)) return;
+    const result = await window.api.saveRepairKitCost(gil);
+    if (result.success) { setKitError(null); load(); } else { setKitError(result.error); setKitInput(data.repairKitCost ? String(data.repairKitCost) : ''); }
   }
 
   if (error && data === null) return <div className="error">Failed to load: {error}</div>;
@@ -204,6 +218,15 @@ function SuppliesView({ refreshKey }) {
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
           {' '}days
         </label>
+        <label title="What one Magitek repair material (repair kit) costs you, in gil: for the cost of what to buy, Fight Club's gil a day after repairs and the Planner's repairs">
+          Repair kit price{' '}
+          <input type="number" min={0} value={kitInput} placeholder="e.g. 2000" style={{ width: '80px' }}
+            onChange={(e) => setKitInput(e.target.value)} onFocus={() => { typingKit.current = true; }}
+            onBlur={saveKitCost}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
+          {' '}gil
+        </label>
+        {kitError && <span className="error-inline">{kitError}</span>}
         <label>
           <input type="checkbox" checked={groupByAccountEnabled} onChange={(e) => setGroupByAccountEnabled(e.target.checked)} />
           {' '}Group by account

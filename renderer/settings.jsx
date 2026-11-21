@@ -976,33 +976,6 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
     setWarningsStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
-  // --- Fleet Economics section ---
-  const [repairKitCost, setRepairKitCost] = useState('');
-  const [repairKitLoaded, setRepairKitLoaded] = useState(false);
-  const [repairKitStatus, setRepairKitStatus] = useState('');
-
-  const [repairKitSaved, setRepairKitSaved] = useState('');
-  const [repairKitError, setRepairKitError] = useState(null);
-
-  useEffect(() => {
-    window.api.getRepairKitCost().then((result) => {
-      if (result.success === false) setRepairKitError(result.error);
-      else {
-        const loaded = result.value !== null ? String(result.value) : '';
-        setRepairKitCost(loaded);
-        setRepairKitSaved(loaded);
-      }
-      setRepairKitLoaded(true);
-    });
-  }, []);
-
-  async function saveRepairKitCost() {
-    setRepairKitStatus('Saving...');
-    const result = await window.api.saveRepairKitCost(Number(repairKitCost));
-    if (result.success) setRepairKitSaved(repairKitCost);
-    setRepairKitStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
-  }
-
   // A section whose boxes were changed but not saved says so beside its Save (Close doesn't save them).
   const notSaved = (changed) => (changed ? <span className="unsaved-note">Not saved yet</span> : null);
   const loadProblem = (error) => (
@@ -1073,30 +1046,6 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
               <button onClick={saveRefreshInterval}>Save</button>
               {notSaved(refreshMinutes !== refreshSaved)}
               {refreshStatus && <span className="save-status">{refreshStatus}</span>}
-            </div>
-          )}
-        </section>
-
-        <section className="settings-section">
-          <h3>Fleet Economics</h3>
-          {!repairKitLoaded && <div className="status">Loading...</div>}
-          {repairKitError && loadProblem(repairKitError)}
-          {repairKitLoaded && !repairKitError && (
-            <div className="settings-row">
-              <label>
-                Repair Kit Cost{' '}
-                <input
-                  type="number"
-                  min="0"
-                  value={repairKitCost}
-                  onChange={(e) => setRepairKitCost(e.target.value)}
-                  style={{ width: '100px' }}
-                  placeholder="e.g. 2000"
-                />
-              </label>
-              <button onClick={saveRepairKitCost}>Save</button>
-              {notSaved(repairKitCost !== repairKitSaved)}
-              {repairKitStatus && <span className="save-status">{repairKitStatus}</span>}
             </div>
           )}
         </section>

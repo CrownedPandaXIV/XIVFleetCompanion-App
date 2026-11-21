@@ -95,13 +95,13 @@ function planFor({ rank, parts, route, bestOrder } = {}) {
   if (!p) return { success: true, stats, route: [] };
   return {
     success: true, stats, route: sectors.map((s) => s.id),
-    range: p.range, hours: p.hours, exp: p.exp, tanks: p.tanks, voyagesPerDay: p.voyagesPerDay,
+    range: p.range, hours: p.hours, exp: p.exp, expSure: p.expSure, expBest: p.expBest, tanks: p.tanks, voyagesPerDay: p.voyagesPerDay,
     gilPerVoyage: p.gilPerVoyage, gilPerDay: p.gilPerDay, expPerDay: p.expPerDay,
     kitsPerVoyage: p.kitsPerVoyage, repairGilPerDay: p.repairGilPerDay, repairKitCost,
     wear: p.wear,
     sectors: p.sectors.map((x) => ({
       id: x.sector.id, letter: x.sector.letter, name: x.sector.name, rankReq: x.sector.rankReq, hasData: !!x.data,
-      result: x.result || null,
+      result: x.result || null, bonus: x.bonus || null, exp: x.sector.expReward,
       breakpoints: x.data ? [0, 1, 2, 3, 4].map((i) => calc.breakpoint(x.data, i)) : null,
     })),
     loot: p.loot.map((l) => ({ ...l, name: names.get(l.itemId) || `Item ${l.itemId}`, price: prices.get(l.itemId) || 0 })),

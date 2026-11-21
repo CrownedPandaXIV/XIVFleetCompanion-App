@@ -47,6 +47,21 @@ module.exports = async (t) => {
   const saved = await t.query(`SELECT setting_key, setting_value FROM fleet_economics_settings WHERE setting_key IN ('supply_window_days', 'restock_target_days') ORDER BY 1`);
   check(JSON.stringify(saved.map((r) => [r.setting_key, Number(r.setting_value)])) === JSON.stringify([['restock_target_days', 10], ['supply_window_days', 7]]), 'both settings are saved: ' + JSON.stringify(saved));
 
+  // The repair kit price is set here (no longer in Settings), and the buy card prices the kits with it.
+  await ev(`(() => {
+    const input = [...document.querySelectorAll('.supplies-controls label')].find(l => l.innerText.includes('Repair kit price')).querySelector('input');
+    input.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '1500'); input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.blur();
+  })()`);
+  let kit = [];
+  for (let i = 0; i < 100 && !(kit.length && Number(kit[0].setting_value) === 1500); i++) {
+    await sleep(150);
+    kit = await t.query(`SELECT setting_value FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'`);
+  }
+  check(kit.length === 1 && Number(kit[0].setting_value) === 1500, 'the repair kit price is saved from the Supplies page: ' + JSON.stringify(kit));
+  await t.query(`DELETE FROM fleet_economics_settings WHERE setting_key = 'repair_kit_cost'`);
+
   await ev(`[...document.querySelectorAll('.supplies-controls label')].find(l => l.innerText.includes('Group by account')).querySelector('input').click()`);
   await sleep(300);
   check(await ev(`document.querySelectorAll('.supplies .account-group > h1').length`) === 0 && await ev(`document.querySelectorAll('.supplies > .supplies-table').length`) === 1, 'ungrouped: one table');

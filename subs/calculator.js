@@ -83,6 +83,18 @@ function sectorResult(dataSector, stats) {
   };
 }
 
+// Bonus experience on a sector, as Pepper's FFXIV Ship Guide gives it for submarines: optimal retrieval +25% (the
+// only one a build is sure of), T2 loot +25%, T3 loot +50%, HQ materials +25% and a double dip +25% (luck), the
+// double dip's second roll able to earn the tier's bonus again; at most +100% of the sector's experience.
+// { sure, best } in percent: sure counts only what the build is sure to get; best everything it could reach.
+function bonusExp(result) {
+  const reached = (s) => s === 'yes' || s === 'maybe';
+  const tierBonus = result.tier === 3 ? 50 : result.tier === 2 ? 25 : 0;
+  const optimal = result.retrieval === 'optimal';
+  const best = (optimal ? 25 : 0) + tierBonus + 25 + (reached(result.doubleDip) ? 25 + tierBonus : 0);
+  return { sure: optimal && result.retrievalSure === 'yes' ? 25 : 0, best: Math.min(100, best) };
+}
+
 const BAND_OF_TIER = { 1: 'Min', 2: 'Mid', 3: 'High' };
 const AMOUNT_AT = { poor: [4, 5], normal: [6, 7], optimal: [8, 9] }; // places in a loot entry: low, high
 
@@ -132,7 +144,7 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
     const d = dataOf.get(s.id);
     if (!d) return { sector: s, data: null };
     const result = sectorResult(d, stats);
-    return { sector: s, data: d, result, loot: sectorLoot(d, result) };
+    return { sector: s, data: d, result, loot: sectorLoot(d, result), bonus: bonusExp(result) };
   });
 
   // Loot added up over the route, item by item.
@@ -162,9 +174,11 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
   });
   const kitsPerVoyage = wear.every(Boolean) ? wear.reduce((sum, w) => sum + w.kitsPerVoyage, 0) : null;
   const perDay = v.hours > 0 ? 24 / v.hours : 0;
+  // Experience with bonuses: what the build is sure of, and the most it could get (a sector without data: none).
+  const withBonus = (key) => perSector.reduce((sum, p) => sum + p.sector.expReward * (1 + (p.bonus ? p.bonus[key] : 0) / 100), 0);
 
   return {
-    sectors: perSector, start, range, hours: v.hours, exp: v.exp,
+    sectors: perSector, start, range, hours: v.hours, exp: v.exp, expSure: withBonus('sure'), expBest: withBonus('best'),
     tanks: sectors.reduce((sum, s) => sum + (Number(s.tanks) || 0), 0),
     loot, gilPerVoyage, gilPerDay: gilPerVoyage * perDay, expPerDay: v.exp * perDay, voyagesPerDay: perDay,
     wear, kitsPerVoyage, repairGilPerDay: kitsPerVoyage === null ? null : kitsPerVoyage * repairKitCost * perDay,
@@ -179,4 +193,4 @@ function startFor(sectorId, startingPoints) {
   return found;
 }
 
-module.exports = { FULL_CONDITION, rangeUsed, bestOrder, breakpoint, meets, sectorResult, sectorLoot, sectorDamage, plan, startFor };
+module.exports = { FULL_CONDITION, rangeUsed, bestOrder, breakpoint, meets, sectorResult, bonusExp, sectorLoot, sectorDamage, plan, startFor };

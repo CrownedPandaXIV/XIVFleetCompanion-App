@@ -87,3 +87,12 @@ test("on the real data, a sector's tier chances add up and a T3 build sees T3 lo
   assert.ok(Math.abs(byTier(low, 1) + byTier(low, 2) + byTier(low, 3) - 1) < 1e-9);
   assert.ok(byTier(high, 3) > 0 && byTier(low, 3) < byTier(high, 3));
 });
+
+test("bonus experience: optimal retrieval is the sure part; luck adds up to +100% a sector", () => {
+  const r = (tier, retrieval, retrievalSure, doubleDip) => ({ tier, retrieval, retrievalSure, doubleDip });
+  assert.deepStrictEqual(calc.bonusExp(r(1, 'poor', 'yes', 'no')), { sure: 0, best: 25 });
+  assert.deepStrictEqual(calc.bonusExp(r(2, 'optimal', 'yes', 'no')), { sure: 25, best: 75 });
+  assert.deepStrictEqual(calc.bonusExp(r(2, 'optimal', 'maybe', 'no')), { sure: 0, best: 75 });
+  assert.deepStrictEqual(calc.bonusExp(r(3, 'optimal', 'yes', 'yes')), { sure: 25, best: 100 });
+  assert.deepStrictEqual(calc.bonusExp(r(2, 'normal', 'yes', 'maybe')), { sure: 0, best: 100 });
+});
