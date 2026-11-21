@@ -26,8 +26,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
 - **The repair kit price is set on the Supplies page**, beside what to buy, instead of in Settings.
 - **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
   retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
-  release reads them again, so new findings arrive with updates. Nothing shows it yet: the Sub Calculator pages
-  come next.
+  release reads them again, so new findings arrive with updates. The Planner uses it.
 - **All five sub stats.** Surveillance, retrieval and favor are now worked out from the game data alongside speed
   and range, for the Sub Calculator.
 - **Sub part condition (database update 17).** A new table for the plugin's readings of each sub part's condition,
