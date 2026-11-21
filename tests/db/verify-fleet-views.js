@@ -346,7 +346,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.strictEqual(rows[0].kind, 'house', 'worst first: the oldest houses');
       assert.strictEqual(rows[0].subject, 'Gone soon');
       assert.match(rows[0].detail, /past 45, the game can demolish it any time/);
-      assert.match(rows.find((r) => r.subject === 'Getting old').detail, /not entered for 9 days; demolished after 36 more/);
+      assert.match(rows.find((r) => r.subject === 'Getting old').detail, /not entered for 9 days; the game can demolish it in 36 more days/);
       assert.match(rows.find((r) => r.subject === 'No date').detail, /no date yet/);
       const { rows: [s] } = await client.query('SELECT low_ceruleum, low_repair_kits FROM fleet_summary_view');
       assert.deepStrictEqual([s.low_ceruleum, s.low_repair_kits], [1, 1], 'the summary leaves out Bex (no longer synced) too');

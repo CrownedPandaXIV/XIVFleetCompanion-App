@@ -197,7 +197,7 @@ ipcMain.handle('get-fc-list', async () => {
       LEFT JOIN character_sort_order so ON so.cid = c.cid
       WHERE h.fc_id IS NOT NULL
       GROUP BY h.fc_id, h.fc_name
-      ORDER BY sort_index NULLS LAST, h.fc_name, h.fc_id
+      ORDER BY sort_index NULLS LAST, h.fc_name COLLATE "C", h.fc_id
     `);
 
     return { success: true, rows: result.rows };
@@ -337,7 +337,7 @@ ipcMain.handle('find-items', async (event, term) => {
       SELECT DISTINCT ${baseId} FROM companion_fc_inventory_snapshot
       WHERE quantity > 0 AND NOT (sorted_container = ANY($1::int[]))`, [MONEY_CONTAINERS]);
     const matched = await client.query(
-      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE ALL($2::text[]) ORDER BY name LIMIT $3`,
+      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE ALL($2::text[]) ORDER BY name COLLATE "C" LIMIT $3`,
       [heldIds.rows.map((r) => String(r.id)), likePatterns(text), FIND_LIMIT + 1]);
     const more = matched.rows.length > FIND_LIMIT;
     const nameById = new Map(matched.rows.slice(0, FIND_LIMIT).map((r) => [Number(r.id), r.name]));

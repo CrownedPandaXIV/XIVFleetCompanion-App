@@ -113,7 +113,7 @@ ipcMain.handle('get-retainer-targets', async () => {
       LEFT JOIN ffxiv_retainertaskrandom vr ON vt.is_random = 'True' AND vr.id = vt.task
       LEFT JOIN ffxiv_retainertasknormal vn ON vt.is_random = 'False' AND vn.id = vt.task
       LEFT JOIN ffxiv_item vi ON vi.id = vn.item
-      ORDER BY so.sort_index NULLS LAST, c.name, rl.hire_order_index NULLS LAST, rl.retainer_id
+      ORDER BY so.sort_index NULLS LAST, c.name COLLATE "C", rl.hire_order_index NULLS LAST, rl.retainer_id
     `);
 
     const gearResult = await client.query(`

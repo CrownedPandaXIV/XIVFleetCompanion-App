@@ -52,7 +52,7 @@ ipcMain.handle('get-metric-subjects', async () => {
       SELECT c.cid, c.name, c.world, c.account_label, so.sort_index
       FROM ${latestCharacter} c
       LEFT JOIN character_sort_order so ON so.cid = c.cid
-      ORDER BY so.sort_index NULLS LAST, c.name
+      ORDER BY so.sort_index NULLS LAST, c.name COLLATE "C"
     `);
     const fcs = await client.query(`
       SELECT DISTINCT ON (h.fc_id) h.fc_id, h.fc_name, h.fc_master

@@ -30,6 +30,14 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
 - Removing a copy a move left behind names the PCs that may still need it to find the new address, and the move window
   says to close the app on your other PCs first.
 - The nightly backup run always quits within a minute of finishing, even if saving the subs' forecasts is held up.
+- **Income is much faster for a big fleet:** on 80 characters with two months of history it took over two minutes;
+  now about two seconds (the same answers). The plugin's Income page uses the same view.
+- **The shared database and the fleet file sort the same way:** names and account labels go letter by letter whatever
+  language the database PC's PostgreSQL was set up in, and missing names sort last on both.
+- Windows of a number of days are exactly that many 24-hour days on both, so they don't shift by an hour after a
+  daylight-saving change.
+- A house warning now says "the game can demolish it in 3 more days" instead of "demolished after 3 more".
+- Database updates wait at most 10 seconds for a table another PC is using, then try again later.
 
 ## 1.10.6 - 2026-11-20
 
