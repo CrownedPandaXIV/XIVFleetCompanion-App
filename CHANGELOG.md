@@ -3,6 +3,17 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.12.0 - 2026-11-21
+
+The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
+
+- **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
+  retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
+  release reads them again, so new findings arrive with updates. Nothing shows it yet: the Sub Calculator pages
+  come next.
+- **All five sub stats.** Surveillance, retrieval and favor are now worked out from the game data alongside speed
+  and range, for the Sub Calculator.
+
 ## 1.11.0 - 2026-11-21
 
 Fixes from a full check of the app and the plugin. This entry grows until 1.11.0 is released.

@@ -5,7 +5,7 @@ const { loadSharedCharacters } = require('../characters/shared-sync');
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const forecastVoyages = require('../subs/voyage-forecast');
-const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
+const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat, STATS } = require('../subs/submarine-builds');
 const rankUp = require('../subs/rank-up');
 const accuracy = require('../subs/forecast-accuracy');
 const { columnsByKey } = require('./shopping');
@@ -107,26 +107,23 @@ async function loadSubmarines(client) {
   return rows;
 }
 
-// Speed and range per rank (ffxiv_submarinerank) and per part (ffxiv_submarinepart), for computeStat.
+// The five stats per rank (ffxiv_submarinerank's bonuses) and per part (ffxiv_submarinepart), for computeStat and
+// buildStats. A stat whose column the game data doesn't have is left out, so it reads as unknown rather than 0.
 async function loadStatTables(client) {
-  const rankStatsResult = await client.query(`SELECT id, speed_bonus, range_bonus FROM ffxiv_submarinerank`);
-  const rankStatsById = new Map();
-  for (const row of rankStatsResult.rows) {
-    const rank = Number(row.id);
-    rankStatsById.set(rank, {
-      speed: row.speed_bonus === null || row.speed_bonus === '' ? null : Number(row.speed_bonus),
-      range: row.range_bonus === null || row.range_bonus === '' ? null : Number(row.range_bonus),
-    });
-  }
+  const rankCols = await columnsByKey(client, 'ffxiv_submarinerank');
+  const partCols = await columnsByKey(client, 'ffxiv_submarinepart');
+  const rankStat = STATS.map((s) => [s, rankCols.get(`${s}bonus`)]).filter(([, c]) => c);
+  const partStat = STATS.map((s) => [s, partCols.get(s)]).filter(([, c]) => c);
+  const quote = (c) => `"${c.replace(/"/g, '""')}"`;
+  const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 
-  const partStatsResult = await client.query(`SELECT class, slot, speed, range FROM ffxiv_submarinepart`);
+  const rankStatsById = new Map();
+  const ranks = await client.query(`SELECT id${rankStat.map(([s, c]) => `, ${quote(c)} AS ${s}`).join('')} FROM ffxiv_submarinerank`);
+  for (const row of ranks.rows) rankStatsById.set(Number(row.id), Object.fromEntries(rankStat.map(([s]) => [s, num(row[s])])));
+
   const partStatsByClassSlot = new Map();
-  for (const row of partStatsResult.rows) {
-    partStatsByClassSlot.set(`${row.class}|${row.slot}`, {
-      speed: Number(row.speed) || 0,
-      range: Number(row.range) || 0,
-    });
-  }
+  const parts = await client.query(`SELECT class, slot${partStat.map(([s, c]) => `, ${quote(c)} AS ${s}`).join('')} FROM ffxiv_submarinepart`);
+  for (const row of parts.rows) partStatsByClassSlot.set(`${row.class}|${row.slot}`, Object.fromEntries(partStat.map(([s]) => [s, Number(row[s]) || 0])));
   return { rankStatsById, partStatsByClassSlot };
 }
 

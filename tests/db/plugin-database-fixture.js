@@ -1,5 +1,6 @@
 // The plugin updates the database itself (plugin 2.1.0, DatabaseUpkeep.cs), with a copy of this app's own files:
-// db/schema.sql, db/catch-up.sql, db/updates/*.sql and db/views.sql (and db/sqlite/, the one-file version's). This copies them into the plugin and works out,
+// db/schema.sql, db/catch-up.sql, db/updates/*.sql and db/views.sql (and db/sqlite/, the one-file version's), and the Sub
+// Calculator's data (subs/calculator-data.json). This copies them into the plugin and works out,
 // with the app's own ensureDatabase, what a database looks like after each way of updating it, for the plugin's
 // tests to check its own updating gives exactly the same: every table and column, index, view (its definition) and
 // version record.
@@ -91,6 +92,8 @@ function updatesUpTo(last) {
   // which is newer.
   const appVersion = APP_VERSION.split('-')[0];
   fs.writeFileSync(path.join(target, 'app-version.txt'), `${appVersion}\n`);
+  // The Sub Calculator's data (loot and breakpoints), the same file the app ships; both are made again at each release.
+  fs.copyFileSync(path.join(__dirname, '..', '..', 'subs', 'calculator-data.json'), path.join(plugin, 'XIVFleetCompanion', 'SubCalculatorData.json'));
 
   // Each: the SQL that makes the database, then each update in turn (upTo: only the updates up to that number and no
   // views, as an older copy has them; otherwise everything) with what the database looks like after it, then once
