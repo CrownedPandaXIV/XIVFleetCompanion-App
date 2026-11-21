@@ -302,6 +302,7 @@ function SubmarinesView({ refreshKey }) {
     window.api.getSubmarines().then((result) => {
       if (result.success) {
         setRows(result.rows);
+        setError(null);
       } else {
         setError(result.error);
       }

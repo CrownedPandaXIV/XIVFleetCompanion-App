@@ -177,14 +177,39 @@ async function checkBackupFile({ tools, file }) {
   return { ok: true };
 }
 
+// Run just before a restore, in one transaction: drops every fleet view and their function, and forgets which
+// views.sql made them. pg_restore --clean drops only what is in the backup, and without CASCADE, so a view added
+// by a later version would stop the restore. The views are made again at the next database check
+// (recheckDatabase), whether the restore worked or not. The same as the plugin's PgBackups.SetViewsAsideSql.
+const SET_VIEWS_ASIDE_SQL = `DO $$
+DECLARE v record;
+BEGIN
+  FOR v IN SELECT n.nspname AS schema, c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE c.relkind = 'v' AND n.nspname = current_schema() AND c.relname LIKE 'fleet\\_%\\_view' LOOP
+    EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', v.schema, v.name);  -- by name: one dropped already, with a view it's built on, is skipped
+  END LOOP;
+  DROP FUNCTION IF EXISTS fleet_part_letter(int) CASCADE;
+  IF to_regclass('companion_views') IS NOT NULL THEN DELETE FROM companion_views; END IF;
+END $$;`;
+
 // Puts the database back as it was in `file`: first a backup of how it is now (so this can be undone),
 // then pg_restore --clean in one transaction, so a failure part way changes nothing. Tables made after
-// that backup are kept. Returns { ok, safety: <the backup made first>, message }.
+// that backup are kept. The fleet views are set aside first (SET_VIEWS_ASIDE_SQL): check the database
+// again afterwards, whatever the result. Returns { ok, safety: <the backup made first>, message }.
 async function restoreBackup({ tools, config, settings, file }) {
   if (!fs.existsSync(file)) return { ok: false, message: `${file} is not there any more.` };
   // Removes no old backups: the one being restored may be the oldest. The next daily backup tidies up.
   const safety = await backupNow({ tools, config, settings: { ...settings, copyFolder: '', keep: Number.MAX_SAFE_INTEGER } });
   if (!safety.ok) return { ok: false, safety, message: `Nothing was restored: first backing up the database as it is now failed. ${safety.message}` };
+  const client = new Client({ ...config, port: Number(config.port || 5432), connectionTimeoutMillis: 10000 });
+  try {
+    await client.connect();
+    await client.query(SET_VIEWS_ASIDE_SQL);
+  } catch (err) {
+    return { ok: false, safety, message: `Nothing was restored: the fleet views couldn't be set aside first. ${err.message}` };
+  } finally {
+    await client.end().catch(() => {});
+  }
   const r = await run(tools.restore, [...connectionArgs(config), '-d', String(config.database), '--clean', '--if-exists',
     '--single-transaction', '--no-owner', '--no-privileges', file], { env: toolEnv(config) });
   writeLog(settings.folder, [r.ok ? `Restored ${path.basename(file)} (the database before it is ${path.basename(safety.file)})` : `RESTORE FAILED, nothing changed: ${toolError('pg_restore', r)}`]);
@@ -192,4 +217,4 @@ async function restoreBackup({ tools, config, settings, file }) {
   return { ok: true, safety, message: `Restored. The database as it was just before is saved as ${path.basename(safety.file)}.` };
 }
 
-module.exports = { backupNow, testBackup, checkBackupFile, restoreBackup, writeLog, TEST_DATABASE };
+module.exports = { backupNow, testBackup, checkBackupFile, restoreBackup, writeLog, TEST_DATABASE, SET_VIEWS_ASIDE_SQL };

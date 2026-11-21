@@ -150,7 +150,9 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
   const [partsNeededCount, setPartsNeededCount] = useState(null);
   const [readySubs, setReadySubs] = useState(null);
   const [routeOptCount, setRouteOptCount] = useState(null);
-  const [error, setError] = useState(null);
+  // Each of the two loads' last error (null once it loads), so one that works doesn't hide the other's.
+  const [errors, setErrors] = useState({});
+  const error = errors.fleet || errors.houses;
   const houseSort = useColumnSort();
   const houseCols = useTableColumns({
     tableKey: 'summaryHouses', ownDefs: HOUSE_WARNING_COLUMN_DEFS, subject: 'fc', excludeExtras: HOUSE_WARNING_DUPLICATE_EXTRAS,
@@ -174,17 +176,15 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
         setNotSynced(result.notSynced || []);
         setSharedSync(result.sharedSync || []);
         setThresholds((t) => ({ ...t, repairKitThreshold: result.repairKitThreshold, ceruleumThreshold: result.ceruleumThreshold }));
-      } else {
-        setError(result.error);
       }
+      setErrors((e) => ({ ...e, fleet: result.success ? null : result.error }));
     });
     window.api.getHouseWarnings().then((result) => {
       if (result.success) {
         setHouseWarnings(result.rows);
         setThresholds((t) => ({ ...t, houseWarnDays: result.warnDays }));
-      } else {
-        setError(result.error);
       }
+      setErrors((e) => ({ ...e, houses: result.success ? null : result.error }));
     });
   }
 

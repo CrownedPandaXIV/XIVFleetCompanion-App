@@ -444,7 +444,7 @@ function FcInventoryTab() {
   );
 }
 
-function FleetInventoryTab() {
+function FleetInventoryTab({ refreshKey }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -457,11 +457,12 @@ function FleetInventoryTab() {
     window.api.getFleetInventorySummary().then((result) => {
       if (result.success) {
         setRows(result.rows);
+        setError(null);
       } else {
         setError(result.error);
       }
     });
-  }, []);
+  }, [refreshKey]);
 
   if (error) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
@@ -609,7 +610,8 @@ function WhereIsItTab() {
   );
 }
 
-function InventoryView() {
+// refreshKey: only the Fleet totals follow the refreshes; the other tabs are browsed, so they're left as they are.
+function InventoryView({ refreshKey }) {
   const [subView, setSubView] = useState('where'); // where | character | fc | fleet
 
   return (
@@ -623,7 +625,7 @@ function InventoryView() {
       {subView === 'where' && <WhereIsItTab />}
       {subView === 'character' && <CharacterInventoryTab />}
       {subView === 'fc' && <FcInventoryTab />}
-      {subView === 'fleet' && <FleetInventoryTab />}
+      {subView === 'fleet' && <FleetInventoryTab refreshKey={refreshKey} />}
     </div>
   );
 }

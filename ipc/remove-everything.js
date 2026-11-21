@@ -14,6 +14,7 @@ const { downloadFolders } = require('../updater');
 const { readInstalled, forgetInstalled, removalPlan, removeEverything, finishScript, startFinish } = require('../setup/remove-everything');
 const { readMoveNote } = require('../db/database-move');
 const { findMovedAwayCopy } = require('../setup/leftovers');
+const { fleetFilePath } = require('../db/fleet-store');
 const { loadBackupSettings } = require('../backups/settings');
 const { settingsFile } = require('../backups/app');
 const { findTools } = require('../backups/tools');
@@ -64,6 +65,7 @@ async function facts() {
     tailscaleHere: windows && fs.existsSync(tailscaleExe()),
     otherDatabases: dbOnThisPc ? await otherDatabases(connection) : movedAway ? await otherDatabases({ ...connection, host: 'localhost', port: movedAway.port }) : [],
     movedAway,
+    fleetFileHere: fs.existsSync(fleetFilePath(app.getPath('appData'))),
     packaged: app.isPackaged,
   };
 }

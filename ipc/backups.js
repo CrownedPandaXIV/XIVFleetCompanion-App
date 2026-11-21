@@ -161,8 +161,9 @@ async function restoreFile(file) {
   const tools = await findTools(settings.pgBin);
   if (!tools.found) return { success: false, error: tools.error };
   const result = await restoreBackup({ tools, config: loadPostgresConfig(), settings, file });
-  // The restored database may be on an older layout: check for database updates again.
-  if (result.ok) recheckDatabase();
+  // The restored database may be on an older layout, and its views were set aside: check the database again
+  // (updates and views), whether it worked or not.
+  recheckDatabase();
   (result.ok ? console.log : console.error)(`Restoring ${path.basename(file)}: ${result.message}`);
   return result.ok ? { success: true, message: result.message } : { success: false, error: result.message };
 }

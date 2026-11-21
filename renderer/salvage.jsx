@@ -89,6 +89,7 @@ function SalvageView({ refreshKey }) {
     window.api.getSalvage().then((result) => {
       if (result.success) {
         setRows(sortRows(result.rows));
+        setError(null);
       } else {
         setError(result.error);
       }

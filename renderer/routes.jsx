@@ -59,6 +59,7 @@ function RouteOptimizationView({ refreshKey }) {
     window.api.getSubmarines().then((result) => {
       if (result.success) {
         setRows(sortRows(result.rows));
+        setError(null);
       } else {
         setError(result.error);
       }

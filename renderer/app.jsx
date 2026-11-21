@@ -705,7 +705,7 @@ function App() {
 
         {currentView === 'summary' && <SummaryView uses={playStyle.uses} onNavigate={setCurrentView} onOpenTrend={(metric) => { setTrendsPreset({ metric, at: Date.now() }); setCurrentView('trends'); }} refreshKey={refreshKey} onOpenSettings={() => setShowSettings('general')} />}
 
-        {currentView === 'inventory' && <InventoryView />}
+        {currentView === 'inventory' && <InventoryView refreshKey={refreshKey} />}
 
         {currentView === 'retainers' && <RetainersView refreshKey={refreshKey} />}
 

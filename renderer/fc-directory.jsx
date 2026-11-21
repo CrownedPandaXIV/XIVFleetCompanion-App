@@ -70,6 +70,7 @@ function FCDirectoryView({ refreshKey }) {
     window.api.getFcDirectory().then((result) => {
       if (result.success) {
         setRows(result.rows);
+        setError(null);
       } else {
         setError(result.error);
       }

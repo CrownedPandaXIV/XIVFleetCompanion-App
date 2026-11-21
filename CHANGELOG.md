@@ -3,6 +3,20 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.11.0 - 2026-11-21
+
+Fixes from a full check of the app and the plugin. This entry grows until 1.11.0 is released.
+
+- **Remove everything keeps the plugin's fleet file.** The app's settings folder is also where the plugin keeps its
+  fleet file (Just this PC), its choice for the PC and their backups. Remove everything deleted the whole folder;
+  it now deletes only the app's own files, and lists the fleet file under what it keeps.
+- **Restoring a backup works after an update that added fleet views.** Before, any backup made before such an
+  update failed to restore with a PostgreSQL message about CASCADE. The fleet views are now set aside first and made
+  again straight after, whether the restore worked or not.
+- **Summary, Subs, Routes, Salvage, FC Directory and Inventory's Fleet totals recover once the database is back.**
+  After one failed load they kept showing "Failed to load" until you switched pages. Inventory's Fleet totals now
+  also follow the app's refreshes.
+
 ## 1.10.6 - 2026-11-20
 
 - **Removing a character on the Character Roster also removes its market listings.** Before, its retainers' listings

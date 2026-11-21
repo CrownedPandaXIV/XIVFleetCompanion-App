@@ -37,7 +37,8 @@ function forgetInstalled(dir, what, fsys = fs) {
 }
 
 // facts: { installed (readInstalled), connection: { host, port, database, user } | null, dbOnThisPc,
-// postgresHere, tailscaleHere, otherDatabases: [names] (in the same PostgreSQL), packaged, movedAway }.
+// postgresHere, tailscaleHere, otherDatabases: [names] (in the same PostgreSQL), packaged, movedAway,
+// fleetFileHere (the plugin's fleet file is in the app's settings folder) }.
 // movedAway: { port, movedTo } when the app's database moved away from this PC and its old copy is still in this
 // PC's PostgreSQL (its note says 'moved'), otherwise null. That copy is removed like the app's own database.
 function removalPlan(facts) {
@@ -75,6 +76,7 @@ function removalPlan(facts) {
   }
   if (c && !facts.dbOnThisPc) keeps.push(`The database on ${c.host} (it's on another PC)`);
   if (facts.tailscaleHere && !canRemoveTailscale) keeps.push('Tailscale (the app didn\'t install it)');
+  if (facts.fleetFileHere) keeps.push('The plugin\'s fleet file (fleet.db) and its backups, in the same folder as the app\'s settings');
   keeps.push('Your backup files');
   keeps.push('The plugin (remove it in the game\'s plugin list)');
   return {
@@ -211,17 +213,22 @@ const FINISH_RUNNING = 'The clean-up is running';
 
 // The PowerShell that finishes once the app has closed: closes anything of the app's still running, runs
 // its uninstaller (found in Windows' list of installed programs, as Installed apps does; none when run from
-// source), waits until its program folder is gone, and deletes its settings folder. Each step is written to
+// source), waits until its program folder is gone, and deletes its settings (but not the plugin's files kept
+// beside them). Each step is written to
 // `log` (%TEMP%\xiv-fleet-remove.log), so a removal that didn't finish can be looked into. `folders`: other folders
 // of the app's to delete with its settings (where it downloads new versions).
 // Run with -Launch, it only starts itself again through Windows' process service (WMI), hidden, and says so in
 // the log. Started that way it isn't one of the app's own processes, which Windows may stop along with the app.
 // installDir: the app's program folder (null when run from source).
+// The plugin's files in the app's settings folder (Windows wildcards), which Remove everything leaves alone:
+// the fleet file with its working files, the plugin's choice for this PC, and the fleet file's backups.
+const PLUGIN_FILES = ['fleet.db', 'fleet.db-*', 'fleet.db.*', 'store.json', 'store.json.*', 'Backups'];
+
 function finishScript({ pid, installDir, userData, folders = [], log }) {
   const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
   const lines = [
     '# XIV Fleet Companion: Remove everything from this PC, the last part. Once the app has closed, this',
-    '# uninstalls it and deletes its settings folder, writing each step to the log below.',
+    '# uninstalls it and deletes its settings (not the plugin\'s fleet file), writing each step to the log below.',
     'param([switch]$Launch)',
     `$log = ${q(log)}`,
     "function Log($m) { Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $m) }",
@@ -255,9 +262,15 @@ function finishScript({ pid, installDir, userData, folders = [], log }) {
     );
   }
   lines.push(
+    // The settings folder is also where the plugin keeps its fleet file, its choice for this PC and their
+    // backups (PLUGIN_FILES): those stay, and the folder goes only when nothing else is left in it.
+    `$keep = @(${PLUGIN_FILES.map(q).join(', ')})`,
+    `function AppFiles { Get-ChildItem -LiteralPath ${q(userData)} -Force -ErrorAction SilentlyContinue | Where-Object { $n = $_.Name; -not ($keep | Where-Object { $n -like $_ }) } }`,
     // A moment for anything still holding a file there to let go.
-    `for ($i = 0; $i -lt 10 -and (Test-Path -LiteralPath ${q(userData)}); $i++) { Remove-Item -LiteralPath ${q(userData)} -Recurse -Force -ErrorAction SilentlyContinue; if (Test-Path -LiteralPath ${q(userData)}) { Start-Sleep -Seconds 2 } }`,
-    `if (Test-Path -LiteralPath ${q(userData)}) { Log ('Could not delete ' + ${q(userData)}) } else { Log 'The settings folder is deleted' }`,
+    'for ($i = 0; $i -lt 10 -and (AppFiles); $i++) { AppFiles | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; if (AppFiles) { Start-Sleep -Seconds 2 } }',
+    `if (AppFiles) { Log ('Could not delete everything in ' + ${q(userData)}) }`,
+    `elseif (Get-ChildItem -LiteralPath ${q(userData)} -Force -ErrorAction SilentlyContinue) { Log 'The settings are deleted; the plugin\'\'s fleet file and backups are kept' }`,
+    `else { Remove-Item -LiteralPath ${q(userData)} -Force -ErrorAction SilentlyContinue; Log 'The settings folder is deleted' }`,
     ...folders.map((f) => `if (Test-Path -LiteralPath ${q(f)}) { Remove-Item -LiteralPath ${q(f)} -Recurse -Force -ErrorAction SilentlyContinue; if (Test-Path -LiteralPath ${q(f)}) { Log ('Could not delete ' + ${q(f)}) } else { Log ('Deleted ' + ${q(f)}) } }`),
     "Log 'Done'",
     // Only once it has finished: if anything stops it on the way, this file stays to be looked at.
@@ -284,5 +297,5 @@ async function startFinish(deps, { tries = 60 } = {}) {
 
 module.exports = {
   INSTALLED_FILE, CONFIRM_WORD, readInstalled, recordInstalled, forgetInstalled, removalPlan, removalSteps, dropDatabase, removeEverything, finishScript,
-  FINISH_RUNNING, startFinish,
+  FINISH_RUNNING, PLUGIN_FILES, startFinish,
 };
