@@ -65,6 +65,9 @@ ipcMain.handle('fleet-file:game-data-update', async () => {
   if (updating) return { success: false, error: 'An update is already running.' };
   updating = true;
   try {
+    // Not at the same time as the first fill, which a page may have started: both would write the same file.
+    const filling = db.fileGameDataFill && db.fileGameDataFill();
+    if (filling) await filling;
     const result = await gameDataFile.loadAll(db.gameDataFile());
     return { success: true, ...result };
   } catch (err) {

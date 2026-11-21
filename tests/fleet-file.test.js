@@ -37,9 +37,18 @@ test('where the fleet is follows the plugin\'s choice for the PC', () => {
 
 test('PostgreSQL\'s SQL as SQLite\'s', () => {
   assert.strictEqual(translate('SELECT a FROM t WHERE b = $1 AND c = $2'), 'SELECT a FROM t WHERE b = ?1 AND c = ?2');
-  assert.strictEqual(translate('SELECT x::int, y::text, (a + b)::numeric FROM t'), 'SELECT CAST(x AS INTEGER), CAST(y AS TEXT), pg_numeric((a + b)) FROM t');
+  assert.strictEqual(translate('SELECT x::int, y::text, (a + b)::numeric FROM t'), 'SELECT pg_int(x), CAST(y AS TEXT), pg_numeric((a + b)) FROM t');
   assert.match(translate('SELECT 1 FROM t WHERE id = ANY($1::int[])'), /id IN \(SELECT value FROM json_each\(\?1\)\)/);
-  assert.match(translate("SELECT (to_jsonb(s)->>'slot')::int FROM s"), /CAST\(\(s\.slot\) AS INTEGER\)/);
+  assert.match(translate('SELECT 1 FROM t WHERE id = ANY($1::text[])'), /id IN \(SELECT CAST\(value AS TEXT\) FROM json_each\(\?1\)\)/, 'the list as the type asked for');
+  assert.match(translate("SELECT (to_jsonb(s)->>'slot')::int FROM s"), /pg_int\(\(s\.slot\)\)/);
+  assert.match(translate('DELETE FROM companion_metric_history h WHERE h.x = 1'), /^DELETE FROM companion_metric_history AS h WHERE/);
+  for (const [bad, why] of [
+    ['SELECT CASE WHEN a THEN 1 END::int FROM t', /CASE \.\.\. END/], ['SELECT x::numeric(10,2) FROM t', /with a size/],
+    ["SELECT '7 days'::interval", /Unknown cast/], ["SELECT 'true'::boolean", /boolean/], ["SELECT 1 WHERE a ~* 'x'", /~\*/],
+    ['SELECT 1 WHERE a <> ALL($1)', /ALL/], ['SELECT 1 WHERE a = ANY(ARRAY[1,2])', /ARRAY/], ['TRUNCATE a, b', /more than one table/],
+    ['SELECT DISTINCT ON (a) a, b FROM t ORDER BY a, b LIMIT 5', /LIMIT/],
+    ['INSERT INTO t (a, n) SELECT a, count(*) FROM u GROUP BY a ON CONFLICT (a) DO UPDATE SET n = excluded.n', /GROUP BY/],
+  ]) assert.throws(() => translate(bad), why, bad);
   assert.match(translate("SELECT 1 WHERE t > now() - interval '5 minutes'"), /now\(\) - 300/);
   assert.match(translate('SELECT 1 WHERE t > now() - make_interval(days => $1)'), /\(\(\?1\) \* 86400\)/);
   assert.match(translate("SELECT 1 WHERE name ILIKE ALL($2::text[])"), /NOT EXISTS \(SELECT 1 FROM json_each\(\?2\) WHERE NOT \(name LIKE value ESCAPE '\\'\)\)/);
@@ -68,6 +77,12 @@ test('a query on a file answers as pg would', async () => {
     assert.deepStrictEqual((await c.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'ffxiv_item' ORDER BY ordinal_position`)).rows.map((r) => r.column_name), ['id', 'name']);
     assert.strictEqual((await c.query('UPDATE companion_character_current SET name = $1 WHERE cid = $2', ['Bo', '2'])).rowCount, 1, 'rowCount for a write');
     await c.query('ROLLBACK'); // as in PostgreSQL: nothing open, no error
+    const r = (await c.query("SELECT 2.7::int AS a, (-2.5)::int AS b, '18014498578000001'::bigint AS c, 7::int AS d, $1::date AS e", ['2026-11-21'])).rows[0];
+    assert.deepStrictEqual([r.a, r.b, String(r.c), r.d], [3, -3, '18014498578000001', 7], '::int rounds as PostgreSQL does, and whole numbers stay exact');
+    assert.strictEqual(Number(r.e instanceof Date ? r.e.getTime() / 1000 : r.e), Date.UTC(2026, 10, 21) / 1000, 'a date given as text');
+    assert.deepStrictEqual((await c.query('SELECT name FROM ffxiv_item WHERE id = ANY($1::text[])', [[5]])).rows, [{ name: 'Thing' }], 'numbers given for a text column still match');
+    await assert.rejects(c.query('SELECT 1 FROM companion_pc_status'), (e) => e.code === '42P01', 'a missing table has PostgreSQL\'s code');
+    await assert.rejects(c.query('SELECT nope FROM companion_character_current'), (e) => e.code === '42703', 'a missing column too');
   } finally {
     await c.end();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -126,5 +141,52 @@ test('the fleet file\'s backups, named and kept as the plugin keeps them', () =>
   const before = backups.listBackups(file).map((b) => b.name).join(',');
   assert.throws(() => backups.backUpNow(file, new Date(2026, 10, 10, 10, 0, 0)), /damaged|malformed/);
   assert.strictEqual(backups.listBackups(file).map((b) => b.name).join(','), before, 'the 7 kept are the same');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a write that finds the file busy waits for the game without freezing the app, then goes through', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'busy-'));
+  const file = path.join(dir, 'fleet.db');
+  const { DatabaseSync } = require('node:sqlite');
+  const game = new DatabaseSync(file);
+  game.exec('PRAGMA journal_mode = WAL; CREATE TABLE t (x)');
+  game.exec('BEGIN IMMEDIATE; INSERT INTO t VALUES (1)');   // the game, mid-write
+  const client = new SqliteClient(file);
+  let ticks = 0;
+  const ticker = setInterval(() => { ticks++; }, 50);
+  setTimeout(() => game.exec('COMMIT'), 800);
+  const started = Date.now();
+  await client.query('INSERT INTO t VALUES (2)');
+  clearInterval(ticker);
+  assert.ok(Date.now() - started >= 700, 'it waited for the game');
+  assert.ok(ticks >= 8, `the app kept running meanwhile (${ticks} ticks)`);
+  assert.strictEqual(Number((await client.query('SELECT count(*) AS n FROM t')).rows[0].n), 2);
+  await client.end();
+  game.close();
+
+  // A setup that fails part way (a game data file that can't be opened) doesn't leave the fleet file open.
+  const bad = path.join(dir, 'not-a-folder');
+  fs.writeFileSync(bad, 'x');
+  assert.throws(() => new SqliteClient(file, { gameData: path.join(bad, 'game-data.db') }));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('game data tables a first load missed are fetched again by themselves', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gd-'));
+  const file = path.join(dir, 'game-data.db');
+  const { fillIfEmpty, missingTables } = require('../db/game-data-file');
+  const tables = [{ file: 'Item', table: 'ffxiv_item' }, { file: 'Recipe', table: 'ffxiv_recipe' }];
+  const csv = '#,Name,Level\n1,Thing,5\n';
+  const asked = [];
+  const first = await fillIfEmpty(file, { tables, fetchJson: false, fetchText: async (url) => { asked.push(url); if (/Recipe/.test(url)) throw new Error('timed out'); return csv; } });
+  assert.deepStrictEqual(first.failed.map((f) => f.table), ['ffxiv_recipe']);
+  assert.deepStrictEqual(missingTables(file, tables).map((t) => t.table), ['ffxiv_recipe']);
+  asked.length = 0;
+  const states = [];
+  const again = await fillIfEmpty(file, { tables, fetchJson: false, fetchText: async (url) => { asked.push(url); return csv; }, onState: (s) => states.push(s.gameData) });
+  assert.strictEqual(again.updated, 1);
+  assert.ok(asked.length === 1 && /Recipe/.test(asked[0]), 'only the missing table: ' + asked.join(', '));
+  assert.deepStrictEqual(states, ['filling', 'filled']);
+  assert.strictEqual(await fillIfEmpty(file, { tables, fetchJson: false, fetchText: async () => { throw new Error('not asked'); } }), null, 'nothing left to do');
   fs.rmSync(dir, { recursive: true, force: true });
 });

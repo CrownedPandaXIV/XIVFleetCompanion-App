@@ -1,6 +1,7 @@
 // Settings: app version, Postgres connection (and whether it can be reached), auto-refresh, repair kit
 // cost, low-level and house warnings.
 const { app, ipcMain } = require('electron');
+const { portProblem } = require('../setup/create-database');
 const { createPgClient, loadPostgresConfig, savePostgresConfig, withClient, connectionStatus } = require('../db');
 const { DEMOLITION_DAYS, warnDaysSetting } = require('../characters/house-warning');
 const { autoRefreshSetting, autoRefreshProblem } = require('../auto-refresh');
@@ -35,45 +36,53 @@ ipcMain.handle('settings:get-postgres-config', async () => {
   }
 });
 
-// Saves new Postgres connection details from the Settings form. If
-// newPassword is blank, the EXISTING saved password is kept rather than
-// being overwritten with blank - lets the person update the host without
-// being forced to retype the password every time.
+// The password to use with these details: the one typed, else the saved one, but only for the address it was saved
+// for (a mistyped or someone else's address never gets it). { password } or { error }.
+function passwordFor(host, newPassword) {
+  if (newPassword) return { password: newPassword };
+  let existing = null;
+  try { existing = loadPostgresConfig(); } catch { /* none saved */ }
+  if (!existing) return { password: '' };
+  if (String(existing.host || '').trim().toLowerCase() !== String(host || '').trim().toLowerCase()) {
+    return { error: 'Type the password too: the saved one is only used with the address it was saved for.' };
+  }
+  return { password: existing.password };
+}
+
+// What's wrong with the details typed, in plain words, or null.
+function detailsProblem({ host, port, database, user }) {
+  if (!String(host || '').trim()) return "Type the database PC's address.";
+  const port_ = portProblem(port);
+  if (port_) return port_;
+  if (!String(database || '').trim()) return "Type the database's name.";
+  if (!String(user || '').trim()) return 'Type the username.';
+  return null;
+}
+
+// Saves new Postgres connection details from the Settings form. If newPassword is blank, the EXISTING saved password
+// is kept (for the same address), so the address's details can be changed without typing the password again.
 ipcMain.handle('settings:save-postgres-config', async (event, { host, port, database, user, newPassword }) => {
   try {
-    let password = newPassword;
-    if (!password) {
-      try {
-        const existing = loadPostgresConfig();
-        password = existing.password;
-      } catch {
-        password = '';
-      }
-    }
-
-    savePostgresConfig({ host, port: Number(port), database, user, password });
+    const problem = detailsProblem({ host, port, database, user });
+    if (problem) return { success: false, error: problem };
+    const { password, error } = passwordFor(host, newPassword);
+    if (error) return { success: false, error };
+    savePostgresConfig({ host: String(host).trim(), port: Number(port), database: String(database).trim(), user: String(user).trim(), password });
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
 
-// Tests a connection WITHOUT saving first - lets the person verify new
-// details work before committing them. If newPassword is blank, tests
-// against the currently-saved password instead (so testing after a
-// host-only edit doesn't require retyping the password).
+// Tests a connection WITHOUT saving first - lets the person verify new details work before committing them. If
+// newPassword is blank, the saved password is used (for the same address only).
 ipcMain.handle('settings:test-postgres-connection', async (event, { host, port, database, user, newPassword }) => {
-  let password = newPassword;
-  if (!password) {
-    try {
-      const existing = loadPostgresConfig();
-      password = existing.password;
-    } catch {
-      password = '';
-    }
-  }
+  const problem = detailsProblem({ host, port, database, user });
+  if (problem) return { success: false, error: problem };
+  const { password, error } = passwordFor(host, newPassword);
+  if (error) return { success: false, error };
 
-  const testClient = createPgClient({ host, port: Number(port), database, user, password, connectionTimeoutMillis: 5000 });
+  const testClient = createPgClient({ host: String(host).trim(), port: Number(port), database, user, password, connectionTimeoutMillis: 5000 });
   try {
     await testClient.connect();
     await testClient.query('SELECT 1');

@@ -123,15 +123,29 @@ function lastUpdate(file) {
   }
 }
 
-// Loads everything when nothing has been loaded yet. onState({ gameData: 'filling' | 'filled' | 'partial' }) for the
-// window. Returns the load's result, or null when there was nothing to do.
+// The tables (of `tables`) the file doesn't have yet.
+function missingTables(file, tables = gameData.TABLES) {
+  if (!fs.existsSync(file)) return tables;
+  const db = open(file);
+  try {
+    const have = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name));
+    return tables.filter((t) => !have.has(t.table));
+  } finally {
+    db.close();
+  }
+}
+
+// Loads everything when nothing has been loaded yet, and any table an earlier load couldn't get (a dropped connection
+// the first time), so a page that needs it isn't left waiting for Settings → Data. onState({ gameData: 'filling' |
+// 'filled' | 'partial' }) for the window. Returns the load's result, or null when there was nothing to do.
 async function fillIfEmpty(file, { onState = () => {}, ...options } = {}) {
-  if (lastUpdate(file)) return null;
+  const missing = lastUpdate(file) ? missingTables(file, options.tables || gameData.TABLES) : null;
+  if (missing && !missing.length) return null;
   onState({ gameData: 'filling' });
-  const result = await loadAll(file, options);
+  const result = await loadAll(file, missing ? { ...options, tables: missing } : options);
   if (result.failed.length) console.error('Game data: some tables could not be filled:', result.failed.map((f) => `${f.table}: ${f.reason}`).join('; '));
   onState({ gameData: result.failed.length ? 'partial' : 'filled' });
   return result;
 }
 
-module.exports = { loadAll, loadTable, lastUpdate, fillIfEmpty, columnsFor };
+module.exports = { loadAll, loadTable, lastUpdate, fillIfEmpty, columnsFor, missingTables };

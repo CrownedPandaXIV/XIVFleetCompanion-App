@@ -18,6 +18,8 @@ const stamp = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDat
 function scrub(text) {
   return text
     .replace(/(password|PGPASSWORD)(["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;}]+)/gi, '$1$2***')
+    // SQL's own form: CREATE/ALTER ROLE ... PASSWORD 'secret'.
+    .replace(/(\bPASSWORD\s+)'(?:[^']|'')*'/gi, "$1'***'")
     .replace(/(postgres(?:ql)?:\/\/[^:\s/]+:)[^@\s]+@/gi, '$1***@');
 }
 

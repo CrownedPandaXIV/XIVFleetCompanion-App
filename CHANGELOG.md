@@ -38,6 +38,19 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
   daylight-saving change.
 - A house warning now says "the game can demolish it in 3 more days" instead of "demolished after 3 more".
 - Database updates wait at most 10 seconds for a table another PC is using, then try again later.
+- **Just this PC: the app no longer freezes while a game is writing the fleet file.** It waited up to 15 seconds
+  with every window stuck; now it waits a moment at a time, staying responsive.
+- **Just this PC: while the game data is first downloading, pages say so** instead of showing an SQL error, and
+  tables a first download missed are fetched again by themselves.
+- Trends charts show connection problems in plain words, and follow a moved database, as every other page does.
+- A saved connection that can't be read on this PC (copied from another PC) says to enter it again, instead of a
+  technical error on every page.
+- Settings only reuses the saved password for the address it was saved for, and checks the address, port, name and
+  username before saving.
+- Safety: the window can't be replaced by a dropped file or a link, a database password in SQL never reaches the log,
+  and a spreadsheet export also guards cells starting with a tab or line break.
+- Another PC updating the database makes pages say so after a minute, instead of waiting forever.
+- Game data tables loaded by hand with number columns can now be updated.
 
 ## 1.10.6 - 2026-11-20
 

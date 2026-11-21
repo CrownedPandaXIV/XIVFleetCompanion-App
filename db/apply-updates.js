@@ -129,7 +129,21 @@ async function ensureDatabase(client, { appVersion, user, updatesDir, viewsFile,
   const latest = Math.max(BASELINE, ...updates.map((u) => u.version));
   const result = { version: null, latest, created: false, applied: [], tracked: true, newer: false };
 
-  await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
+  // Another PC updating the database holds this: waited for at most a minute (rather than leaving every page on
+  // "Loading..." behind a PC that's stuck), then said plainly and tried again at the next page load.
+  await client.query("SET lock_timeout = '60s'");
+  try {
+    await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
+  } catch (err) {
+    if (err.code === '55P03') {
+      const busy = new Error('Another PC is updating the database right now. Try again in a minute.');
+      busy.code = err.code;
+      throw busy;
+    }
+    throw err;
+  } finally {
+    await client.query('RESET lock_timeout').catch(() => {});
+  }
   try {
     let version = null;
     let tracked = (await client.query(`SELECT to_regclass('companion_schema_version') IS NOT NULL AS t`)).rows[0].t;

@@ -11,6 +11,8 @@ test('cells are quoted only when needed, and formulas are not run by a spreadshe
   assert.strictEqual(csvCell('-1,234'), '"-1,234"', 'a negative number stays a number');
   assert.strictEqual(csvCell('+5%'), '+5%');
   assert.strictEqual(csvCell(null), '');
+  assert.strictEqual(csvCell('\t=1+1'), "'\t=1+1", 'a tab before a formula is made text too');
+  assert.strictEqual(csvCell('\r=1+1'), '"\'\r=1+1"');
 });
 
 test('a table becomes CSV with a UTF-8 marker and Windows line ends', () => {

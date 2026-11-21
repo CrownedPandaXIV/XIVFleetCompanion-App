@@ -1,6 +1,6 @@
 // Trend charts and the extra table columns: what can be charted or added, and their values.
 const { ipcMain } = require('electron');
-const { withClient, snapshotFragments, openClient, fleetLocation } = require('../db');
+const { withClient, snapshotFragments, openClient, fleetLocation, plainError } = require('../db');
 const metricSeries = require('../db/metric-series');
 const columnCatalog = require('../shared/column-catalog');
 const { SALVAGE_PRICES } = require('./inventory');
@@ -111,6 +111,11 @@ ipcMain.handle('get-metric-series', async (event, request) => {
     params.to = new Date(Math.ceil(params.to.getTime() / 60000) * 60000);
   }
 
+  // As every page: the database brought up to date, a moved database followed, and a connection problem said in
+  // plain words (with the connection banner told), before the series' own connections.
+  const ready = await withClient(async () => null, (err) => ({ success: false, error: err.message }));
+  if (ready && ready.success === false) return ready;
+
   const key = JSON.stringify([fleetLocation(), params.from, params.to, params.points, params.metrics, params.subjectTypes, params.weights, params.subjectIds]);
   const newest = await newestRecorded();
   const hit = seriesCache.get(key);
@@ -122,6 +127,7 @@ ipcMain.handle('get-metric-series', async (event, request) => {
     if (seriesCache.size > SERIES_CACHE_MAX) seriesCache.delete(seriesCache.keys().next().value);
     return value;
   } catch (err) {
-    return { success: false, error: err.message };
+    console.error('Trends:', err.message);
+    return { success: false, error: plainError(err) };
   }
 });

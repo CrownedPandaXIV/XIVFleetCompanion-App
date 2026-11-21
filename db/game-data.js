@@ -188,7 +188,8 @@ const cellValue = (value, emptyStyle) => (value === '' || value === undefined ? 
 // True when the table already holds exactly the file's rows (same values, same order).
 async function tableMatchesFile(client, plan, rows, emptyStyle) {
   if (plan.added.length || plan.renames.length || plan.rowsBefore !== rows.length) return false;
-  const cols = plan.matches.map((m) => quoteIdent(m.column)).join(', ');
+  // As text, as the file has them (a table loaded by hand may have typed columns).
+  const cols = plan.matches.map((m) => `${quoteIdent(m.column)}::text AS ${quoteIdent(m.column)}`).join(', ');
   const idPos = plan.matches.findIndex((m) => normalizeKey(m.column) === 'id');
   const result = await client.query(`SELECT ${cols} FROM ${quoteIdent(plan.table)}`);
   const existing = new Map();
@@ -255,9 +256,19 @@ async function applyTable(client, plan, rows) {
       await client.query(`ALTER TABLE ${quoteIdent(plan.table)} ADD COLUMN ${quoteIdent(a.column)} text`);
     }
     await client.query(`TRUNCATE ${quoteIdent(plan.table)}`);
+    // Each value as its column's type: a table loaded by hand may have typed columns (an empty cell is then NULL).
+    const { rows: typed } = await client.query(
+      `SELECT attname AS column_name, format_type(atttypid, atttypmod) AS type FROM pg_attribute
+       WHERE attrelid = to_regclass($1) AND attnum > 0 AND NOT attisdropped`, [quoteIdent(plan.table)]);
+    const typeOf = new Map(typed.map((t) => [t.column_name, t.type]));
     const columnList = targets.map((t) => quoteIdent(t.column)).join(', ');
     const unnestArgs = targets.map((_, i) => `$${i + 1}::text[]`).join(', ');
-    const insert = `INSERT INTO ${quoteIdent(plan.table)} (${columnList}) SELECT * FROM unnest(${unnestArgs})`;
+    const values = targets.map((t, i) => {
+      const type = typeOf.get(t.column) || 'text';
+      return type === 'text' ? `v${i}` : `NULLIF(v${i}, '')::${type}`;
+    }).join(', ');
+    const names = targets.map((_, i) => `v${i}`).join(', ');
+    const insert = `INSERT INTO ${quoteIdent(plan.table)} (${columnList}) SELECT ${values} FROM unnest(${unnestArgs}) AS u(${names})`;
     for (let start = 0; start < rows.length; start += INSERT_BATCH_ROWS) {
       const batch = rows.slice(start, start + INSERT_BATCH_ROWS);
       const params = targets.map((t) => batch.map((row) => cellValue(row[t.index], plan.emptyStyle)));

@@ -22,6 +22,8 @@ test('a password never reaches the log, however it is printed', () => {
     ["{ password: 'hunter2' }", '{ password: *** }'],
     ['PGPASSWORD=secret pg_dump', 'PGPASSWORD=*** pg_dump'],
     ['postgresql://fleet:s3cret@100.64.0.1:5432/db', 'postgresql://fleet:***@100.64.0.1:5432/db'],
+    ["CREATE ROLE fleet LOGIN PASSWORD 'it''s secret'", "CREATE ROLE fleet LOGIN PASSWORD '***'"],
+    ["ALTER ROLE fleet password 'x'", "ALTER ROLE fleet password '***'"],
   ]) assert.strictEqual(scrub(input), expected);
   assert.strictEqual(scrub('The database moved to 100.64.0.1:5432'), 'The database moved to 100.64.0.1:5432');
   assert.ok(!formatLine('info', [{ host: 'h', password: 'hunter2' }], AT).includes('hunter2'));
