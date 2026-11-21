@@ -13,6 +13,49 @@ function PlannerPill({ sure, children }) {
   return <span className={`planner-pill ${tone}`}>{children}</span>;
 }
 
+// The "What this build reaches" table's columns. A sector without XIVStats data says so in its Loot tier cell.
+const plannerNoData = (s) => !s.hasData;
+const plannerDash = <span className="dim">—</span>;
+const PLANNER_REACH_DEFS = [
+  { key: 'sector', label: 'Sector', locked: true, cell: (s) => `${s.letter}: ${s.name}`, sort: (s) => s.letter },
+  { key: 'tier', label: 'Loot tier', cell: (s) => (plannerNoData(s) ? <span className="dim">No XIVStats data for this sector yet.</span> : (
+    <React.Fragment>
+      <PlannerPill sure={s.result.tierSure}>Tier {s.result.tier}</PlannerPill>
+      {s.result.tier < 3 ? <div className="dim">{plannerN(s.result.need.t3)} more surveillance for T3</div>
+        : s.result.tierSure === 'maybe' ? <div className="tone-warn">{plannerN(s.result.need.t3)} more to be sure</div> : null}
+    </React.Fragment>)), sort: (s) => (s.result ? s.result.tier : null) },
+  { key: 'retrieval', label: 'Retrieval', cell: (s) => (plannerNoData(s) ? plannerDash : (
+    <React.Fragment>
+      <PlannerPill sure={s.result.retrieval === 'optimal' ? s.result.retrievalSure : s.result.retrieval === 'normal' ? 'maybe' : 'no'}>
+        {s.result.retrieval[0].toUpperCase() + s.result.retrieval.slice(1)}</PlannerPill>
+      {s.result.retrieval !== 'optimal' || s.result.retrievalSure === 'maybe'
+        ? <div className="dim">{plannerN(s.result.need.optimal)} more retrieval for optimal</div> : null}
+    </React.Fragment>)), sort: (s) => (s.result ? ['poor', 'normal', 'optimal'].indexOf(s.result.retrieval) : null) },
+  { key: 'doubleDip', label: 'Double dip', cell: (s) => (plannerNoData(s) ? plannerDash : (
+    <React.Fragment>
+      <PlannerPill sure={s.result.doubleDip}>{s.result.doubleDip === 'yes' ? 'Yes' : s.result.doubleDip === 'maybe' ? 'Maybe' : 'No'}</PlannerPill>
+      {s.result.doubleDip !== 'yes' && <div className="dim">{plannerN(s.result.need.favor)} more favor</div>}
+    </React.Fragment>)), sort: (s) => (s.result ? ['no', 'maybe', 'yes'].indexOf(s.result.doubleDip) : null) },
+  { key: 'tiers', label: 'T2 / T3 at', td: (s) => <td className="num">{plannerNoData(s) ? plannerDash : `${plannerRange(s.breakpoints[0])} / ${plannerRange(s.breakpoints[1])}`}</td>,
+    sort: (s) => (s.breakpoints ? s.breakpoints[1].high : null) },
+  { key: 'retrievals', label: 'Normal / Optimal at', td: (s) => <td className="num">{plannerNoData(s) ? plannerDash : `${plannerRange(s.breakpoints[2])} / ${plannerRange(s.breakpoints[3])}`}</td>,
+    sort: (s) => (s.breakpoints ? s.breakpoints[3].high : null) },
+  { key: 'favor', label: 'Favor at', td: (s) => <td className="num">{plannerNoData(s) ? plannerDash : plannerRange(s.breakpoints[4])}</td>,
+    sort: (s) => (s.breakpoints ? s.breakpoints[4].high : null) },
+  { key: 'bonus', label: 'Bonus exp', td: (s) => <td className="num" title={`${plannerN(s.exp)} experience before bonuses`}>
+    {plannerNoData(s) ? plannerDash : `${s.bonus.sure > 0 ? `+${s.bonus.sure}% sure, ` : ''}up to +${s.bonus.best}%`}</td>, sort: (s) => (s.bonus ? s.bonus.best : null) },
+];
+
+// The "Possible loot" table's columns.
+const PLANNER_LOOT_DEFS = [
+  { key: 'item', label: 'Item', locked: true, cell: (l) => l.name, sort: (l) => l.name },
+  { key: 'tier', label: 'Tier', cell: (l) => `T${l.tier}`, sort: (l) => l.tier },
+  { key: 'sectors', label: 'Sectors', cell: (l) => l.sectors.join(', ') || '—', sort: (l) => l.sectors.join(',') || null },
+  { key: 'amount', label: 'Amount each time', td: (l) => <td className="num">{l.low === l.high ? l.low : `${l.low}–${l.high}`}</td>, sort: (l) => l.high },
+  { key: 'perVoyage', label: 'Per voyage', td: (l) => <td className="num">{l.perVoyage > 0 ? plannerN(l.perVoyage, 2) : '—'}</td>, sort: (l) => l.perVoyage },
+  { key: 'gil', label: 'Gil per voyage', td: (l) => <td className="num gil">{l.gil > 0 ? plannerN(l.gil) : '—'}</td>, sort: (l) => l.gil },
+];
+
 // Where a sub is: out until a time (the day too when it isn't today), back waiting to be collected, or in port.
 function plannerWhere(returnTime, now = Date.now() / 1000) {
   if (!returnTime) return { text: 'In port', tone: 'dim' };
@@ -135,6 +178,12 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
     window.api.planSubVoyage({ rank, parts, route }).then((r) => { if (current) setPlan(r.success ? r : { error: r.error }); });
     return () => { current = false; };
   }, [base, rank, parts, route]);
+
+  // The two tables, as every page's: resizable columns you can drag to move, click to sort, and the Columns menu.
+  const reachSort = useColumnSort();
+  const reachCols = useTableColumns({ tableKey: 'plannerReach', ownDefs: PLANNER_REACH_DEFS, rows: plan && plan.sectors ? plan.sectors : null, idOf: () => null });
+  const lootSort = useColumnSort();
+  const lootCols = useTableColumns({ tableKey: 'plannerLoot', ownDefs: PLANNER_LOOT_DEFS, rows: plan && plan.loot ? plan.loot : null, idOf: () => null });
 
   // "Open in Planner": load that sub once the page has its subs.
   useEffect(() => {
@@ -283,52 +332,14 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
 
           <div className="account-group">
             <h2>What this build reaches <span className="count">amber: the sources differ, so it might not</span></h2>
-            <table>
-              <thead><tr><th>Sector</th><th>Loot tier</th><th>Retrieval</th><th>Double dip</th>
-                <th className="num">T2 / T3 at</th><th className="num">Normal / Optimal at</th><th className="num">Favor at</th><th className="num">Bonus exp</th></tr></thead>
-              <tbody>
-                {plan.sectors.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.letter}: {s.name}</td>
-                    {!s.hasData ? <td colSpan="7" className="dim">No XIVStats data for this sector yet.</td> : (
-                      <React.Fragment>
-                        <td><PlannerPill sure={s.result.tierSure}>Tier {s.result.tier}</PlannerPill>
-                          {s.result.tier < 3 ? <div className="dim">{plannerN(s.result.need.t3)} more surveillance for T3</div>
-                            : s.result.tierSure === 'maybe' ? <div className="tone-warn">{plannerN(s.result.need.t3)} more to be sure</div> : null}</td>
-                        <td><PlannerPill sure={s.result.retrieval === 'optimal' ? s.result.retrievalSure : s.result.retrieval === 'normal' ? 'maybe' : 'no'}>
-                          {s.result.retrieval[0].toUpperCase() + s.result.retrieval.slice(1)}</PlannerPill>
-                          {s.result.retrieval !== 'optimal' || s.result.retrievalSure === 'maybe'
-                            ? <div className="dim">{plannerN(s.result.need.optimal)} more retrieval for optimal</div> : null}</td>
-                        <td><PlannerPill sure={s.result.doubleDip}>{s.result.doubleDip === 'yes' ? 'Yes' : s.result.doubleDip === 'maybe' ? 'Maybe' : 'No'}</PlannerPill>
-                          {s.result.doubleDip !== 'yes' && <div className="dim">{plannerN(s.result.need.favor)} more favor</div>}</td>
-                        <td className="num">{plannerRange(s.breakpoints[0])} / {plannerRange(s.breakpoints[1])}</td>
-                        <td className="num">{plannerRange(s.breakpoints[2])} / {plannerRange(s.breakpoints[3])}</td>
-                        <td className="num">{plannerRange(s.breakpoints[4])}</td>
-                        <td className="num" title={`${plannerN(s.exp)} experience before bonuses`}>
-                          {s.bonus.sure > 0 ? `+${s.bonus.sure}% sure, ` : ''}up to +{s.bonus.best}%</td>
-                      </React.Fragment>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="controls"><ColumnPicker cols={reachCols} /></div>
+            <ColumnTable cols={reachCols} sort={reachSort} rows={reachCols.rows} rowKey={(s) => s.id} />
           </div>
 
           <div className="account-group">
             <h2>Possible loot <span className="count">greyed: tiers this build can't count on</span></h2>
-            <table>
-              <thead><tr><th>Item</th><th>Tier</th><th>Sectors</th><th className="num">Amount each time</th><th className="num">Per voyage</th><th className="num">Gil per voyage</th></tr></thead>
-              <tbody>
-                {plan.loot.map((l) => (
-                  <tr key={l.itemId} className={l.perVoyage > 0 ? '' : 'dim'}>
-                    <td>{l.name}</td><td>T{l.tier}</td><td>{l.sectors.join(', ') || '—'}</td>
-                    <td className="num">{l.low === l.high ? l.low : `${l.low}–${l.high}`}</td>
-                    <td className="num">{l.perVoyage > 0 ? plannerN(l.perVoyage, 2) : '—'}</td>
-                    <td className="num gil">{l.gil > 0 ? plannerN(l.gil) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="controls"><ColumnPicker cols={lootCols} /></div>
+            <ColumnTable cols={lootCols} sort={lootSort} rows={lootCols.rows} rowKey={(l) => l.itemId} rowClassName={(l) => (l.perVoyage > 0 ? '' : 'dim')} />
           </div>
         </React.Fragment>
       )}

@@ -72,6 +72,17 @@ module.exports = async (t) => {
       default: ['fc', 'tab', 'item', 'quantity'],
       move: ['quantity', 'fc'], remove: 'Tab',
     },
+    {
+      // The Planner's first table (What this build reaches), once a synced sub is loaded from the sub picker.
+      name: 'Planner (what this build reaches)', nav: 'Planner', prepare: async () => {
+        await waitFor(`document.querySelector('.planner-picker-button') && !document.querySelector('.planner-picker-button').disabled`, 'the sub picker', 20000);
+        await ev(`document.querySelector('.planner-picker-button').click()`);
+        await waitFor(`document.querySelectorAll('.planner-picker-sub').length > 0`, 'the subs to choose', 10000);
+        await ev(`document.querySelector('.planner-picker-sub').click()`);
+      },
+      default: ['sector', 'loot tier', 'retrieval', 'double dip', 't2 / t3 at', 'normal / optimal at', 'favor at', 'bonus exp'],
+      move: ['bonus exp', 'retrieval'], remove: 'Favor at',
+    },
   ];
 
   const open = async (spec) => {

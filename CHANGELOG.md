@@ -16,6 +16,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     Pepper's guide disagree, and how much more of a stat it needs;
   - the loot it can bring back, gil per voyage and per day, experience per day, and repair kits a day (parts' wear
     as Submarine Tracker predicts it).
+  Its two tables work like every other page's: columns to size, move, sort and choose.
   - bonus experience as Pepper's guide gives it: what the build is sure of (optimal retrieval's +25%) and the most
     luck can add (T2/T3 loot, HQ materials, a double dip; up to +100% a sector).
 - **Choosing one of your subs on the Planner.** The dropdown is replaced by a panel grouped by account, then
