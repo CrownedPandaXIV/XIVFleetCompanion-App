@@ -483,6 +483,22 @@
     .planner-facts b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
     .planner-pill { font-weight: 600; }
     .planner-foot { padding: 4px 24px 24px; font-size: 12px; }
+    .planner .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; }
+    .planner-picker { display: inline-block; }
+    .planner-picker-button { min-width: 260px; text-align: left; }
+    .planner-picker-note { font-size: 12px; }
+    .planner-picker-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 24px; width: min(760px, calc(100% - 48px)); background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px; box-sizing: border-box; }
+    .planner-picker-panel input[type=search] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+    .planner-picker-list { max-height: 60vh; overflow-y: auto; }
+    .planner-picker-empty { padding: 8px; }
+    .planner-picker-list button { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 6px; border-radius: 4px; font: inherit; }
+    .planner-picker-list button:hover { background: var(--hover); }
+    .planner-picker-account { font-weight: 600; margin-top: 4px; }
+    .planner-picker-character { padding-left: 14px; }
+    .planner-picker-character-name { font-weight: 500; }
+    .planner-picker-list button.planner-picker-sub { display: grid; grid-template-columns: 1.3fr 0.6fr 0.6fr 1fr 1.4fr; gap: 8px; padding-left: 22px; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .planner-picker-list button.planner-picker-sub.chosen { outline: 1px solid var(--link); }
+    .planner-picker-sub-name { font-weight: 500; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }

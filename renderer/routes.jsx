@@ -46,11 +46,14 @@ const ROUTE_OPT_COLUMN_DEFS = [
   { key: 'targetGilDay', label: 'Target gil/day', cell: (r) => <GilDay value={r.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   // Green for more gil a day, red for less (as the plugin).
   { key: 'gain', label: 'Gil/day gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
-    : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain > 0 ? '+' : r.gain < 0 ? '−' : ''}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain }
+    : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain > 0 ? '+' : r.gain < 0 ? '−' : ''}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain },
+  { key: 'planner', label: 'Planner', cell: (r, ctx) => (ctx && ctx.onOpenPlanner
+    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(r.cid, r.sub_name)} title="Open this sub's build and route in Sub Calculator → Planner.">Open in Planner</button>
+    : null) }
 ];
 const ROUTE_OPT_DUPLICATE_EXTRAS = ['x_world'];
 
-function RouteOptimizationView({ refreshKey }) {
+function RouteOptimizationView({ refreshKey, onOpenPlanner }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
@@ -89,7 +92,7 @@ function RouteOptimizationView({ refreshKey }) {
       </thead>
       <tbody>
         {rowsToShow.map((r) => (
-          <tr key={`${r.cid}-${r.sub_name}`}><ColumnBodyCells cols={routeOptCols} row={r} /></tr>
+          <tr key={`${r.cid}-${r.sub_name}`}><ColumnBodyCells cols={routeOptCols} row={r} ctx={{ onOpenPlanner }} /></tr>
         ))}
       </tbody>
     </table>

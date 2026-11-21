@@ -62,10 +62,18 @@ async function loadCalculator(client) {
   const [names, prices, repairKitCost] = await Promise.all([itemNames(client, itemIds), itemPrices(client, itemIds), repairKitCostFrom(client)]);
   cache = { game, data, names, prices, repairKitCost };
 
+  // The player's subs for the sub picker: who has them (account, character, world, Free Company), their build,
+  // route and whether they are out (return_time), in the roster's order.
   let subs = [];
   try {
+    const fcNames = new Map();
+    try {
+      for (const r of (await client.query('SELECT cid, fc_name FROM companion_character_housing')).rows) if (r.fc_name) fcNames.set(String(r.cid), r.fc_name);
+    } catch { /* no Free Company names: the picker searches without them */ }
     subs = (await loadSubmarines(client)).map((s) => ({
-      label: `${s.sub_name} (${s.character_name || 'unknown'})`, rank: s.rank, parts: s.part_letters,
+      cid: String(s.cid), subName: s.sub_name, character: s.character_name || 'Unknown character', world: s.world || '',
+      account: s.account_label || '', fc: fcNames.get(String(s.cid)) || '', sortIndex: s.sort_index ?? null,
+      rank: s.rank, parts: s.part_letters, routeText: s.current_route || '', returnTime: Number(s.return_time) || 0,
       route: Array.from(s.points || []).filter((b) => b > 0),
     })).filter((s) => s.parts.every((p) => CLASS_OF[p]));
   } catch { /* no subs yet: the page still works from scratch */ }

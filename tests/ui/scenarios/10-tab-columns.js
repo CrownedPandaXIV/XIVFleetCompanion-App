@@ -31,7 +31,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Subs', nav: 'Subs',
-      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'fight club builds'],
+      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'planner', 'fight club builds'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
@@ -54,7 +54,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Route Optimization', nav: 'Route Optimization',
-      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain'],
+      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain', 'planner'],
       move: ['gil/day gain', 'sub'], remove: 'Sub', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
     },
     {

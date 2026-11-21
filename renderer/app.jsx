@@ -428,6 +428,9 @@ function App() {
     }).catch(() => {});
   }, []);
   const [trendsPreset, setTrendsPreset] = useState(null);
+  // "Open in Planner" on the Subs and Route Optimization pages: the sub to load, then the Planner page.
+  const [plannerSub, setPlannerSub] = useState(null);
+  const openInPlanner = (cid, subName) => { setPlannerSub({ cid, subName, at: Date.now() }); setCurrentView('planner'); };
   const [trendDetail, setTrendDetail] = useState(null);
 
   // Chart icons and cards elsewhere ask for a detail panel or the Trends page by event.
@@ -700,14 +703,14 @@ function App() {
           </div>
         )}
 
-        {currentView === 'subs' && <SubmarinesView refreshKey={refreshKey} />}
+        {currentView === 'subs' && <SubmarinesView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}
 
         {currentView === 'parts' && <PartsView refreshKey={refreshKey} />}
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
-        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} />}
+        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} />}
 
-        {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} />}
+        {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}
 
         {currentView === 'summary' && <SummaryView uses={playStyle.uses} onNavigate={setCurrentView} onOpenTrend={(metric) => { setTrendsPreset({ metric, at: Date.now() }); setCurrentView('trends'); }} refreshKey={refreshKey} onOpenSettings={() => setShowSettings('general')} />}
 

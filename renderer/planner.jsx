@@ -13,7 +13,103 @@ function PlannerPill({ sure, children }) {
   return <span className={`planner-pill ${tone}`}>{children}</span>;
 }
 
-function PlannerView({ refreshKey }) {
+// Where a sub is: out until a time (the day too when it isn't today), back waiting to be collected, or in port.
+function plannerWhere(returnTime, now = Date.now() / 1000) {
+  if (!returnTime) return { text: 'In port', tone: 'dim' };
+  if (returnTime <= now) return { text: 'Back, waiting', tone: 'tone-good' };
+  const at = new Date(returnTime * 1000);
+  const sameDay = at.toDateString() === new Date(now * 1000).toDateString();
+  const time = at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return { text: `At sea until ${sameDay ? time : `${at.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`}`, tone: '' };
+}
+
+// Choosing one of your subs: a panel grouped by account, then character (world, Free Company), each group folding
+// away, with a search across character, world, account, Free Company and sub name. Each row: rank, build, route and
+// where the sub is now.
+function PlannerSubPicker({ subs, chosen, onChoose }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [folded, setFolded] = useState(() => new Set());
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = subs.filter((s) => {
+    const hay = `${s.subName} ${s.character} ${s.world} ${s.account} ${s.fc}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+  // Accounts in name order (no label last), characters as the roster orders them.
+  const accounts = [];
+  for (const s of shown) {
+    const account = s.account || 'No account label';
+    let a = accounts.find((x) => x.name === account);
+    if (!a) accounts.push(a = { name: account, characters: [] });
+    let c = a.characters.find((x) => x.cid === s.cid);
+    if (!c) a.characters.push(c = { cid: s.cid, name: s.character, world: s.world, fc: s.fc, subs: [] });
+    c.subs.push(s);
+  }
+  accounts.sort((a, b) => (a.name === 'No account label') - (b.name === 'No account label') || a.name.localeCompare(b.name));
+  const toggle = (key) => setFolded((f) => { const n = new Set(f); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const isFolded = (key) => !words.length && folded.has(key);
+  const now = Date.now() / 1000;
+
+  return (
+    <div className="planner-picker" ref={box}>
+      <button type="button" className="planner-picker-button" onClick={() => setOpen(!open)} disabled={!subs.length}>
+        {!subs.length ? 'No subs synced yet' : chosen ? `${chosen.subName} · ${chosen.character}` : 'Choose one of your subs…'}
+        <span className="dim"> ▾</span>
+      </button>
+      {open && (
+        <div className="planner-picker-panel">
+          <input type="search" autoFocus placeholder="Search character, world, account, FC or sub" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="planner-picker-list">
+            {!shown.length && <div className="dim planner-picker-empty">No sub matches “{search}”.</div>}
+            {accounts.map((a) => (
+              <div key={a.name}>
+                <button type="button" className="planner-picker-account" onClick={() => toggle(`a|${a.name}`)}>
+                  {isFolded(`a|${a.name}`) ? '▸' : '▾'} {a.name} <span className="dim">({a.characters.reduce((n, c) => n + c.subs.length, 0)})</span>
+                </button>
+                {!isFolded(`a|${a.name}`) && a.characters.map((c) => (
+                  <div key={c.cid} className="planner-picker-character">
+                    <button type="button" className="planner-picker-character-name" onClick={() => toggle(`c|${c.cid}`)}>
+                      {isFolded(`c|${c.cid}`) ? '▸' : '▾'} {c.name}{c.world ? <span className="dim"> ({c.world})</span> : null}
+                      {c.fc ? <span className="dim"> · {c.fc}</span> : null}
+                    </button>
+                    {!isFolded(`c|${c.cid}`) && c.subs.map((s) => {
+                      const where = plannerWhere(s.returnTime, now);
+                      const isChosen = chosen && chosen.cid === s.cid && chosen.subName === s.subName;
+                      return (
+                        <button type="button" key={s.subName} className={`planner-picker-sub${isChosen ? ' chosen' : ''}`}
+                          onClick={() => { onChoose(s); setOpen(false); }}>
+                          <span className="planner-picker-sub-name">{s.subName}</span>
+                          <span>Rank {s.rank}</span>
+                          <span>{s.parts.join('')}</span>
+                          <span>{s.routeText || <span className="dim">no route</span>}</span>
+                          <span className={where.tone}>{where.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// openSub: { cid, subName, at } from "Open in Planner" on the Subs or Route Optimization page; loaded once, then
+// onOpenSubUsed clears it.
+function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   const [base, setBase] = useState(null);
   const [error, setError] = useState(null);
   const [rank, setRank] = useState(100);
@@ -22,6 +118,7 @@ function PlannerView({ refreshKey }) {
   const [route, setRoute] = useState([]);
   const [adding, setAdding] = useState('');
   const [plan, setPlan] = useState(null);
+  const [chosen, setChosen] = useState(null);
 
   useEffect(() => {
     window.api.getSubCalculator().then((r) => {
@@ -39,6 +136,21 @@ function PlannerView({ refreshKey }) {
     return () => { current = false; };
   }, [base, rank, parts, route]);
 
+  // "Open in Planner": load that sub once the page has its subs.
+  useEffect(() => {
+    if (!openSub || !base || !base.subs) return;
+    const s = base.subs.find((x) => x.cid === String(openSub.cid) && x.subName === openSub.subName);
+    if (s) {
+      setChosen(s);
+      setRank(s.rank);
+      setParts(s.parts);
+      setRoute(s.route.slice(0, 5));
+      const first = base.sectors.find((x) => x.id === s.route[0]);
+      if (first) setMapId(first.map);
+    }
+    if (onOpenSubUsed) onOpenSubUsed();
+  }, [openSub, base]);
+
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
   if (!base) return <div className="status">Loading...</div>;
   if (base.missingGameData) {
@@ -51,9 +163,9 @@ function PlannerView({ refreshKey }) {
   const over = stats && plan.range !== null && plan.range > stats.range;
   const tooHigh = route.map((id) => sectorOf.get(id)).filter((s) => s && s.rankReq > rank);
 
-  const loadSub = (i) => {
-    const s = base.subs[Number(i)];
+  const loadSub = (s) => {
     if (!s) return;
+    setChosen(s);
     setRank(s.rank);
     setParts(s.parts);
     setRoute(s.route.slice(0, 5));
@@ -69,12 +181,9 @@ function PlannerView({ refreshKey }) {
   return (
     <div className="planner">
       <div className="controls">
-        <label>Load from my sub{' '}
-          <select value="" onChange={(e) => loadSub(e.target.value)} disabled={!base.subs.length}>
-            <option value="">{base.subs.length ? 'Choose a sub…' : 'No subs synced yet'}</option>
-            {base.subs.map((s, i) => <option key={i} value={i}>{s.label}, rank {s.rank}</option>)}
-          </select>
-        </label>
+        <label>Start from one of your subs</label>{' '}
+        <PlannerSubPicker subs={base.subs} chosen={chosen} onChoose={loadSub} />
+        {chosen && <span className="dim planner-picker-note">Change anything below to try other builds; your sub isn't changed.</span>}
       </div>
 
       <div className="planner-row">

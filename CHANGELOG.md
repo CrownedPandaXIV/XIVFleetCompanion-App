@@ -18,6 +18,11 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     as Submarine Tracker predicts it).
   - bonus experience as Pepper's guide gives it: what the build is sure of (optimal retrieval's +25%) and the most
     luck can add (T2/T3 loot, HQ materials, a double dip; up to +100% a sector).
+- **Choosing one of your subs on the Planner.** The dropdown is replaced by a panel grouped by account, then
+  character (with world and Free Company), each group folding away, with a search for character, world, account,
+  Free Company or sub name. Each sub shows its rank, build, route and where it is: at sea until a time, back and
+  waiting, or in port.
+- **Open in Planner** on each row of the Subs and Route Optimization pages loads that sub on the Planner.
 - **The repair kit price is set on the Supplies page**, beside what to buy, instead of in Settings.
 - **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
   retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
