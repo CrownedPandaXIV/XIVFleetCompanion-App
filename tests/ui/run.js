@@ -33,6 +33,22 @@ function startApp(profile, extraEnv = {}) {
   return child;
 }
 
+// Closes the app and waits until it has gone and its debugging port is free, so the next scenario can't connect to
+// this one's window.
+async function stopApp(child) {
+  const gone = new Promise((r) => (child.exitCode !== null || child.signalCode !== null ? r() : child.once('exit', r)));
+  child.kill();
+  const late = setTimeout(() => child.kill('SIGKILL'), 10000);
+  await gone;
+  clearTimeout(late);
+  const portInUse = () => new Promise((r) => {
+    const s = require('net').connect(PORT, '127.0.0.1');
+    s.once('connect', () => { s.destroy(); r(true); });
+    s.once('error', () => r(false));
+  });
+  for (let i = 0; i < 100 && await portInUse(); i++) await new Promise((r) => setTimeout(r, 100));
+}
+
 // The scratch database is made by db/schema.sql plus the fixtures, which add back the old snapshot table that
 // plugins before 0.4.0 wrote (scenarios 12 and 13 read it). With that table there and no version recorded, the app
 // won't update the database and shows a banner. A real database at this layout has its version recorded, so record
@@ -80,10 +96,9 @@ async function recordDatabaseVersion() {
       failed++;
     } finally {
       try { t && t.close(); } catch (e) { /* ignore */ }
-      if (app) app.kill();
+      if (app) await stopApp(app);
       try { await withDb(scenario.after); } catch (e) { console.log('CLEANUP ERROR:', e.message); failed++; }
       try { if (scenario.teardown) await scenario.teardown(); } catch (e) { console.log('CLEANUP ERROR:', e.message); failed++; }
-      await new Promise((r) => setTimeout(r, 1000));
     }
   }
   console.log(failed ? `\n${failed} scenario(s) FAILED` : '\nALL UI SCENARIOS PASSED');

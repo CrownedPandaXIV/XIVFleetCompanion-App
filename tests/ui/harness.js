@@ -30,13 +30,19 @@ async function connect(port, shotDir) {
   const ev = async (expression) => {
     const r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'evaluation failed');
+    if (!r.result) throw new Error('the page gave no answer (it was reloading)');
     return r.result.value;
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Asks again until true. A page that is reloading can't answer for a moment: that counts as not yet.
   const waitFor = async (expr, label, ms = 30000) => {
     const start = Date.now();
-    while (Date.now() - start < ms) { if (await ev(expr)) return Date.now() - start; await sleep(150); }
-    throw new Error('timed out waiting for ' + label);
+    let last = null;
+    while (Date.now() - start < ms) {
+      try { if (await ev(expr)) return Date.now() - start; last = null; } catch (e) { last = e; }
+      await sleep(150);
+    }
+    throw new Error('timed out waiting for ' + label + (last ? ` (${last.message})` : ''));
   };
   const shot = async (name) => {
     if (!shotDir) return;
@@ -51,13 +57,20 @@ async function connect(port, shotDir) {
     if (!cond) failures.push(msg);
   };
   const clickText = (sel, text) => ev(`(() => { const b=[...document.querySelectorAll(${JSON.stringify(sel)})].find(x=>x.innerText.trim()===${JSON.stringify(text)}); if(!b) throw new Error('no ' + ${JSON.stringify(text)}); b.click(); return true; })()`);
-  const nav = (label) => clickText('.sidebar-button', label);
+  // Opens a page and waits (up to 15 s) until it has nothing left saying "Loading...", so a check after it doesn't
+  // look at a page still loading on a slow machine. A page that stays loading is for the scenario's checks to find.
+  const settled = async (ms = 15000) => {
+    const start = Date.now();
+    await sleep(100);
+    while (Date.now() - start < ms && await ev(`[...document.querySelectorAll('.status')].some((e) => /Loading/.test(e.innerText))`)) await sleep(150);
+  };
+  const nav = async (label) => { await clickText('.sidebar-button', label); await settled(); return true; };
   const setSelect = (label, value) => ev(`(() => { const f=[...document.querySelectorAll('.trend-field')].find(x=>x.innerText.startsWith(${JSON.stringify(label)})); const s=f.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(s, ${JSON.stringify(value)}); s.dispatchEvent(new Event('change',{bubbles:true})); return s.value; })()`);
   const chartReady = () => waitFor(`!!document.querySelector('.trend-chart-wrap canvas') && document.querySelector('.trend-chart-wrap').style.opacity==='1'`, 'the chart');
 
   await call('Runtime.enable');
   await call('Page.enable');
-  return { call, ev, sleep, waitFor, shot, check, clickText, nav, setSelect, chartReady, errors, failures, close: () => ws.close() };
+  return { call, ev, sleep, waitFor, settled, shot, check, clickText, nav, setSelect, chartReady, errors, failures, close: () => ws.close() };
 }
 
 module.exports = { connect };

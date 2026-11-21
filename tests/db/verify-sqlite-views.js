@@ -77,7 +77,9 @@ function plain(v) {
   if (typeof v === 'string' && /^-?\d+\.\d+$/.test(v)) return Number(v);
   return v;
 }
+// Whole numbers exactly (gil, counts); only fractions (and times, as seconds with milliseconds) to a millionth.
 const same = (a, b) => {
+  if (Number.isInteger(a) && Number.isInteger(b)) return a === b;
   if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
   return a === b;
 };

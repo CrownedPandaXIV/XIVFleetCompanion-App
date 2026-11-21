@@ -108,7 +108,15 @@ function differences(a, b, at = '', out = []) {
   }
   const [na, nb] = [num(a), num(b)];
   if (na !== null && nb !== null) {
+    // Whole numbers exactly: a character, retainer or Free Company id is above 2^53, where Number() can't tell
+    // neighbours apart, so ids given as text are compared as text. Only fractions may differ a little.
+    const whole = (x) => (typeof x === 'string' ? /^-?\d+$/.test(x) : Number.isInteger(x));
     if (typeof a !== typeof b) out.push(`${at}: PostgreSQL ${JSON.stringify(a)} (${typeof a}), file ${JSON.stringify(b)} (${typeof b})`);
+    else if (whole(a) && whole(b)) {
+      // A time in milliseconds (in a field named as a time) may be a millisecond out: the file keeps seconds as a fraction.
+      const time = /(_at|At|time|Time|_ms|Ms|seen|Seen|date|Date|until|Until)\w*$/.test(at) && Math.abs(na) > 1e12 && Math.abs(na - nb) <= 1000;
+      if (!time && (typeof a === 'string' ? BigInt(a) !== BigInt(b) : a !== b)) out.push(`${at}: PostgreSQL ${a}, file ${b}`);
+    }
     else if (Math.abs(na - nb) > 1e-5 * Math.max(1, Math.abs(na))) out.push(`${at}: PostgreSQL ${a}, file ${b}`);
     return out;
   }
@@ -302,6 +310,14 @@ async function round(name, pg, file) {
 }
 
 (async () => {
+  report('the comparison itself tells ids one apart, and allows only small gaps in fractions', [
+    ...(differences({ cid: '18014498578000001' }, { cid: '18014498578000004' }).length ? [] : ['two cids one apart passed as the same']),
+    ...(differences({ r: '33777097243660301' }, { r: '33777097243000000' }).length ? [] : ['two retainer ids passed as the same']),
+    ...(differences({ n: 1790000000001 }, { n: 1790000000000 }).length ? [] : ['two whole numbers passed as the same']),
+    ...(differences({ f: 2.0000001 }, { f: 2.0000002 }).length ? ['two near fractions counted as different'] : []),
+    ...(differences({ lastAt: 1794685317259 }, { lastAt: 1794685317260 }).length ? ['a time a millisecond out counted as different'] : []),
+    ...(differences({ gil: 1794685317259 }, { gil: 1794685317260 }).length ? [] : ['gil one apart passed as the same']),
+  ]);
   const admin = new Client();
   await admin.connect();
   await admin.query(`DROP DATABASE IF EXISTS ${NAME} WITH (FORCE)`);
