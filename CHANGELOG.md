@@ -100,6 +100,8 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
 - Setup Help points to Settings → Database → Test Connection on the other PC, rather than the Tailscale page.
 - Gil & Market: the note under unsold listings no longer says undercutting isn't checked while Live Market Prices is on.
 - Fight Club Data: merged cells are read right when the sheet doesn't start at A1 (as the plugin now does too).
+- Sub Rules' All tick can be unticked (slot 1 stays ticked), as in the plugin. The PCs page and Roster say "another
+  PC or account" instead of "another game", and the note about PCs that haven't reported reads right for several.
 
 ## 1.10.6 - 2026-11-20
 

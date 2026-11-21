@@ -283,8 +283,9 @@ function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const filterState = parseSubFilterToSlots(local.sub_filter);
 
+  // Unticking All leaves slot 1 ticked (a rule applies to at least one slot), as the plugin.
   function setAll(checked) {
-    if (checked) setLocal({ ...local, sub_filter: '' });
+    setLocal({ ...local, sub_filter: checked ? '' : slotsToSubFilter(false, [1]) });
   }
 
   function setSlot(slotNum, checked) {

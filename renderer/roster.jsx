@@ -33,7 +33,7 @@ const ROSTER_COLUMN_DEFS = [
   { key: 'syncedBy', label: 'Synced by', sort: (r) => syncedBy(r), cell: (row) => syncedBy(row),
     td: (row) => (
       <td className="synced-by" title={row.login_pc
-        ? `Last played in this game ${new Date(row.logged_in_at).toLocaleString()}. Only this game syncs the character; others that have it leave it alone.`
+        ? `Last played ${new Date(row.logged_in_at).toLocaleString()} on the PC or account that syncs it. Only that one syncs the character; others that have it leave it alone.`
         : 'No login recorded yet: every game that has the character syncs it.'}>{syncedBy(row)}</td>
     ) }
 ];

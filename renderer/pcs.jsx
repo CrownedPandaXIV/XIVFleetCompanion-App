@@ -36,9 +36,9 @@ function PcProblemsCell({ problems }) {
 }
 
 // ctx.newest: the newest plugin version any PC runs; ctx.minVersion: the oldest this app works fully with.
-// "12 (2 left out) (3 left to another setup)": the characters a setup synced, those unticked in its settings, and
+// "12 (2 left out) (3 left to another PC or account)": the characters a setup synced, those unticked in its settings, and
 // those it left to the setup they last logged in on (plugin 1.0.2).
-const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another game)` : ''}`;
+const pcCharacters = (p) => `${p.characters_synced ?? '—'}${p.characters_left_out ? ` (${p.characters_left_out} left out)` : ''}${p.characters_elsewhere ? ` (${p.characters_elsewhere} left to another PC or account)` : ''}`;
 
 // Its last sync; a PC that has never synced but reads says so.
 const pcLastSync = (p) => (!p.last_sync_at && p.last_read_at ? `Only reads (seen ${pcAgo(p.last_read_at)})` : pcAgo(p.last_sync_at));
@@ -78,7 +78,7 @@ const PC_COLUMN_DEFS = [
     cell: (p) => pcCharacters(p),
     td: (p) => (
       <td title={p.characters_elsewhere
-        ? `${p.characters_elsewhere} of the characters this game's AutoRetainer has last played in another game, so that game syncs them (the Roster's Synced by column says which).`
+        ? `${p.characters_elsewhere} of the characters its AutoRetainer knows last played on another PC or account, so that one syncs them (the Roster's Synced by column says which).`
         : undefined}>
         {pcCharacters(p)}
       </td>
@@ -187,7 +187,7 @@ function PcsView({ refreshKey }) {
       {data.unreported.length > 0 && (
         <div className="warning pcs-unreported">
           No PC has reported for: {data.unreported.map((a) => `${a.account_label || 'no account label'} (${a.characters} character${a.characters === 1 ? '' : 's'}, last synced ${pcAgo(a.last_synced_at)})`).join(', ')}.
-          Its PC runs a plugin older than 0.10.0.
+          {data.unreported.length === 1 ? 'Its PC runs a plugin older than 0.10.0.' : 'Their PCs run a plugin older than 0.10.0.'}
         </div>
       )}
     </div>
