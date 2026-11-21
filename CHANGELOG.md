@@ -13,6 +13,8 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   come next.
 - **All five sub stats.** Surveillance, retrieval and favor are now worked out from the game data alongside speed
   and range, for the Sub Calculator.
+- **Sub part condition (database update 17).** A new table for the plugin's readings of each sub part's condition,
+  taken in the Free Company's workshop, so the Sub Calculator can later work out how much each voyage wears your parts.
 
 ## 1.11.0 - 2026-11-21
 
