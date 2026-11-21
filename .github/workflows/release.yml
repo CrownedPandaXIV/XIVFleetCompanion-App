@@ -22,7 +22,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The full tests first (test.yml): nothing is tagged or published unless they all pass.
+  tests:
+    uses: ./.github/workflows/test.yml
+
   tag-release:
+    needs: tests
     runs-on: ubuntu-24.04
 
     steps:

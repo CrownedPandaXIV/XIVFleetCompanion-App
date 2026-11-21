@@ -117,10 +117,11 @@ ipcMain.handle('get-retainer-targets', async () => {
     `);
 
     const gearResult = await client.query(`
-      SELECT inv.retainer_id, inv.item_id, i.name AS item_name,
+      SELECT inv.retainer_id, inv.item_id, i.name AS item_name, (inv.item_id >= 1000000 AND inv.item_id < 2000000) AS hq,
              i.level_item, i.level_equip, i.equip_slot_category, cjc.*
       FROM companion_inventory_snapshot inv
-      LEFT JOIN ffxiv_item i ON i.id::text = inv.item_id::text
+      -- A high-quality piece is stored at its id + 1,000,000 (the game's numbering): looked up as the item itself.
+      LEFT JOIN ffxiv_item i ON i.id::text = (CASE WHEN inv.item_id >= 1000000 AND inv.item_id < 2000000 THEN inv.item_id - 1000000 ELSE inv.item_id END)::text
       LEFT JOIN ffxiv_classjobcategory cjc ON cjc.id = i.class_job_category
       WHERE inv.sorted_container = 11000
       ORDER BY inv.retainer_id, inv.sorted_slot_index
@@ -154,7 +155,7 @@ ipcMain.handle('get-retainer-targets', async () => {
         }
 
         const status = computeGearStatus(retainer.job_abbreviation, retainer.target_mode, retainer.target_value, g);
-        return { label, itemName: g.item_name || `Item ${g.item_id}`, levelItem, status };
+        return { label, itemName: `${g.item_name || `Item ${g.item_id}`}${g.hq ? ' (HQ)' : ''}`, levelItem, status };
       });
 
       // If a target is set, show every canonical slot even if nothing's

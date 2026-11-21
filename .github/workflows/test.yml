@@ -1,14 +1,14 @@
 name: Tests
 
-# Runs on every pull request and every change to main.
+# Runs on every pull request, and from release.yml before anything is published (a change to main is tested there).
 #   unit      the fast tests, plus a check that the interface files still build
 #   database  the trend-chart queries against a real Postgres, checked against an independent calculation
 #   ui        the real app, started against a scratch database, clicked through by a script
 #   installer the Windows installer builds (nothing is published here; see release.yml)
 on:
-  push:
-    branches: [ main ]
   pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
