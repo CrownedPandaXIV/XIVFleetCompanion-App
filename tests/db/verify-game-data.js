@@ -49,6 +49,19 @@ async function scenario(name, fn) {
     assert.strictEqual((await g.checkAll(c, opts())).tables[0].status, 'unchanged');
   });
 
+  await scenario('a table loaded by hand with typed columns is compared as text and can be updated', async () => {
+    await reset(`CREATE TABLE gdt_one (id int, name text, ingredient0 int, flag text)`,
+      `INSERT INTO gdt_one VALUES (1,'Alpha',10,'True'),(2,'Beta',NULL,'False'),(3,'Gamma, the third',30,'True')`);
+    FILES.One = CSV;
+    assert.strictEqual((await g.checkAll(c, opts())).tables[0].status, 'unchanged', 'the same numbers count as the same');
+    FILES.One = '#,Name,Ingredient[0],Flag\n1,Alpha,12,True\n2,Beta,,False\n3,"Gamma, the third",30,True\n';
+    const r = await g.checkAll(c, opts());
+    const out = await g.applyAll(c, r);
+    assert.strictEqual(out[0].status, 'updated', JSON.stringify(out[0]));
+    const now = await rows();
+    assert.deepStrictEqual(now.map((x) => x.ingredient0), [12, null, 30]);
+  });
+
   await scenario('a new column in the file is added to the table and filled', async () => {
     await reset(SAME, SAME_ROWS);
     FILES.One = '#,Name,Ingredient[0],Flag,Brand New\n1,Alpha,10,True,x\n2,Beta,,False,y\n3,"Gamma, the third",30,True,z\n';

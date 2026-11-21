@@ -25,6 +25,17 @@ function computeSuboptimalSubs(rows) {
     });
 }
 
+// When no sub is off its Target route: why, so "all on target" isn't said when there was nothing to compare
+// (as the plugin's SubRoutes.NothingToSwitch).
+function routesNothingText(subs) {
+  const from85 = subs.filter((s) => Number(s.rank) >= 85);
+  if (from85.length === 0) return 'No sub is rank 85 yet: Target routes start at rank 85, as in Fight Club.';
+  if (!from85.some((s) => s.target_route)) {
+    return "No sub from rank 85 has a Target route: Fight Club Data isn't imported (Settings → Data → Fight Club Data), or lists nothing for their ranks.";
+  }
+  return 'Every sub from rank 85 is on its Target route.';
+}
+
 // The Route Optimization page's own columns (rows are subs that are not on their Target route).
 const ROUTE_OPT_COLUMN_DEFS = [
   { key: 'character', label: 'Character', locked: true, cell: (r) => <CharacterName name={r.character_name} world={r.world} />, sort: (r) => r.character_name },
@@ -35,7 +46,7 @@ const ROUTE_OPT_COLUMN_DEFS = [
   { key: 'targetGilDay', label: 'Target gil/day', cell: (r) => <GilDay value={r.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   // Green for more gil a day, red for less (as the plugin).
   { key: 'gain', label: 'Gil/day gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
-    : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain >= 0 ? '+' : '−'}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain }
+    : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain > 0 ? '+' : r.gain < 0 ? '−' : ''}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain }
 ];
 const ROUTE_OPT_DUPLICATE_EXTRAS = ['x_world'];
 
@@ -59,13 +70,14 @@ function RouteOptimizationView({ refreshKey }) {
     window.api.getSubmarines().then((result) => {
       if (result.success) {
         setRows(sortRows(result.rows));
+        setError(null);
       } else {
         setError(result.error);
       }
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   const suboptimal = computeSuboptimalSubs(routeOptCols.rows);
@@ -89,6 +101,7 @@ function RouteOptimizationView({ refreshKey }) {
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls">
         {!routeOptSort.sortColumn && (
           <label>
@@ -107,7 +120,7 @@ function RouteOptimizationView({ refreshKey }) {
       </div>
 
       {suboptimal.length === 0 && (
-        <div className="status">Every rank-85+ sub is already on its Target route.</div>
+        <div className="status">{routesNothingText(rows)}</div>
       )}
 
       {suboptimal.length > 0 && routeOptSort.sortColumn && table(routeOptSorted)}

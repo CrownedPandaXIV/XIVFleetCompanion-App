@@ -6,23 +6,26 @@
 
 const MINUTE = 60 * 1000;
 
-// characters: [{ cid, account_label, last_synced_at }] (last_synced_at: a date or ISO text).
-// Returns Map cid (text) -> how far behind its account's newest character it is (ms), for those at least
-// `behindMinutes` behind.
-function notSyncedCharacters(characters, behindMinutes) {
+// characters: [{ cid, account_label, last_synced_at }] (last_synced_at: a date or ISO text). loginPcs: Map cid (text)
+// -> the PC it last logged in on (readLoginPcs). Returns Map cid (text) -> how far behind its account's newest
+// character it is (ms), for those at least `behindMinutes` behind. Characters with no account label are grouped by
+// the PC they last logged in on where that's known: two games syncing without labels are two accounts, and one being
+// closed doesn't make the other's characters look unsynced. (As db/views.sql fleet_not_synced_view.)
+function notSyncedCharacters(characters, behindMinutes, loginPcs = new Map()) {
   const at = (c) => (c.last_synced_at ? new Date(c.last_synced_at).getTime() : NaN);
+  const account = (c) => c.account_label || (loginPcs.get(String(c.cid)) ? `pc:${loginPcs.get(String(c.cid))}` : 'Ungrouped');
   const newest = new Map();
   for (const c of characters) {
     const t = at(c);
     if (!Number.isFinite(t)) continue;
-    const label = c.account_label || 'Ungrouped';
+    const label = account(c);
     if (!newest.has(label) || t > newest.get(label)) newest.set(label, t);
   }
   const behind = new Map();
   for (const c of characters) {
     const t = at(c);
     if (!Number.isFinite(t)) continue;
-    const lag = newest.get(c.account_label || 'Ungrouped') - t;
+    const lag = newest.get(account(c)) - t;
     if (lag >= behindMinutes * MINUTE) behind.set(String(c.cid), lag);
   }
   return behind;
@@ -47,4 +50,14 @@ async function readBehindMinutes(client) {
   return behindMinutesSetting(rows.length ? rows[0].setting_value : null);
 }
 
-module.exports = { BEHIND_MINUTES_KEY, BEHIND_MINUTES_DEFAULT, BEHIND_MINUTES_LIMITS, behindMinutesSetting, notSyncedCharacters, readBehindMinutes };
+// Each character's PC it last logged in on (companion_character_login), for notSyncedCharacters: Map cid -> PC.
+async function readLoginPcs(client) {
+  try {
+    const { rows } = await client.query('SELECT cid::text AS cid, pc_name FROM companion_character_login');
+    return new Map(rows.map((r) => [String(r.cid), r.pc_name]));
+  } catch {
+    return new Map(); // a database from before the logins were recorded
+  }
+}
+
+module.exports = { BEHIND_MINUTES_KEY, BEHIND_MINUTES_DEFAULT, BEHIND_MINUTES_LIMITS, behindMinutesSetting, notSyncedCharacters, readBehindMinutes, readLoginPcs };

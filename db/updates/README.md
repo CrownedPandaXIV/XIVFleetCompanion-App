@@ -27,12 +27,18 @@ If two copies of the app connect at the same moment, they take turns.
 
 The ready-made views plugin 2.0 reads (`fleet_*_view`) live in `db/views.sql`, not in this folder, because they change
 often as more of the app's numbers move into the database. After the numbered updates, the app compares that file's
-checksum with the one recorded in `companion_views` and, when they differ, replaces the views in one transaction. So
-edit `db/views.sql` freely, and don't add a numbered update for a view. An older app never replaces a newer app's views,
-and a login that may only read keeps the views it has. Tables and data still change only through numbered updates.
+checksum with the one recorded in `companion_views` and, when they differ, replaces the views in one transaction. Don't
+add a numbered update for a view. An older app never replaces a newer app's views, and a login that may only read keeps
+the views it has. Tables and data still change only through numbered updates.
 
 
-Two rules for the views:
+Three rules for the views:
+
+- **Views only gain columns.** Plugins on other PCs may be older than the app that made the views, and they read the
+  views by column name. A view may get new columns, and new views may be added, but a column a release has had is never
+  renamed, removed or given another type: add the new one beside it instead. `db/released-view-columns.txt` lists every
+  released column, and `tests/db/verify-sqlite-views.js` fails if one is missing. At each release, add the new columns
+  to that list with `node tests/db/released-view-columns.js`.
 
 - **No game data tables (`ffxiv_*`).** A new database gets its game data only after the views are made, and a view
   that reads a game data column couldn't be made there, which would stop the app's database check. Give the game's

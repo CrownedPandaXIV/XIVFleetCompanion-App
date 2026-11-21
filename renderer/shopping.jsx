@@ -317,16 +317,16 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   }
 
   function copy() {
-    navigator.clipboard.writeText(shoppingListText(list)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const show = (state) => { setCopied(state); setTimeout(() => setCopied(false), 2000); };
+    navigator.clipboard.writeText(shoppingListText(list)).then(() => show(true), () => show('failed'));
   }
 
   async function saveMade(part, made) {
     setList((l) => ({ ...l, parts: l.parts.map((p) => (p.itemId === part.itemId ? { ...p, made } : p)) }));
     const result = await window.api.saveShoppingProgress({ itemId: part.itemId, made, crafts: part.crafts, aheadDays });
-    setProgressError(result.success ? null : result.error);
+    setProgressError(result.success ? null : `${part.name}: ${result.error}. It's back as it was.`);
+    // Not saved: the number goes back, so the list doesn't show what other PCs won't see.
+    if (!result.success) setList((l) => ({ ...l, parts: l.parts.map((p) => (p.itemId === part.itemId ? { ...p, made: part.made } : p)) }));
   }
 
   const noRecipe = list.parts.filter((p) => p.noRecipe);
@@ -345,7 +345,7 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
         {list.market && list.market.enabled && list.market.choices && list.market.choices.length > 0 && (
           <ShoppingPriceScope market={list.market} onChange={choosePriceScope} />
         )}
-        <button style={{ marginLeft: '16px' }} onClick={copy}>{copied ? 'Copied' : 'Copy as Text'}</button>
+        <button style={{ marginLeft: '16px' }} onClick={copy}>{copied === 'failed' ? "Couldn't copy: try again" : copied ? 'Copied' : 'Copy as Text'}</button>
         {updating && <span className="shopping-note shopping-updating" style={{ marginLeft: '16px' }}>Updating...</span>}
       </div>
       {error && <div className="error">Could not update the shopping list: {error}. Showing the last one.</div>}

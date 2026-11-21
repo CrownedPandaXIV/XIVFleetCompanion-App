@@ -337,8 +337,9 @@ async function moveDatabase(input, deps, report = () => {}) {
       await snap.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
       const snapshot = (await snap.query('SELECT pg_export_snapshot() AS s')).rows[0].s;
       before = await countTables(snap);
-      fs.mkdirSync(deps.tmpDir || os.tmpdir(), { recursive: true });
-      undo.dump = path.join(deps.tmpDir || os.tmpdir(), `xiv-fleet-move-${now().getTime()}.dump`);
+      const tmp = deps.tmpDir || require('../backups/tools').toolTempDir();
+      fs.mkdirSync(tmp, { recursive: true });
+      undo.dump = path.join(tmp, `xiv-fleet-move-${now().getTime()}.dump`);
       const growing = setInterval(() => {
         try { set('copy', 'working', `${mb(fs.statSync(undo.dump).size)} so far...`); } catch { /* not started */ }
       }, 2000);
@@ -393,9 +394,16 @@ async function moveDatabase(input, deps, report = () => {}) {
     clearInterval(heartbeat);
     heartbeat = null;
     await old.query(`UPDATE companion_database_move SET state = 'moved', updated_at = now(), moved_at = now() WHERE id = 1`);
-    undo.pausing = false;
-    deps.saveConfig({ ...config, host: 'localhost', port });
-    set('switch', 'done', `Every app and plugin switches to ${input.address}:${port} at its next refresh or sync.`);
+    // From here every PC is being sent to the new database: it's kept whatever happens next (nothing below undoes it),
+    // and the old one stays as it was. As the plugin.
+    Object.assign(undo, { pausing: false, createdDatabase: false, kept: null, createdRole: false });
+    let note = '';
+    try {
+      deps.saveConfig({ ...config, host: 'localhost', port });
+    } catch (err) {
+      note = ` This app's own saved details couldn't be updated (${err.message}); it finds the new place by itself at its next refresh, as the others do.`;
+    }
+    set('switch', 'done', `Every app and plugin switches to ${input.address}:${port} at its next refresh or sync.${note}`);
     return { ok: true, steps, to: `${input.address}:${port}` };
   } catch (err) {
     set(current, 'failed', err.message);

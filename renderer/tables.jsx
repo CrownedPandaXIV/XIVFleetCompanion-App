@@ -80,9 +80,11 @@ function useColumnWidths(tableKey, columnKeys, defaultWidth = 150) {
     } catch {
       saved = {};
     }
+    // Every saved width is kept, the added columns' (from the Columns menu) as well as the table's own.
     const result = {};
+    for (const [k, w] of Object.entries(saved)) if (Number(w) > 0) result[k] = Number(w);
     columnKeys.forEach((k) => {
-      result[k] = saved[k] || defaultWidth;
+      result[k] = result[k] || defaultWidth;
     });
     return result;
   });
@@ -95,10 +97,18 @@ function useColumnWidths(tableKey, columnKeys, defaultWidth = 150) {
     localStorage.setItem(storageKey, JSON.stringify(newWidths));
   }
 
+  // From a mouse drag, or from the keyboard on the resize handle (Left / Right arrows: 10 px at a time).
   function startResize(columnKey, e) {
+    const startWidth = widthsRef.current[columnKey] || defaultWidth;
+    if (e.type === 'keydown') {
+      const step = { ArrowLeft: -10, ArrowRight: 10 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      persist({ ...widthsRef.current, [columnKey]: Math.max(10, startWidth + step) });
+      return;
+    }
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = widthsRef.current[columnKey] || defaultWidth;
 
     function onMove(moveEvent) {
       const delta = moveEvent.clientX - startX;
@@ -385,6 +395,11 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
           e.dataTransfer.effectAllowed = 'move';
         } : undefined}
         onClick={sortable ? () => onSortClick(columnKey) : undefined}
+        // Sorting by keyboard too: Tab to the heading, then Enter or Space.
+        role={sortable ? 'button' : undefined}
+        tabIndex={sortable ? 0 : undefined}
+        onKeyDown={sortable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSortClick(columnKey); } } : undefined}
+        aria-label={sortable ? `Sort by ${label}${isSorted ? (sortDirection === 'asc' ? ', now lowest first' : ', now highest first') : ''}` : undefined}
         style={{ cursor: sortable ? 'pointer' : 'default', userSelect: 'none' }}
         title={sortable ? (onMoveColumn ? 'Click to sort, drag to move' : 'Click to sort') : undefined}
       >
@@ -393,6 +408,11 @@ function ResizableHeader({ label, columnKey, widths, startResize, sortable, sort
       </span>
       <div
         onMouseDown={(e) => startResize(columnKey, e)}
+        onKeyDown={(e) => startResize(columnKey, e)}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`Width of ${label}: Left and Right arrows change it`}
+        tabIndex={0}
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         title="Drag to resize"
@@ -722,6 +742,7 @@ function tableTitle(table) {
 function TableExportMenu() {
   const [menu, setMenu] = useState(null);
   const [note, setNote] = useState(null);
+  const noteTimer = useRef(null);
 
   useEffect(() => {
     function onContextMenu(e) {
@@ -741,9 +762,11 @@ function TableExportMenu() {
     };
   }, []);
 
+  // Each note shows for 3 seconds from when it appears (an earlier one's timer doesn't cut a later one short).
   function flash(text) {
     setNote(text);
-    setTimeout(() => setNote(null), 3000);
+    clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(null), 3000);
   }
 
   async function exportCsv() {
@@ -758,7 +781,7 @@ function TableExportMenu() {
     const { table } = menu;
     setMenu(null);
     const text = tableToRows(table).map((row) => row.map((cell) => cell.replace(/[\t\n]/g, ' ')).join('\t')).join('\n');
-    navigator.clipboard.writeText(text).then(() => flash('Table copied: paste it into a spreadsheet.'));
+    navigator.clipboard.writeText(text).then(() => flash('Table copied: paste it into a spreadsheet.'), () => flash("Couldn't copy the table: click in the window and try again."));
   }
 
   return (

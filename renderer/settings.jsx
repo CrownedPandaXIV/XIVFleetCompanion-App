@@ -34,6 +34,13 @@ function FightClubImportModal({ onClose }) {
     });
   }, []);
 
+  // Escape closes it too, except while importing (that finishes by itself and then says how it went).
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && stage !== 'importing') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stage]);
+
   function toggleRow(rowNumber) {
     setCheckedRows((prev) => ({ ...prev, [rowNumber]: !prev[rowNumber] }));
   }
@@ -58,7 +65,7 @@ function FightClubImportModal({ onClose }) {
       <div className="modal">
         <h2>Import Fight Club Data</h2>
 
-        {stage === 'loading' && <div className="status">Reading file...</div>}
+        {stage === 'loading' && <div className="status">Reading file... <button onClick={onClose}>Close</button></div>}
 
         {stage === 'error' && (
           <div>
@@ -482,11 +489,14 @@ function UpdatesSection() {
   const [info, setInfo] = useState(null);
   const [recent, setRecent] = useState(null);
   const showRecent = () => (recent ? setRecent(null) : window.api.getRecentChanges().then((r) => setRecent(r.versions)));
+  // A failed answer doesn't replace what is shown; it says why instead.
+  const [problem, setProblem] = useState(null);
+  const answered = (r) => { if (r && r.success === false) setProblem(r.error); else { setProblem(null); setInfo(r); } };
   useEffect(() => {
-    window.api.getUpdateStatus().then(setInfo);
+    window.api.getUpdateStatus().then(answered);
     return window.api.onUpdateStatus((status) => setInfo((i) => ({ ...(i || {}), status })));
   }, []);
-  if (!info) return <section className="settings-section updates-section"><h3>Updates</h3><div className="status">Loading...</div></section>;
+  if (!info) return <section className="settings-section updates-section"><h3>Updates</h3><div className="status">{problem ? `Couldn't check: ${problem}` : 'Loading...'}</div></section>;
   const { status } = info;
   const busy = ['checking', 'downloading', 'ready'].includes(status.state);
   return (
@@ -494,15 +504,16 @@ function UpdatesSection() {
       <h3>Updates</h3>
       <div className="settings-row">
         <span>This is version {info.version}.</span>
-        {!status.source && <button className="updates-check" onClick={() => window.api.checkForUpdates().then(setInfo)} disabled={busy}>Check for updates</button>}
+        {!status.source && <button className="updates-check" onClick={() => window.api.checkForUpdates().then(answered)} disabled={busy}>Check for updates</button>}
         <span className={`save-status updates-status${status.state === 'error' ? ' supply-warn' : ''}`}>{status.text}</span>
       </div>
+      {problem && <div className="error-inline">Couldn't check: {problem}</div>}
       {!status.source && <div className="alerts-help">The app also looks by itself when it starts and every hour, and downloads a new version in the background.</div>}
       {!status.source && (
         <div className="settings-row test-versions">
           <label>
             <input type="checkbox" className="test-versions-toggle" checked={!!status.testing}
-              onChange={(e) => window.api.setTestVersions(e.target.checked).then(setInfo)} />
+              onChange={(e) => window.api.setTestVersions(e.target.checked).then(answered)} />
             {' '}Get test versions
           </label>
           <span className="alerts-help">
@@ -760,14 +771,20 @@ function SpeedCheckSection() {
     setStep('Timing each database question behind Income and Summary...');
     const detail = await window.api.getSpeedDetail();
     const details = detail.success ? detail.details : [{ part: 'Income and Summary', error: detail.error }];
-    const { findings, report } = await window.api.getSpeedFindings({ measured: db.measured, tabs, details });
+    const found = await window.api.getSpeedFindings({ measured: db.measured, tabs, details });
+    if (found.success === false) { setStep(null); setError(found.error); return; }
+    const { findings, report } = found;
     setResult({ findings, report, tabs, details });
     setStep(null);
   };
 
   const copy = async () => {
-    await navigator.clipboard.writeText(result.report);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(result.report);
+      setCopied(true);
+    } catch {
+      setCopied('failed');
+    }
   };
 
   return (
@@ -778,7 +795,7 @@ function SpeedCheckSection() {
         a minute.</p>
       <div className="settings-row">
         <button onClick={run} disabled={!!step}>{step ? 'Checking...' : 'Run speed check'}</button>
-        {result && <button onClick={copy}>{copied ? 'Copied' : 'Copy results'}</button>}
+        {result && <button onClick={copy}>{copied === 'failed' ? "Couldn't copy: try again" : copied ? 'Copied' : 'Copy results'}</button>}
         {step && <span className="save-status">{step}</span>}
       </div>
       {error && <div className="setup-test-status setup-problem">The speed check couldn't run: {error}</div>}
@@ -832,7 +849,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
 
   const [appVersion, setAppVersion] = useState('');
   useEffect(() => {
-    window.api.getAppVersion().then(setAppVersion);
+    window.api.getAppVersion().then((v) => { if (typeof v === 'string') setAppVersion(v); });
   }, []);
 
   // Where the fleet is (db/fleet-store.js): the fleet file has no connection to set up, and backups and game data of its own.
@@ -846,10 +863,14 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [refreshMinutes, setRefreshMinutes] = useState('');
   const [refreshLoaded, setRefreshLoaded] = useState(false);
   const [refreshStatus, setRefreshStatus] = useState('');
+  // What's saved (to mark an edit not saved yet), and why it couldn't be read (then nothing is shown to save over it).
+  const [refreshSaved, setRefreshSaved] = useState('');
+  const [refreshError, setRefreshError] = useState(null);
 
   useEffect(() => {
     window.api.getAutoRefreshInterval().then((result) => {
-      setRefreshMinutes(String(result.minutes));
+      if (result.success === false) setRefreshError(result.error);
+      else { setRefreshMinutes(String(result.minutes)); setRefreshSaved(String(result.minutes)); }
       setRefreshLoaded(true);
     });
   }, []);
@@ -857,6 +878,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   async function saveRefreshInterval() {
     setRefreshStatus('Saving...');
     const result = await window.api.saveAutoRefreshInterval(Number(refreshMinutes));
+    if (result.success) setRefreshSaved(refreshMinutes);
     setRefreshStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
@@ -924,14 +946,21 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [warnings, setWarnings] = useState(null);
   const [warningsStatus, setWarningsStatus] = useState('');
 
+  const [warningsSaved, setWarningsSaved] = useState(null);
+  const [warningsError, setWarningsError] = useState(null);
+
   useEffect(() => {
     window.api.getLowThresholds().then((result) => {
-      setWarnings({
+      // Stand-in values from a read that failed would be saved back over the real ones: shown as a problem instead.
+      if (result.success === false) { setWarningsError(result.error); return; }
+      const loaded = {
         repairKitThreshold: String(result.repairKitThreshold),
         ceruleumThreshold: String(result.ceruleumThreshold),
         houseWarnDays: String(result.houseWarnDays),
         notSyncedMinutes: String(result.notSyncedMinutes),
-      });
+      };
+      setWarnings(loaded);
+      setWarningsSaved(loaded);
     });
   }, []);
 
@@ -943,6 +972,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
       houseWarnDays: Number(warnings.houseWarnDays),
       notSyncedMinutes: Number(warnings.notSyncedMinutes),
     });
+    if (result.success) setWarningsSaved(warnings);
     setWarningsStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
@@ -951,9 +981,17 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [repairKitLoaded, setRepairKitLoaded] = useState(false);
   const [repairKitStatus, setRepairKitStatus] = useState('');
 
+  const [repairKitSaved, setRepairKitSaved] = useState('');
+  const [repairKitError, setRepairKitError] = useState(null);
+
   useEffect(() => {
     window.api.getRepairKitCost().then((result) => {
-      setRepairKitCost(result.value !== null ? String(result.value) : '');
+      if (result.success === false) setRepairKitError(result.error);
+      else {
+        const loaded = result.value !== null ? String(result.value) : '';
+        setRepairKitCost(loaded);
+        setRepairKitSaved(loaded);
+      }
       setRepairKitLoaded(true);
     });
   }, []);
@@ -961,15 +999,34 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   async function saveRepairKitCost() {
     setRepairKitStatus('Saving...');
     const result = await window.api.saveRepairKitCost(Number(repairKitCost));
+    if (result.success) setRepairKitSaved(repairKitCost);
     setRepairKitStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
+
+  // A section whose boxes were changed but not saved says so beside its Save (Close doesn't save them).
+  const notSaved = (changed) => (changed ? <span className="unsaved-note">Not saved yet</span> : null);
+  const loadProblem = (error) => (
+    <div className="error">Couldn't load these settings: {error} Close Settings and open it again once the database is back.</div>
+  );
 
   // --- Fight Club Import section ---
   const [showFightClubImport, setShowFightClubImport] = useState(false);
 
+  // Escape closes Settings (unless a window opened from it is on top, which closes first), and the keyboard starts
+  // inside it.
+  const modalRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (modalRef.current) modalRef.current.focus();
+    const onKey = (e) => { if (e.key === 'Escape' && document.querySelectorAll('.modal').length === 1) closeRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="modal-overlay">
-      <div className="modal settings-modal">
+      <div className="modal settings-modal" ref={modalRef} tabIndex={-1} role="dialog" aria-label="Settings" style={{ outline: 'none' }}>
         <div className="settings-header">
           <h2>Settings</h2>
           <span className="status">{appVersion ? `Version ${appVersion}` : ''}</span>
@@ -997,7 +1054,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         <section className="settings-section">
           <h3>Auto-Refresh</h3>
           {!refreshLoaded && <div className="status">Loading...</div>}
-          {refreshLoaded && (
+          {refreshError && loadProblem(refreshError)}
+          {refreshLoaded && !refreshError && (
             <div className="settings-row">
               <label>
                 Refresh every{' '}
@@ -1013,6 +1071,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
                 minute(s)
               </label>
               <button onClick={saveRefreshInterval}>Save</button>
+              {notSaved(refreshMinutes !== refreshSaved)}
               {refreshStatus && <span className="save-status">{refreshStatus}</span>}
             </div>
           )}
@@ -1021,7 +1080,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         <section className="settings-section">
           <h3>Fleet Economics</h3>
           {!repairKitLoaded && <div className="status">Loading...</div>}
-          {repairKitLoaded && (
+          {repairKitError && loadProblem(repairKitError)}
+          {repairKitLoaded && !repairKitError && (
             <div className="settings-row">
               <label>
                 Repair Kit Cost{' '}
@@ -1035,6 +1095,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
                 />
               </label>
               <button onClick={saveRepairKitCost}>Save</button>
+              {notSaved(repairKitCost !== repairKitSaved)}
               {repairKitStatus && <span className="save-status">{repairKitStatus}</span>}
             </div>
           )}
@@ -1042,7 +1103,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
 
         <section className="settings-section settings-warnings">
           <h3>Warnings</h3>
-          {!warnings && <div className="status">Loading...</div>}
+          {!warnings && !warningsError && <div className="status">Loading...</div>}
+          {warningsError && loadProblem(warningsError)}
           {warnings && (
             <div>
               <div className="settings-row">
@@ -1072,6 +1134,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
               <div className="alerts-help">Used by the Summary and the Character Roster's red numbers and not-synced marks. 0 turns a low-supply warning off; the house warning is 1 to 44 days (the game demolishes at 45); not synced is 10 to 1440 minutes.</div>
               <div className="settings-row">
                 <button onClick={saveWarnings}>Save</button>
+                {notSaved(JSON.stringify(warnings) !== JSON.stringify(warningsSaved))}
                 {warningsStatus && <span className="save-status">{warningsStatus}</span>}
               </div>
             </div>

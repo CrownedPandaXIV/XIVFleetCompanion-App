@@ -274,12 +274,18 @@ const SUB_RULE_COLUMN_DEFS = [
 ];
 
 function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
-  const [local, setLocal] = useState(rule);
+  // Edits are kept only until saved: a row with none shows the rule as read last (changed in the game too, as the
+  // plugin does), so Save never writes back an old copy. A new row is all draft until saved.
+  const [draft, setDraft] = useState(null);
+  const local = draft || rule;
+  const setLocal = setDraft;
   const [saveStatus, setSaveStatus] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const filterState = parseSubFilterToSlots(local.sub_filter);
 
+  // Unticking All leaves slot 1 ticked (a rule applies to at least one slot), as the plugin.
   function setAll(checked) {
-    if (checked) setLocal({ ...local, sub_filter: '' });
+    setLocal({ ...local, sub_filter: checked ? '' : slotsToSubFilter(false, [1]) });
   }
 
   function setSlot(slotNum, checked) {
@@ -290,8 +296,17 @@ function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
 
   async function handleSave() {
     setSaveStatus('Saving...');
-    const result = await onSave(local);
+    const result = await onSave(local, rule);
     setSaveStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
+    if (result.success) setDraft(null);
+  }
+
+  async function handleDelete() {
+    setConfirmDelete(false);
+    if (!rule.id) { onDelete(rule); return; } // never saved: just taken off the list
+    setSaveStatus('Deleting...');
+    const result = await onDelete(rule);
+    setSaveStatus(result.success ? '' : `Not deleted: ${result.error}`);
   }
 
   const slotCell = (slotKey) => (
@@ -352,15 +367,29 @@ function SubRuleRow({ rule, roster, onSave, onDelete, cols }) {
       {cols.visibleDefs.map((d) => <React.Fragment key={d.key}>{cells[d.key]}</React.Fragment>)}
       <td style={{ whiteSpace: 'nowrap' }}>
         <button onClick={handleSave}>Save</button>{' '}
-        <button onClick={() => onDelete(local.id)}>Delete</button>
+        {/* As the plugin: Delete asks first, in the row. */}
+        {!confirmDelete && <button onClick={() => setConfirmDelete(true)}>Delete</button>}
+        {confirmDelete && (
+          <React.Fragment>
+            <button className="danger" onClick={handleDelete}>Delete it</button>{' '}
+            <button onClick={() => setConfirmDelete(false)}>Keep</button>
+          </React.Fragment>
+        )}
+        {draft && rule.id && <div className="unsaved-note" style={{ marginLeft: 0 }}>Not saved yet</div>}
         {saveStatus && <div style={{ fontSize: '0.8em', color: 'var(--dim)' }}>{saveStatus}</div>}
       </td>
     </tr>
   );
 }
 
-function SubRulesPanel() {
+// refreshKey: reads the rules again with the page. onChanged: after a save or delete, so the parts beside it follow.
+function SubRulesPanel({ refreshKey, onChanged = () => {} }) {
   const [rules, setRules] = useState(null);
+  // Rows added but not saved yet, each with its own id (not its place in the list, which sorting changes).
+  const [newRules, setNewRules] = useState([]);
+  const nextNewId = useRef(0);
+  // A new rule moves to its place among the saved ones once saved, so "Saved." shows here rather than in its row.
+  const [panelStatus, setPanelStatus] = useState('');
   const [roster, setRoster] = useState([]);
   const [error, setError] = useState(null);
   const subRulesCols = useTableColumns({ tableKey: 'subRules', ownDefs: SUB_RULE_COLUMN_DEFS, rows: null, idOf: () => null });
@@ -396,37 +425,57 @@ function SubRulesPanel() {
         setRoster(result.rows.map((r) => ({ cid: r.cid, name: r.name, world: r.world })));
       }
     });
-  }, [fetchRules]);
+  }, [fetchRules, refreshKey]);
 
-  async function handleSave(rule) {
+  async function handleSave(edited, row) {
+    const { newId, ...rule } = edited;
     const result = rule.id ? await window.api.updateSubBuildRule(rule) : await window.api.addSubBuildRule(rule);
-    if (result.success) await fetchRules();
+    if (result.success) {
+      if (row.newId) {
+        setNewRules((prev) => prev.filter((r) => r.newId !== row.newId));
+        setPanelStatus(`Rank ${rule.rank} rule saved.`);
+      }
+      await fetchRules();
+      onChanged();
+    }
     return result;
   }
 
-  async function handleDelete(id) {
-    await window.api.deleteSubBuildRule(id);
-    fetchRules();
+  async function handleDelete(row) {
+    if (!row.id) {
+      setNewRules((prev) => prev.filter((r) => r.newId !== row.newId));
+      return { success: true };
+    }
+    const result = await window.api.deleteSubBuildRule(row.id);
+    if (result.success) {
+      await fetchRules();
+      onChanged();
+    }
+    return result;
   }
 
   function handleAddRow() {
-    setRules((prev) => [
-      ...(prev || []),
-      { id: null, rank: 0, cid_override: null, sub_filter: '', hull: '', stern: '', bow: '', bridge: '' }
+    setNewRules((prev) => [
+      ...prev,
+      { newId: `new-${++nextNewId.current}`, id: null, rank: 0, cid_override: null, sub_filter: '', hull: '', stern: '', bow: '', bridge: '' }
     ]);
   }
 
-  if (error) return <div className="error">Failed to load rules: {error}</div>;
+  if (error && rules === null) return <div className="error">Failed to load rules: {error}</div>;
   if (rules === null) return <div className="status">Loading...</div>;
 
-  const sortedRules = subRulesSort.sortColumn
-    ? applyColumnSort(rules, subRulesSort.sortColumn, subRulesSort.sortDirection, subRulesAccessors)
-    : rules;
+  // New rows stay at the bottom, in the order added, until saved.
+  const sortedRules = [
+    ...(subRulesSort.sortColumn ? applyColumnSort(rules, subRulesSort.sortColumn, subRulesSort.sortDirection, subRulesAccessors) : rules),
+    ...newRules,
+  ];
 
   return (
-    <div>
+    <div className="sub-rules">
       <div className="controls">
         <button onClick={handleAddRow}>Add Rule</button>
+        {panelStatus && <span className="save-status">{panelStatus}</span>}
+        {error && <span className="error-inline">Could not update the rules: {error}</span>}
         <span style={{ marginLeft: '16px' }}><ColumnPicker cols={subRulesCols} /></span>
         {subRulesSort.sortColumn && (
           <button style={{ marginLeft: '16px' }} onClick={() => subRulesSort.resetSort()}>Reset Sorting</button>
@@ -440,8 +489,8 @@ function SubRulesPanel() {
           </tr>
         </thead>
         <tbody>
-          {sortedRules.map((rule, i) => (
-            <SubRuleRow key={rule.id ?? `new-${i}`} rule={rule} roster={roster} onSave={handleSave} onDelete={handleDelete} cols={subRulesCols} />
+          {sortedRules.map((rule) => (
+            <SubRuleRow key={rule.id ?? rule.newId} rule={rule} roster={roster} onSave={handleSave} onDelete={handleDelete} cols={subRulesCols} />
           ))}
         </tbody>
       </table>
@@ -459,6 +508,8 @@ const LOOK_AHEAD_HELP = 'Also list the parts of each sub\'s next build (the Subs
   'so they can be bought or crafted ahead of time. Spares go to what is needed now first. Applies to Summary, Detail and the Shopping List.';
 
 function PartsView({ refreshKey }) {
+  // Bumped after a Sub Rule is saved or deleted, so the parts it decides are read again (as the plugin does).
+  const [rulesChanged, setRulesChanged] = useState(0);
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [subView, setSubView] = useState('summary'); // summary | detail | shopping
@@ -522,7 +573,7 @@ function PartsView({ refreshKey }) {
       }
     });
     return () => { current = false; };
-  }, [refreshKey, aheadDays]);
+  }, [refreshKey, aheadDays, rulesChanged]);
 
   // Plain mouse-drag resize, clamped (clampRulesWidth) so neither the panel nor the parts table becomes unusable;
   // remembered on this PC. A smaller window brings a wide panel back within the window.
@@ -548,25 +599,26 @@ function PartsView({ refreshKey }) {
   }, []);
 
   // Once the page is drawn (after loading), its own room is known: bring a remembered width within it.
-  const drawn = rows !== null && !error;
+  const drawn = rows !== null;
   useEffect(() => {
     if (drawn) setRulesPanelWidth((w) => clampRulesWidth(w));
   }, [drawn]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   return (
     <div ref={pageRef} style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
+        {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
         <div className="controls">
-          <button onClick={() => setSubView('summary')} disabled={subView === 'summary'}>
+          <button onClick={() => setSubView('summary')} className={`sub-tab${subView === 'summary' ? ' active' : ''}`} aria-pressed={subView === 'summary'}>
             Summary
           </button>{' '}
-          <button onClick={() => setSubView('detail')} disabled={subView === 'detail'}>
+          <button onClick={() => setSubView('detail')} className={`sub-tab${subView === 'detail' ? ' active' : ''}`} aria-pressed={subView === 'detail'}>
             Detail
           </button>{' '}
-          <button onClick={() => setSubView('shopping')} disabled={subView === 'shopping'}>
+          <button onClick={() => setSubView('shopping')} className={`sub-tab${subView === 'shopping' ? ' active' : ''}`} aria-pressed={subView === 'shopping'}>
             Shopping List
           </button>
           <label style={{ marginLeft: '16px', whiteSpace: 'nowrap' }} title={LOOK_AHEAD_HELP}>
@@ -600,7 +652,7 @@ function PartsView({ refreshKey }) {
 
         {subView === 'summary' && <PartsSummaryTable rows={rows} aheadDays={aheadDays} />}
 
-        {subView === 'shopping' && <ShoppingListView refreshKey={refreshKey} aheadDays={aheadDays} />}
+        {subView === 'shopping' && <ShoppingListView refreshKey={`${refreshKey}|${rulesChanged}`} aheadDays={aheadDays} />}
 
         {subView === 'detail' && rows.length === 0 && (
           <div className="status">
@@ -645,7 +697,7 @@ function PartsView({ refreshKey }) {
           />
           <div style={{ width: `${rulesPanelWidth}px`, minWidth: '180px', flexShrink: 0, overflowX: 'auto' }}>
             <h2 style={{ padding: '0 0 8px' }}>Sub Rules</h2>
-            <SubRulesPanel />
+            <SubRulesPanel refreshKey={refreshKey} onChanged={() => setRulesChanged((n) => n + 1)} />
           </div>
         </React.Fragment>
       )}

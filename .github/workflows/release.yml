@@ -15,8 +15,19 @@ on:
 permissions:
   contents: write
 
+# One publishing run at a time (this and test-release.yml both change the Releases repo's "testing" release): a
+# second waits, never cancels.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
+  # The full tests first (test.yml): nothing is tagged or published unless they all pass.
+  tests:
+    uses: ./.github/workflows/test.yml
+
   tag-release:
+    needs: tests
     runs-on: ubuntu-24.04
 
     steps:
@@ -38,6 +49,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
+      with:
+        persist-credentials: false
 
     - name: Already published?
       id: check
@@ -49,7 +62,7 @@ jobs:
         if [ -z "$GH_TOKEN" ]; then
           echo "No RELEASES_TOKEN secret yet: the installer for ${version} is not published."
           echo "publish=false" >> "$GITHUB_OUTPUT"
-        elif gh release view "v${version}" -R CrownedPandaXIV/XIVFleetCompanion-Releases --json assets --jq '.assets[].name' 2>/dev/null | grep -qx latest.yml; then
+        elif [ "$(bash .github/scripts/published.sh "$version")" = yes ]; then
           echo "v${version} is already published."
           echo "publish=false" >> "$GITHUB_OUTPUT"
         else
@@ -62,14 +75,22 @@ jobs:
         node-version: 22
         cache: npm
 
-    - name: Build and publish the installer
+    # No token here: installing and building run other people's code (every package's install scripts), which must not
+    # reach the one that publishes updates.
+    - name: Build the installer
+      if: steps.check.outputs.publish == 'true'
+      shell: bash
+      run: |
+        npm ci
+        npm run dist
+
+    - name: Publish the installer
       if: steps.check.outputs.publish == 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
       run: |
-        npm ci
-        npm run dist
-        bash .github/scripts/publish-installer.sh "$(node -p "require('./package.json').version")"
+        version=$(node -p "require('./package.json').version")
+        bash .github/scripts/publish-installer.sh "$version"
         # Copies with "Get test versions" on look at the testing release: it gets this version too when it's newer.
-        bash .github/scripts/publish-testing.sh "$(node -p "require('./package.json').version")" --if-newer
+        bash .github/scripts/publish-testing.sh "$version" --if-newer

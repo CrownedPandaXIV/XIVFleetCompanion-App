@@ -134,7 +134,7 @@ ipcMain.handle('remove-pc', (event, pcName, accountLabel) => withDetails(async (
 // JavaScript, for the tests).
 const VENTURE_TOTALS = `
     SELECT owner_cid::text AS owner_cid, item_id, hq, sum(quantity) AS quantity,
-           count(*)::int AS rewards, array_agg(DISTINCT retainer_name) AS retainers
+           count(*)::int AS rewards, array_agg(DISTINCT retainer_name) AS retainer_names
     FROM companion_venture_result WHERE received_at > $1
     GROUP BY owner_cid, item_id, hq`;
 

@@ -180,9 +180,13 @@ async function nothingChanged(label) {
     const plugin = await connect({ ...CONFIG, application_name: PLUGIN_APPLICATION_NAME });
     // The plugin finishes its sync shortly after being paused.
     setTimeout(() => plugin.end(), 30);
-    const r = await moveDatabase(input(), deps({ wait: () => new Promise((res) => setTimeout(res, 20)) }), (s) => steps.push(s));
+    // This app's own saved details fail to save after everyone was sent to the new database: the move still stands
+    // (nothing is undone past that point), and says so.
+    const saveFails = (c) => { saved.push(c); throw new Error('the credential store is locked'); };
+    const r = await moveDatabase(input(), deps({ wait: () => new Promise((res) => setTimeout(res, 20)), saveConfig: saveFails }), (s) => steps.push(s));
     await pooled.end();
     assert.strictEqual(r.ok, true, r.error);
+    assert.match(r.steps.find((s) => s.id === 'switch').detail, /couldn't be updated \(the credential store is locked\); it finds the new place by itself/);
     assert.strictEqual(r.to, `${ADDRESS}:${NEW_PORT}`);
     assert.ok(r.steps.every((s) => s.state === 'done'), JSON.stringify(r.steps));
     assert.match(r.steps.find((s) => s.id === 'compare').detail, /tables, [\d,]+ rows, all the same/);

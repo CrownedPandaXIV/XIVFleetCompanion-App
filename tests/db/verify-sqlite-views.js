@@ -16,6 +16,11 @@ const { DatabaseSync } = require('node:sqlite');
 
 const NAME = 'fleet_sqlite_check';
 const DB = path.join(__dirname, '..', '..', 'db');
+// Each view column as "view.column:type", as db/released-view-columns.txt lists them.
+const VIEW_COLUMNS_SQL = `SELECT table_name || '.' || column_name || ':' || data_type AS line FROM information_schema.columns
+  WHERE table_schema = current_schema() AND table_name LIKE 'fleet\\_%'
+    AND table_name IN (SELECT table_name FROM information_schema.views WHERE table_schema = current_schema()) ORDER BY 1`;
+
 const VIEWS = [
   ['fleet_supplies_view', ['cid']],
   ['fleet_subs_view', ['cid', 'sub_name']],
@@ -77,7 +82,9 @@ function plain(v) {
   if (typeof v === 'string' && /^-?\d+\.\d+$/.test(v)) return Number(v);
   return v;
 }
+// Whole numbers exactly (gil, counts); only fractions (and times, as seconds with milliseconds) to a millionth.
 const same = (a, b) => {
+  if (Number.isInteger(a) && Number.isInteger(b)) return a === b;
   if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
   return a === b;
 };
@@ -167,6 +174,14 @@ const SETTINGS = [
         const liteCols = lite.prepare(`SELECT name FROM pragma_table_info('${view}')`).all().map((r) => r.name);
         assert.deepStrictEqual(liteCols, pgCols, view);
       }
+    });
+
+    // Older plugins on other PCs read these views by column name: every column a release had stays, with its type.
+    await scenario('every view column already released is still there, with the same type (older plugins read them)', async () => {
+      const released = fs.readFileSync(path.join(DB, 'released-view-columns.txt'), 'utf8').split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
+      const now = new Set((await pg.query(VIEW_COLUMNS_SQL)).rows.map((r) => r.line));
+      const gone = released.filter((l) => !now.has(l));
+      assert.deepStrictEqual(gone, [], `removed, renamed or retyped: ${gone.join(', ')}. Keep the old column (a new name can be added beside it).`);
     });
 
     for (const [round, seed] of [[1, 7], [2, 42], [3, 2026]]) {

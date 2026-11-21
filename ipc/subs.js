@@ -1,6 +1,6 @@
 // Submarines: the Subs view (routes, gil/day, speed/range), low fuel/repair warnings, Fight Club builds toggle.
 const { ipcMain } = require('electron');
-const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { notSyncedCharacters, readBehindMinutes, readLoginPcs } = require('../characters/not-synced');
 const { loadSharedCharacters } = require('../characters/shared-sync');
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
@@ -446,7 +446,7 @@ ipcMain.handle('get-fleet-warnings', async () => {
     `);
 
     // Characters the plugin no longer syncs keep their last supplies; they are left out and named.
-    const behind = notSyncedCharacters(result.rows, await readBehindMinutes(client));
+    const behind = notSyncedCharacters(result.rows, await readBehindMinutes(client), await readLoginPcs(client));
     const notSynced = result.rows.filter((r) => behind.has(String(r.cid)))
       .map((r) => ({ cid: r.cid, name: r.name, world: r.world, account_label: r.account_label, behind_ms: behind.get(String(r.cid)) }));
 
@@ -474,7 +474,7 @@ ipcMain.handle('get-fleet-warnings', async () => {
   });
 });
 
-ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled }) => {
+ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled } = {}) => {
   return withClient(async (client) => {
     await client.query(
       `INSERT INTO sub_craft_toggle (cid, sub_name, craft_enabled, updated_at)

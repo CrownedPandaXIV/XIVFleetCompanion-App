@@ -55,8 +55,13 @@ function loadPostgresConfig() {
   }
 
   const encrypted = fs.readFileSync(CREDENTIAL_FILE);
-  const decrypted = safeStorage.decryptString(encrypted);
-  return JSON.parse(decrypted);
+  try {
+    return JSON.parse(safeStorage.decryptString(encrypted));
+  } catch (err) {
+    // Saved on another PC, or Windows' keys for this account were reset: only this PC's Windows account can read it.
+    console.error('The saved connection could not be read:', err.message);
+    throw new Error("The saved database connection can't be read on this PC (it was saved on another PC, or Windows was reset). Enter it again in Settings → Database.");
+  }
 }
 
 // Whether the database can be reached (see connection-status.js). Every open window is told when
@@ -168,7 +173,14 @@ function describeFileError(err) {
   if (/database is locked|SQLITE_BUSY/i.test(text)) return 'The fleet file is busy (a game is writing to it). Try again in a moment.';
   if (/unable to open|SQLITE_CANTOPEN/i.test(text)) return `The fleet file could not be opened (${FLEET_FILE()}).`;
   if (/malformed|SQLITE_CORRUPT|not a database/i.test(text)) return 'The fleet file is damaged. The plugin can check it and put a backup back (the Status page in the game).';
-  return text;
+  // The game data (item names, sub parts...) comes into its own file in the background the first time.
+  if (/no such table: (gd\.)?ffxiv_/i.test(text)) {
+    return fileGameDataFilling
+      ? "The game data (item names, sub parts, recipes) is still downloading. This page fills in once it's done; Settings → Data shows how it's going."
+      : "The game data (item names, sub parts, recipes) isn't on this PC yet. Settings → Data → Update now gets it.";
+  }
+  // The statement the fleet file was asked is for the log, not the page.
+  return text.replace(/\s*\(in: [\s\S]*$/, '');
 }
 
 async function withFile(work, onError) {
@@ -181,6 +193,7 @@ async function withFile(work, onError) {
     return result;
   } catch (err) {
     const message = describeFileError(err);
+    if (message !== err.message) console.error('Fleet file:', err.message);
     const result = await onError(err, client || { dialect: 'sqlite', query: async () => ({ rows: [], rowCount: 0 }) });
     if (result && typeof result === 'object' && result.error === err.message) result.error = message;
     return result;
@@ -192,15 +205,30 @@ async function withFile(work, onError) {
 // The game data (item names, sub parts, recipes...) for the file: downloaded once into the app's own game data
 // file, in the background, as for a new database (db/game-data-file.js).
 let fileGameData = null;
+let fileGameDataFilling = false;
 function fillFileGameData() {
   if (fileGameData || process.env.XIV_FLEET_SKIP_GAME_DATA_FILL) return;
+  fileGameDataFilling = true;
   fileGameData = require('./game-data-file').fillIfEmpty(GAME_DATA_FILE(), {
     onState: (state) => setDatabaseState({ ok: true, file: true, ...state }),
-  }).catch((err) => {
+  }).finally(() => { fileGameDataFilling = false; }).catch((err) => {
     console.error('Could not fill in the game data:', err.message);
     setDatabaseState({ ok: true, file: true, gameData: 'failed', gameDataProblem: err.message });
     setTimeout(() => { fileGameData = null; }, RETRY_DATABASE_CHECK_MS);
   });
+}
+
+// work(client) in one transaction: all of it saved, or (on any error) none of it.
+async function inTransaction(client, work) {
+  await client.query('BEGIN');
+  try {
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
 }
 
 // Runs `work(client)` against a fresh, connected Postgres client and always
@@ -361,6 +389,7 @@ function savePostgresConfig(config) {
 }
 
 module.exports = {
+  inTransaction,
   createPgClient, loadPostgresConfig, savePostgresConfig, withClient, snapshotFragments, followMoveNow,
   openClient, fleetLocation, fleetFile: FLEET_FILE, gameDataFile: GAME_DATA_FILE,
   // (file: this PC's fleet is in the plugin's file, for the header)
@@ -368,4 +397,13 @@ module.exports = {
   databaseStatus: () => databaseState || (moveState ? { ok: true, move: moveState } : null),
   // After restoring a backup: check for database updates again on the next connection.
   recheckDatabase: () => { databaseCheck = null; },
+  // An error from a query of the app's own (Trends' series), in the same plain words as every page's.
+  plainError: (err) => {
+    if (fleetLocation() === 'file') return describeFileError(err);
+    let config = null;
+    try { config = loadPostgresConfig(); } catch { /* none saved */ }
+    return describeError(err, config);
+  },
+  // The background fill of the fleet file's game data, when one is running (Settings → Data's update waits for it).
+  fileGameDataFill: () => (fileGameDataFilling ? fileGameData : null),
 };

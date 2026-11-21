@@ -27,7 +27,9 @@ test('nothing newer: up to date, with when it last looked', () => {
   const s = run([['checking-for-update'], ['update-not-available', { version: '0.36.0' }]]);
   assert.deepStrictEqual(s, { state: 'up-to-date', checkedAt: NOW });
   assert.strictEqual(statusText(s, { now: NOW + 10 * 1000 }), 'Up to date. Last looked just now.');
-  assert.match(statusText(s, { now: NOW + 3 * 60 * 1000 }), /^Up to date\. Last looked at 9:05/);
+  // The time as this PC writes it (9:05, 9.05, 오전 9:05...).
+  const nine05 = new Date(NOW).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  assert.ok(statusText(s, { now: NOW + 3 * 60 * 1000 }).startsWith(`Up to date. Last looked at ${nine05}`));
 });
 
 test('errors are said in plain words: no internet is not a failure of the app', () => {

@@ -2,11 +2,11 @@
 // Google Sheets open as is. No Electron here, so it can be tested on its own (tests/csv.test.js).
 
 // One cell: quoted when it holds a comma, quote or line break; a cell that starts like a formula
-// (=, +, -, @) gets a leading apostrophe so a spreadsheet shows it as text instead of running it,
+// (=, +, -, @, or a tab or carriage return before one) gets a leading apostrophe so a spreadsheet shows it as text instead of running it,
 // unless it is a plain number such as -1,234.
 function csvCell(value) {
   let text = value === null || value === undefined ? '' : String(value);
-  if (/^[=+\-@]/.test(text) && !/^[+-]?[\d,.]+%?$/.test(text)) text = `'${text}`;
+  if (/^[=+\-@\t\r]/.test(text) && !/^[+-]?[\d,.]+%?$/.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

@@ -73,6 +73,15 @@ const FC_CREDIT_DUPLICATE_EXTRAS = ['x_account', 'x_chest_ceruleum'];
 
 function FcCreditsSection({ credits, onSaveTankCost, refreshKey }) {
   const [costInput, setCostInput] = useState(String(credits.tankCost));
+  const [costError, setCostError] = useState(null);
+  const typing = useRef(false);
+  async function saveCost() {
+    typing.current = false;
+    if (Number(costInput) === credits.tankCost) return;
+    const result = await onSaveTankCost(Number(costInput));
+    if (result.success) setCostError(null);
+    else { setCostError(result.error); setCostInput(String(credits.tankCost)); }
+  }
   const accountSort = useColumnSort();
   const accountCols = useTableColumns({ tableKey: 'fcCreditAccounts', ownDefs: FC_CREDIT_ACCOUNT_COLUMN_DEFS, rows: credits.accounts, idOf: () => null });
   const fcSort = useColumnSort();
@@ -80,7 +89,7 @@ function FcCreditsSection({ credits, onSaveTankCost, refreshKey }) {
     tableKey: 'fcCreditFcs', ownDefs: FC_CREDIT_FC_COLUMN_DEFS, subject: 'fc', excludeExtras: FC_CREDIT_DUPLICATE_EXTRAS,
     rows: credits.fcs, idOf: (fc) => fc.fc_id, refreshKey,
   });
-  useEffect(() => setCostInput(String(credits.tankCost)), [credits.tankCost]);
+  useEffect(() => { if (!typing.current) setCostInput(String(credits.tankCost)); }, [credits.tankCost]);
   const f = credits.fleet;
   const n = creditNumber;
   return (
@@ -90,10 +99,11 @@ function FcCreditsSection({ credits, onSaveTankCost, refreshKey }) {
         <label>
           Company credits per ceruleum tank{' '}
           <input type="number" min={1} value={costInput} style={{ width: '80px' }}
-            onChange={(e) => setCostInput(e.target.value)}
-            onBlur={() => { if (Number(costInput) !== credits.tankCost) onSaveTankCost(Number(costInput)); }}
+            onChange={(e) => setCostInput(e.target.value)} onFocus={() => { typing.current = true; }}
+            onBlur={saveCost}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
         </label>
+        {costError && <span className="error-inline">{costError}</span>}
         <span className="supplies-note-inline">From the OIC Quartermaster at your Grand Company; check the price in game.</span>
       </div>
       <div className="supplies-summary">
@@ -136,12 +146,13 @@ function SuppliesView({ refreshKey }) {
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
   const [targetInput, setTargetInput] = useState('');
   const [saveError, setSaveError] = useState(null);
+  const typing = useRef(false);
 
   function load() {
     window.api.getSupplies().then((result) => {
       if (result.success) {
         setData(result);
-        setTargetInput(String(result.targetDays));
+        if (!typing.current) setTargetInput(String(result.targetDays));
         setError(null);
       } else {
         setError(result.error);
@@ -156,12 +167,14 @@ function SuppliesView({ refreshKey }) {
     if (result.success) {
       setSaveError(null);
       load();
-    } else {
+    } else if (tankCost === undefined) {
       setSaveError(result.error);
+      setTargetInput(String(data.targetDays));
     }
+    return result;
   }
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && data === null) return <div className="error">Failed to load: {error}</div>;
   if (data === null) return <div className="status">Loading...</div>;
 
   const rows = sortRows(supplyCols.rows);
@@ -175,6 +188,7 @@ function SuppliesView({ refreshKey }) {
 
   return (
     <div className="supplies">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls supplies-controls">
         <label>
           Use over the last{' '}
@@ -185,8 +199,8 @@ function SuppliesView({ refreshKey }) {
         <label>
           Buy enough for{' '}
           <input type="number" min={1} max={data.maxTargetDays} value={targetInput} style={{ width: '60px' }}
-            onChange={(e) => setTargetInput(e.target.value)}
-            onBlur={() => { if (Number(targetInput) !== data.targetDays) save(data.windowDays, Number(targetInput)); }}
+            onChange={(e) => setTargetInput(e.target.value)} onFocus={() => { typing.current = true; }}
+            onBlur={() => { typing.current = false; if (Number(targetInput) !== data.targetDays) save(data.windowDays, Number(targetInput)); }}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
           {' '}days
         </label>

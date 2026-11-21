@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, screen } = require('electron');
+const { app, BrowserWindow, Menu, screen, shell } = require('electron');
 const path = require('path');
 const { chooseUserDataFolder } = require('./user-data-folder');
 
@@ -110,6 +110,17 @@ function createWindow() {
   if (maximized) mainWindow.maximize();
   mainWindow.on('close', () => {
     writeWindowState(stateFile, { ...mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() });
+  });
+
+  // The window only ever shows the app's own page, which has the full window.api: a file dropped on it or a link must
+  // not replace it. Web links open in the browser; anything else is refused.
+  const home = require('url').pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+  mainWindow.webContents.on('will-navigate', (event, target) => {
+    if (String(target).split(/[?#]/)[0] !== home) event.preventDefault(); // its own page reloading is fine
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   // Keep the version in the window title; otherwise the page's own <title> replaces it.

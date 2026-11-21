@@ -62,13 +62,17 @@ function parseAndValidateFightClubFile(filePath) {
   // top-left cell (grid[s.r][s.c]) - every other cell it spans is null
   // in the raw grid. Copying that value across the whole range restores
   // what the sheet actually displays.
+  // The grid starts at the sheet's first used cell (its range), while merges are where they are on the sheet: moved by
+  // as much, so a sheet starting at B2 doesn't copy each merged value one row and one column off (as the plugin).
+  const start = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s : { r: 0, c: 0 };
   const merges = sheet['!merges'] || [];
-  for (const range of merges) {
-    const value = grid[range.s.r] ? grid[range.s.r][range.s.c] : null;
+  for (const merge of merges) {
+    const range = { s: { r: merge.s.r - start.r, c: merge.s.c - start.c }, e: { r: merge.e.r - start.r, c: merge.e.c - start.c } };
+    const value = range.s.r >= 0 && range.s.c >= 0 && grid[range.s.r] ? grid[range.s.r][range.s.c] : null;
     if (value === null || value === undefined) continue;
-    for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let r = Math.max(range.s.r, 0); r <= range.e.r; r++) {
       if (!grid[r]) continue;
-      for (let c = range.s.c; c <= range.e.c; c++) {
+      for (let c = Math.max(range.s.c, 0); c <= range.e.c; c++) {
         grid[r][c] = value;
       }
     }
@@ -178,7 +182,10 @@ ipcMain.handle('import-fight-club:pick-file', async () => {
 // replace: the whole table is emptied and reloaded inside a single
 // transaction, so a failure partway through leaves the OLD data intact
 // rather than a half-imported table.
-ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) => {
+ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel } = {}) => {
+  if (!Array.isArray(rows) || !rows.every((row) => row && typeof row === 'object' && row.data && typeof row.data === 'object')) {
+    return { success: false, error: 'Nothing to import: read the spreadsheet again.' };
+  }
   const dbColumns = FIGHT_CLUB_COLUMNS.map((c) => c.dbColumn);
 
   return withClient(async (client) => {
@@ -191,8 +198,8 @@ ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) =
       const patchPlaceholder = `$${dbColumns.length + 1}`;
 
       await client.query(
-        `INSERT INTO fight_club_routes (${dbColumns.join(', ')}, patch_label)
-         VALUES (${placeholders}, ${patchPlaceholder})`,
+        `INSERT INTO fight_club_routes (${dbColumns.join(', ')}, patch_label, imported_at)
+         VALUES (${placeholders}, ${patchPlaceholder}, now())`,
         [...values, patchLabel || null]
       );
     }

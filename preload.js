@@ -14,8 +14,20 @@ const READ_CALL = /^(get-|settings:get-|game-data-status$|game-data-backups$)/;
 const MAX_REMEMBERED = 200;
 const lastLoaded = new Map();
 
+// A handler that throws (rather than answering { success: false }) comes back as that answer too, so a page shows
+// the problem instead of waiting on "Loading..." for good. Electron's own wording before the message is left off.
+function thrownAnswer(err) {
+  const message = String((err && err.message) || err).replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/, '');
+  return { success: false, error: message || 'Something went wrong.' };
+}
+
 async function invoke(channel, ...args) {
-  const result = await ipcRenderer.invoke(channel, ...args);
+  let result;
+  try {
+    result = await ipcRenderer.invoke(channel, ...args);
+  } catch (err) {
+    return thrownAnswer(err);
+  }
   if (!READ_CALL.test(channel)) return result;
   const key = channel + '\u0000' + JSON.stringify(args);
   if (result && result.success !== false) {

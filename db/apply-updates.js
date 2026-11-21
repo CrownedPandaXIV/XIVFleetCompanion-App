@@ -83,6 +83,10 @@ function noRightsError(user, cause) {
   return err;
 }
 
+// An update or the views wait at most 10 seconds for a table another PC is using (everything else on it would queue
+// behind them meanwhile), then give way and are tried again later. As the plugin's DatabaseUpkeep.
+const GIVE_WAY = "SET LOCAL lock_timeout = '10s'";
+
 // The views (db/views.sql) are applied again whenever that file changes: its checksum is recorded in
 // companion_views (database update 15) with the app version that applied it. Replaced in one transaction when the
 // checksum differs, unless a newer app applied the ones there (two app versions on two PCs would otherwise keep
@@ -100,6 +104,7 @@ async function ensureViews(client, { viewsFile, appVersion, tracked }) {
   if (!tracked) return null;
   await client.query('BEGIN');
   try {
+    await client.query(GIVE_WAY);
     await client.query(sql);
     await client.query(
       `INSERT INTO companion_views (id, checksum, app_version, applied_at) VALUES (1, $1, $2, now())
@@ -124,7 +129,21 @@ async function ensureDatabase(client, { appVersion, user, updatesDir, viewsFile,
   const latest = Math.max(BASELINE, ...updates.map((u) => u.version));
   const result = { version: null, latest, created: false, applied: [], tracked: true, newer: false };
 
-  await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
+  // Another PC updating the database holds this: waited for at most a minute (rather than leaving every page on
+  // "Loading..." behind a PC that's stuck), then said plainly and tried again at the next page load.
+  await client.query("SET lock_timeout = '60s'");
+  try {
+    await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
+  } catch (err) {
+    if (err.code === '55P03') {
+      const busy = new Error('Another PC is updating the database right now. Try again in a minute.');
+      busy.code = err.code;
+      throw busy;
+    }
+    throw err;
+  } finally {
+    await client.query('RESET lock_timeout').catch(() => {});
+  }
   try {
     let version = null;
     let tracked = (await client.query(`SELECT to_regclass('companion_schema_version') IS NOT NULL AS t`)).rows[0].t;
@@ -172,12 +191,15 @@ async function ensureDatabase(client, { appVersion, user, updatesDir, viewsFile,
     for (const u of pending) {
       await client.query('BEGIN');
       try {
+        await client.query(GIVE_WAY);
         await client.query(fs.readFileSync(u.file, 'utf8'));
         await record(client, u.version, u.name, appVersion);
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
-        err.message = `Database update ${u.version} (${u.name}) failed, so nothing of it was applied: ${err.message}`;
+        err.message = err.code === '55P03'
+          ? `Database update ${u.version} (${u.name}) waits for another PC to finish with the database; it's tried again in a moment.`
+          : `Database update ${u.version} (${u.name}) failed, so nothing of it was applied: ${err.message}`;
         throw err;
       }
       result.applied.push(`update ${u.version}: ${u.name}`);

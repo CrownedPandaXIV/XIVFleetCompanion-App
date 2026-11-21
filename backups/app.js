@@ -6,7 +6,7 @@ const { app } = require('electron');
 const path = require('path');
 const { loadPostgresConfig, followMoveNow } = require('../db');
 const { loadBackupSettings, saveLastResult } = require('./settings');
-const { findTools } = require('./tools');
+const { findTools, serverMajor } = require('./tools');
 const { backupNow } = require('./run');
 
 const settingsFile = () => path.join(app.getPath('userData'), 'backups.json');
@@ -15,19 +15,18 @@ const settingsFile = () => path.join(app.getPath('userData'), 'backups.json');
 async function backupWithSettings() {
   const { settings } = loadBackupSettings(settingsFile());
   let result;
-  const tools = await findTools(settings.pgBin);
-  if (!tools.found) {
-    result = { ok: false, at: Date.now(), message: tools.error };
-  } else {
-    let config = null;
-    try {
-      // If the database moved to another PC, back up the new one.
-      await followMoveNow();
-      config = loadPostgresConfig();
-    } catch (err) {
-      result = { ok: false, at: Date.now(), message: err.message };
-    }
-    if (config) result = await backupNow({ tools, config, settings });
+  let config = null;
+  try {
+    // If the database moved to another PC, back up the new one.
+    await followMoveNow();
+    config = loadPostgresConfig();
+  } catch (err) {
+    result = { ok: false, at: Date.now(), message: err.message };
+  }
+  if (config) {
+    // Tools at least the database's version (pg_dump refuses a newer server).
+    const tools = await findTools(settings.pgBin, { serverMajor: await serverMajor(config) });
+    result = tools.found ? await backupNow({ tools, config, settings }) : { ok: false, at: Date.now(), message: tools.error };
   }
   saveLastResult(settingsFile(), result);
   return result;
@@ -43,7 +42,12 @@ async function runFromCommandLine() {
     console.error(err);
     code = 1;
   }
-  await require('../ipc/subs').saveForecastsNow();
+  // At most a minute: saving the forecasts can wait on a database update or the first game data fill, and this hidden
+  // run must still quit.
+  await Promise.race([
+    require('../ipc/subs').saveForecastsNow().catch((err) => console.error('Saving the forecasts:', err.message)),
+    new Promise((resolve) => { setTimeout(resolve, 60000).unref(); }),
+  ]);
   app.exit(code);
 }
 

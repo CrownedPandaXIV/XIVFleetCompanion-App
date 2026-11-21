@@ -5,7 +5,16 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+
+// A pg client with an 'error' listener (as db/index.js createPgClient, which this file can't load outside the app): a
+// connection that drops while it sits idle, say during a long pg_restore, would otherwise crash the whole app.
+function client(config, extra = {}) {
+  const c = new Client({ connectionTimeoutMillis: 10000, keepAlive: true, ...config, port: Number(config.port || 5432), ...extra });
+  c.on('error', (err) => console.error('Backup connection error (non-fatal):', err.message));
+  return c;
+}
 const { run } = require('./tools');
+const { PLUGIN_APPLICATION_NAME } = require('../db/database-move');
 const { backupName, listBackups, backupsToRemove } = require('./files');
 
 // Tables whose row counts are compared when a backup is tested.
@@ -130,7 +139,7 @@ async function countRows(client, table) {
 // database and removes the temporary one. The live database is only read. Needs a login that may create
 // databases. Returns { ok, rows: [{ table, live, restored }], message }.
 async function testBackup({ tools, config, file }) {
-  const admin = new Client({ ...config, port: Number(config.port || 5432) });
+  const admin = client(config);
   await admin.connect();
   try {
     try {
@@ -145,7 +154,7 @@ async function testBackup({ tools, config, file }) {
     try {
       const r = await run(tools.restore, [...connectionArgs(config), '-d', TEST_DATABASE, '--no-owner', '--no-privileges', file], { env: toolEnv(config) });
       if (!r.ok) return { ok: false, rows: [], message: toolError('Loading the backup', r) };
-      const restored = new Client({ ...config, port: Number(config.port || 5432), database: TEST_DATABASE });
+      const restored = client(config, { database: TEST_DATABASE });
       await restored.connect();
       const rows = [];
       try {
@@ -177,19 +186,92 @@ async function checkBackupFile({ tools, file }) {
   return { ok: true };
 }
 
+// Run just before a restore, in one transaction: drops every fleet view and their function, and forgets which
+// views.sql made them. pg_restore --clean drops only what is in the backup, and without CASCADE, so a view added
+// by a later version would stop the restore. The views are made again at the next database check
+// (recheckDatabase), whether the restore worked or not. The same as the plugin's PgBackups.SetViewsAsideSql.
+const SET_VIEWS_ASIDE_SQL = `DO $$
+DECLARE v record;
+BEGIN
+  FOR v IN SELECT n.nspname AS schema, c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE c.relkind = 'v' AND n.nspname = current_schema() AND c.relname LIKE 'fleet\\_%\\_view' LOOP
+    EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', v.schema, v.name);  -- by name: one dropped already, with a view it's built on, is skipped
+  END LOOP;
+  DROP FUNCTION IF EXISTS fleet_part_letter(int) CASCADE;
+  IF to_regclass('companion_views') IS NOT NULL THEN DELETE FROM companion_views; END IF;
+END $$;`;
+
+// Pauses the plugins on every PC while the database is restored, as a move does (setup/move-database.js): the move
+// note says 'pausing' (plugins wait while it's fresh, so it's refreshed every 30 seconds), then this waits until no
+// plugin has been busy for a while. Returns { ok, end() } (end() takes the note down) or { ok: false, message }.
+// A database before update 10 has no note: nothing to pause. A note saying the database moved away is left alone.
+async function pausePlugins(config, { tries = 60, everyMs = 3000 } = {}) {
+  const db = client(config);
+  await db.connect();
+  const end = async () => {
+    clearInterval(beat);
+    await db.query(`DELETE FROM companion_database_move WHERE id = 1 AND state = 'pausing'`).catch(() => {});
+    await db.end().catch(() => {});
+  };
+  let beat = null;
+  const hasNote = (await db.query(`SELECT to_regclass('companion_database_move') IS NOT NULL AS t`)).rows[0].t;
+  if (!hasNote) { await db.end().catch(() => {}); return { ok: true, end: async () => {} }; }
+  const set = await db.query(`INSERT INTO companion_database_move (id, state, host, port, from_host, started_at, updated_at, moved_at)
+    VALUES (1, 'pausing', $1, $2, 'restore', now(), now(), NULL)
+    ON CONFLICT (id) DO UPDATE SET state = 'pausing', from_host = 'restore', started_at = now(), updated_at = now(), moved_at = NULL
+    WHERE companion_database_move.state <> 'moved'`, [String(config.host), Number(config.port || 5432)]);
+  if (set.rowCount === 0) { await db.end().catch(() => {}); return { ok: true, end: async () => {} }; }
+  beat = setInterval(() => { db.query(`UPDATE companion_database_move SET updated_at = now() WHERE id = 1 AND state = 'pausing'`).catch(() => {}); }, 30000);
+  let quiet = 0;
+  for (let i = 0; i < tries && quiet < 2; i++) {
+    const busy = Number((await db.query(`SELECT count(*) AS n FROM pg_stat_activity
+      WHERE datname = current_database() AND application_name = $1 AND pid <> pg_backend_pid()
+        AND (state <> 'idle' OR state_change > now() - make_interval(secs => 15))`, [PLUGIN_APPLICATION_NAME])).rows[0].n);
+    quiet = busy === 0 ? quiet + 1 : 0;
+    if (quiet < 2) await new Promise((r) => setTimeout(r, everyMs));
+  }
+  if (quiet < 2) {
+    await end();
+    return { ok: false, message: 'A plugin on another PC was still syncing after 3 minutes, so nothing was restored. Try again in a few minutes.' };
+  }
+  return { ok: true, end };
+}
+
 // Puts the database back as it was in `file`: first a backup of how it is now (so this can be undone),
 // then pg_restore --clean in one transaction, so a failure part way changes nothing. Tables made after
-// that backup are kept. Returns { ok, safety: <the backup made first>, message }.
-async function restoreBackup({ tools, config, settings, file }) {
+// that backup are kept. The fleet views are set aside first (SET_VIEWS_ASIDE_SQL): check the database
+// again afterwards, whatever the result. Returns { ok, safety: <the backup made first>, message }.
+async function restoreBackup({ tools, config, settings, file, pause = {} }) {
   if (!fs.existsSync(file)) return { ok: false, message: `${file} is not there any more.` };
   // Removes no old backups: the one being restored may be the oldest. The next daily backup tidies up.
   const safety = await backupNow({ tools, config, settings: { ...settings, copyFolder: '', keep: Number.MAX_SAFE_INTEGER } });
   if (!safety.ok) return { ok: false, safety, message: `Nothing was restored: first backing up the database as it is now failed. ${safety.message}` };
-  const r = await run(tools.restore, [...connectionArgs(config), '-d', String(config.database), '--clean', '--if-exists',
-    '--single-transaction', '--no-owner', '--no-privileges', file], { env: toolEnv(config) });
+  let paused;
+  try {
+    paused = await pausePlugins(config, pause);
+  } catch (err) {
+    return { ok: false, safety, message: `Nothing was restored: the other PCs couldn't be paused first. ${err.message}` };
+  }
+  if (!paused.ok) return { ok: false, safety, message: paused.message };
+  let r;
+  try {
+    const db = client(config);
+    try {
+      await db.connect();
+      await db.query(SET_VIEWS_ASIDE_SQL);
+    } catch (err) {
+      return { ok: false, safety, message: `Nothing was restored: the fleet views couldn't be set aside first. ${err.message}` };
+    } finally {
+      await db.end().catch(() => {});
+    }
+    r = await run(tools.restore, [...connectionArgs(config), '-d', String(config.database), '--clean', '--if-exists',
+      '--single-transaction', '--no-owner', '--no-privileges', file], { env: toolEnv(config) });
+  } finally {
+    await paused.end();
+  }
   writeLog(settings.folder, [r.ok ? `Restored ${path.basename(file)} (the database before it is ${path.basename(safety.file)})` : `RESTORE FAILED, nothing changed: ${toolError('pg_restore', r)}`]);
   if (!r.ok) return { ok: false, safety, message: `${toolError('Restoring', r)} Nothing was changed.` };
   return { ok: true, safety, message: `Restored. The database as it was just before is saved as ${path.basename(safety.file)}.` };
 }
 
-module.exports = { backupNow, testBackup, checkBackupFile, restoreBackup, writeLog, TEST_DATABASE };
+module.exports = { backupNow, testBackup, checkBackupFile, restoreBackup, writeLog, TEST_DATABASE, SET_VIEWS_ASIDE_SQL, client, pausePlugins };

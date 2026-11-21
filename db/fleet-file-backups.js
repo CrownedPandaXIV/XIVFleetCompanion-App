@@ -34,6 +34,12 @@ function backUpNow(fleetFile, now = new Date()) {
   const temp = path.join(folder, `making-${process.pid}-${Date.now()}.tmp`);
   const db = new DatabaseSync(fleetFile, { timeout: 15000 });
   try {
+    // A damaged file isn't backed up: a copy of it would push the last good backups out of the 7 kept (the plugin
+    // doesn't back up a damaged file either).
+    const check = db.prepare('PRAGMA quick_check').all().map((r) => Object.values(r)[0]);
+    if (check.length !== 1 || check[0] !== 'ok') {
+      throw new Error("The fleet file is damaged, so it wasn't backed up (the backups already made are kept). Restore one in the game: the plugin's Status page, Restore a backup.");
+    }
     db.prepare('VACUUM INTO ?').run(temp);
   } finally {
     db.close();

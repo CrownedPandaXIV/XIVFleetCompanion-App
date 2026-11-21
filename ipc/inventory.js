@@ -20,6 +20,12 @@ const SALVAGE_PRICES = {
 // shared by several tracked characters is counted once, on one member's
 // row (the FC leader if tracked, else the first in roster order), so the
 // fleet total does not count it per member.
+// A high-quality stack is stored at its item id + 1,000,000 (the game's numbering): named as the item, with "(HQ)".
+const BASE_ID_SQL = (col) => `(CASE WHEN ${col} >= 1000000 AND ${col} < 2000000 THEN ${col} - 1000000 ELSE ${col} END)`;
+const isHq = (id) => Number(id) >= 1000000 && Number(id) < 2000000;
+const baseItemId = (id) => (isHq(id) ? Number(id) - 1000000 : Number(id));
+const itemLabel = (name, id) => `${name || `Item ${baseItemId(id)}`}${isHq(id) ? ' (HQ)' : ''}`;
+
 ipcMain.handle('get-salvage', async () => {
   return withClient(async (client) => {
     const { latestCharacter } = await snapshotFragments(client);
@@ -127,7 +133,9 @@ ipcMain.handle('get-salvage', async () => {
 // sentinel for "this is the character's own bag, not a retainer"
 // (confirmed against real data earlier).
 ipcMain.handle('get-character-inventory', async (event, cids) => {
-  if (!Array.isArray(cids)) {
+  // Whole-number ids only, and not too many (PostgreSQL would refuse anything else with a technical message, and the
+  // fleet file would quietly match nothing).
+  if (!Array.isArray(cids) || cids.length > 2000 || !cids.every((id) => /^\d{1,20}$/.test(String(id)))) {
     return { success: false, error: 'Invalid request.' };
   }
   return withClient(async (client) => {
@@ -143,7 +151,7 @@ ipcMain.handle('get-character-inventory', async (event, cids) => {
       LEFT JOIN ${latestCharacter} c ON c.cid = inv.owner_cid
       LEFT JOIN companion_inventory_type_lookup til ON til.sorted_container = inv.sorted_container
       LEFT JOIN companion_retainer_lookup rl ON rl.retainer_id = inv.retainer_id
-      LEFT JOIN ffxiv_item it ON it.id::text = inv.item_id::text
+      LEFT JOIN ffxiv_item it ON it.id::text = ${BASE_ID_SQL('inv.item_id')}::text
       WHERE inv.owner_cid = ANY($1::numeric[])
         AND inv.quantity > 0
         AND inv.sorted_container != 2000
@@ -162,7 +170,7 @@ ipcMain.handle('get-character-inventory', async (event, cids) => {
         location,
         equipped: isEquipped({ kind: isRetainer ? 'retainer' : 'character', container: row.sorted_container }),
         item_id: row.item_id,
-        item_name: row.item_name || `Item ${row.item_id}`,
+        item_name: itemLabel(row.item_name, row.item_id),
         quantity: row.quantity
       };
     });
@@ -197,7 +205,7 @@ ipcMain.handle('get-fc-list', async () => {
       LEFT JOIN character_sort_order so ON so.cid = c.cid
       WHERE h.fc_id IS NOT NULL
       GROUP BY h.fc_id, h.fc_name
-      ORDER BY sort_index NULLS LAST, h.fc_name, h.fc_id
+      ORDER BY sort_index NULLS LAST, h.fc_name COLLATE "C", h.fc_id
     `);
 
     return { success: true, rows: result.rows };
@@ -234,7 +242,9 @@ ipcMain.handle('get-house-warnings', async () => {
 // One FC's full chest contents, real item names, grouped by tab via
 // sorted_container (20000-20004 -> Tab 1-5).
 ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
-  if (!Array.isArray(fcIds)) {
+  // Whole-number ids only, and not too many (PostgreSQL would refuse anything else with a technical message, and the
+  // fleet file would quietly match nothing).
+  if (!Array.isArray(fcIds) || fcIds.length > 2000 || !fcIds.every((id) => /^\d{1,20}$/.test(String(id)))) {
     return { success: false, error: 'Invalid request.' };
   }
   return withClient(async (client) => {
@@ -244,7 +254,7 @@ ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
              (SELECT fc_name FROM companion_character_housing ch
               WHERE ch.fc_id = fc.fc_id ORDER BY ch.updated_at DESC LIMIT 1) AS fc_name
       FROM companion_fc_inventory_snapshot fc
-      LEFT JOIN ffxiv_item it ON it.id::text = fc.item_id::text
+      LEFT JOIN ffxiv_item it ON it.id::text = ${BASE_ID_SQL('fc.item_id')}::text
       WHERE fc.fc_id = ANY($1::numeric[]) AND fc.quantity > 0
         AND fc.sorted_container BETWEEN 20000 AND 20004
     `, [fcIds]);
@@ -254,7 +264,7 @@ ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
       fc_name: row.fc_name || `FC ${row.fc_id}`,
       tab: `Tab ${row.sorted_container - 20000 + 1}`,
       item_id: row.item_id,
-      item_name: row.item_name || `Item ${row.item_id}`,
+      item_name: itemLabel(row.item_name, row.item_id),
       quantity: row.quantity
     }));
 
@@ -297,14 +307,14 @@ ipcMain.handle('get-fleet-inventory-summary', async () => {
     const itemIds = Array.from(totalsByItemId.keys());
     const nameResult = await client.query(
       `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[])`,
-      [itemIds.map(String)]
+      [[...new Set(itemIds.map((id) => String(baseItemId(id))))]]
     );
     const nameById = new Map(nameResult.rows.map((r) => [Number(r.id), r.name]));
 
     const rows = itemIds
       .map((itemId) => ({
         item_id: itemId,
-        item_name: nameById.get(itemId) || `Item ${itemId}`,
+        item_name: itemLabel(nameById.get(baseItemId(itemId)), itemId),
         total_quantity: totalsByItemId.get(itemId),
         equipped_quantity: equippedByItemId.get(itemId)
       }))
@@ -337,7 +347,7 @@ ipcMain.handle('find-items', async (event, term) => {
       SELECT DISTINCT ${baseId} FROM companion_fc_inventory_snapshot
       WHERE quantity > 0 AND NOT (sorted_container = ANY($1::int[]))`, [MONEY_CONTAINERS]);
     const matched = await client.query(
-      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE ALL($2::text[]) ORDER BY name LIMIT $3`,
+      `SELECT id, name FROM ffxiv_item WHERE id = ANY($1::text[]) AND name ILIKE ALL($2::text[]) ORDER BY name COLLATE "C" LIMIT $3`,
       [heldIds.rows.map((r) => String(r.id)), likePatterns(text), FIND_LIMIT + 1]);
     const more = matched.rows.length > FIND_LIMIT;
     const nameById = new Map(matched.rows.slice(0, FIND_LIMIT).map((r) => [Number(r.id), r.name]));
@@ -387,6 +397,7 @@ ipcMain.handle('find-items', async (event, term) => {
           ...ownerFields(character, who),
           ...(character ? {} : { ownerKey: String(r.owner_cid) }),
           kind: String(r.retainer_id) !== String(r.owner_cid) ? 'retainer' : 'character',
+          holderId: String(r.retainer_id) !== String(r.owner_cid) ? `r:${r.retainer_id}` : `c:${r.owner_cid}`,
           container: r.sorted_container,
           containerName: r.container_name,
           retainerName: r.retainer_name,
@@ -401,6 +412,7 @@ ipcMain.handle('find-items', async (event, term) => {
           who,
           ...ownerFields(byCid.get(holderOfFc.get(String(r.fc_id))), who),
           kind: 'fc',
+          holderId: `fc:${r.fc_id}`,
           container: r.sorted_container,
           containerName: r.container_name,
           qty: Number(r.quantity),

@@ -44,7 +44,7 @@ without them.
 
 No administrator rights are needed: it installs just for your Windows account.
 
-**One download, two ways to open it** (pick in the setup screen, or later in Settings → General → This PC shows):
+**One download, two ways to open it** (the full app unless you pick otherwise in Settings → General → This PC shows):
 
 | | The full app | The Database Helper |
 | --- | --- | --- |
@@ -80,12 +80,14 @@ this is for whoever wants to try things first. The plugin has its own test build
 
 The first time the app starts, it asks what this PC is for:
 
-- **Everything on this PC:** it plays and keeps the database, and no other PC connects.
+- **I play on one PC:** nothing to install. In the game, type `/xivfleet` and click **Keep it on this PC**: the game
+  keeps your fleet in one file on this PC, and once it has synced the app opens it by itself (see
+  [Just this PC](#just-this-pc)).
 - **This PC keeps the database for my other PCs.**
 - **This PC uses a database on another PC.**
 - **This PC only plays the game** (just the plugin).
 
-Then click **Set up this PC**. The app downloads PostgreSQL and Tailscale from their makers where they're needed
+For the last three, click **Set up this PC**. The app downloads PostgreSQL and Tailscale from their makers where they're needed
 (checking each download is the genuine file), installs them, and sets everything up. Windows asks for permission once.
 On the database PC you choose two passwords:
 
@@ -198,7 +200,7 @@ On a PC where you don't need your fleet's pages, such as the PC that keeps the d
 with the plugin, choose **Settings → General → This PC shows → The Database Helper**. It's the same app with only
 its database tools: where the database is and whether it's up to date, this PC's backups, and the PCs that use
 it, with setup, moving the database, backups and restore, and Remove everything a click away. It still keeps the
-database up to date and makes the nightly backup. The setup screen asks the same question the first time. It's for
+database up to date and makes the nightly backup. It's for
 that PC only, and **Open the full app** switches back without losing anything.
 
 ## Just this PC

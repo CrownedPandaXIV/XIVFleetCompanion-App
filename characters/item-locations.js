@@ -81,7 +81,9 @@ function compareRoster(a, b) {
 //   [{ itemId, name, total, places: [{ who, world, account, kind, where, qty }] }]
 // stacks: [{ itemId, name, who, world, account, kind, container, containerName, retainerName, qty,
 //            owner (name of the character it belongs to, or of the FC chest's holder), ownerKey (that
-//            character's id), sortIndex, hireOrder }].
+//            character's id), sortIndex, hireOrder, holderId (the character, retainer or FC holding it, as
+//            'c:<cid>', 'r:<retainer id>' or 'fc:<fc id>') }].
+// Each place has a key that is the same only for the same place (for React rows).
 // Stacks in the same place (several bag slots) are added together.
 function groupByItem(stacks) {
   const items = new Map();
@@ -92,11 +94,13 @@ function groupByItem(stacks) {
     const where = placeLabel(s);
     item.total += s.qty;
     const ownerKey = s.ownerKey ?? null;
-    const place = item.places.find((p) => p.ownerKey === ownerKey && p.who === s.who && p.world === (s.world || null) && p.where === where);
+    // Which bags, retainer or chest by id (two FCs or retainers can share a name), else as before by owner and name.
+    const key = `${s.holderId ?? `${ownerKey}|${s.who}|${s.world || ''}`}|${where}`;
+    const place = item.places.find((p) => p.key === key);
     if (place) place.qty += s.qty;
     else {
       item.places.push({
-        who: s.who, world: s.world || null, account: s.account || null, kind: s.kind, where, qty: s.qty,
+        key, who: s.who, world: s.world || null, account: s.account || null, kind: s.kind, where, qty: s.qty,
         owner: s.owner || s.who, ownerKey, sortIndex: s.sortIndex ?? null, hireOrder: s.hireOrder ?? null,
         retainerName: s.retainerName || null, equipped: isEquipped(s),
       });

@@ -98,11 +98,16 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
 
   useEffect(() => {
     window.api.getRetainerSummary().then((r) => { if (r.success) { setData(r); setError(null); } else setError(r.error); });
-    window.api.getLoot().then((r) => setVentures(r.success && !r.missing ? r : false));
-    window.api.getMarket().then((r) => setMarket(r.success ? r : false));
+    // false: the database needs an update for it; { error }: it couldn't be loaded (said as it is).
+    // A failed refresh keeps a figure already shown.
+    const keepShown = (prev, r) => (prev && !prev.error ? prev : { error: r.error });
+    window.api.getLoot().then((r) => setVentures((prev) => (r.success ? (r.missing ? false : r) : keepShown(prev, r))));
+    window.api.getMarket().then((r) => setMarket((prev) => (r.success ? r : keepShown(prev, r))));
   }, [refreshKey]);
 
-  const m = market ? market.market : null;
+  const m = market && !market.error ? market.market : null;
+  const failed = (answer) => (answer && answer.error ? `couldn't be loaded: ${answer.error}` : '');
+  const v = ventures && !ventures.error ? ventures : null;
   const needs008 = 'needs a database update (see the banner at the top)';
   return (
     <div className="summary-retainers">
@@ -117,14 +122,14 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
         <SummaryTile className="retainers-ventures-tile" label="Ventures" value={data ? `${data.ready} ready to collect` : '—'}
           note={data ? `${data.away} out, ${data.soon} back within an hour` : ''} />
         <SummaryTile className="retainers-income-tile" label="Venture Income"
-          value={ventures ? <><span className="gil">{summaryGil(ventures.ventureTotals.perDay)} gil</span> a day</> : '—'}
-          note={ventures ? <>last {ventures.windowDays} days, at what a vendor pays{ventures.market && ventures.market.ventures
-            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(ventures.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}</>
-            : ventures === false ? needs008 : ''}>
+          value={v ? <><span className="gil">{summaryGil(v.ventureTotals.perDay)} gil</span> a day</> : '—'}
+          note={v ? <>last {v.windowDays} days, at what a vendor pays{v.market && v.market.ventures
+            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(v.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}</>
+            : ventures === false ? needs008 : failed(ventures)}>
           <button onClick={() => onNavigate('income')} style={{ marginTop: '8px' }}>View Income</button>
         </SummaryTile>
         <SummaryTile className="retainers-listings-tile" label="Listings Unsold for a While" value={m ? m.totals.stale.toLocaleString() : '—'}
-          note={m ? <>up for {market.minDays}+ days, <span className="gil">{summaryGil(m.totals.staleValue)} gil</span>{m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}</> : market ? needs008 : ''}>
+          note={m ? <>up for {market.minDays}+ days, <span className="gil">{summaryGil(m.totals.staleValue)} gil</span>{m.live && m.live.undercut ? ` · ${m.live.undercut.length} undercut` : ''}</> : market && market.error ? failed(market) : market ? needs008 : ''}>
           <button onClick={() => onNavigate('market')} style={{ marginTop: '8px' }}>View Gil & Market</button>
         </SummaryTile>
       </div>
@@ -147,10 +152,12 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
   const [thresholds, setThresholds] = useState({ repairKitThreshold: 0, ceruleumThreshold: 0, houseWarnDays: 7 });
   const [houseWarnings, setHouseWarnings] = useState(null);
   const [salvageTotal, setSalvageTotal] = useState(null);
-  const [partsNeededCount, setPartsNeededCount] = useState(null);
+  const [partsNeeded, setPartsNeeded] = useState(null);
   const [readySubs, setReadySubs] = useState(null);
   const [routeOptCount, setRouteOptCount] = useState(null);
-  const [error, setError] = useState(null);
+  // Each of the two loads' last error (null once it loads), so one that works doesn't hide the other's.
+  const [errors, setErrors] = useState({});
+  const error = errors.fleet || errors.houses;
   const houseSort = useColumnSort();
   const houseCols = useTableColumns({
     tableKey: 'summaryHouses', ownDefs: HOUSE_WARNING_COLUMN_DEFS, subject: 'fc', excludeExtras: HOUSE_WARNING_DUPLICATE_EXTRAS,
@@ -174,17 +181,15 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
         setNotSynced(result.notSynced || []);
         setSharedSync(result.sharedSync || []);
         setThresholds((t) => ({ ...t, repairKitThreshold: result.repairKitThreshold, ceruleumThreshold: result.ceruleumThreshold }));
-      } else {
-        setError(result.error);
       }
+      setErrors((e) => ({ ...e, fleet: result.success ? null : result.error }));
     });
     window.api.getHouseWarnings().then((result) => {
       if (result.success) {
         setHouseWarnings(result.rows);
         setThresholds((t) => ({ ...t, houseWarnDays: result.warnDays }));
-      } else {
-        setError(result.error);
       }
+      setErrors((e) => ({ ...e, houses: result.success ? null : result.error }));
     });
   }
 
@@ -199,7 +204,7 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
 
     window.api.getPartsNeeded().then((result) => {
       if (result.success) {
-        setPartsNeededCount(result.rows.filter((r) => !r.spare_location).length);
+        setPartsNeeded(result.rows);
         setReadySubs(subsReadyForParts(result.rows));
       }
     });
@@ -211,13 +216,17 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && warnings === null && houseWarnings === null) return <div className="error">Failed to load: {error}</div>;
   // Characters no longer synced keep their old subs; they are left out here as in the alerts.
   const notSyncedCids = new Set(notSynced.map((c) => String(c.cid)));
   const readyShown = readyCols.rows === null ? null : readyCols.rows.filter((s) => !notSyncedCids.has(String(s.cid)));
+  // Counted from the same characters as the list beside it.
+  const partsNeededCount = partsNeeded === null ? null
+    : partsNeeded.filter((r) => !r.spare_location && !notSyncedCids.has(String(r.cid))).length;
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <SharedSyncWarning characters={sharedSync} />
       <div className="controls summary-thresholds">
         <span>

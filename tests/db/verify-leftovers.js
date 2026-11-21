@@ -37,6 +37,10 @@ const note = (state) => `${MOVE_TABLE};
   for (const [d, state] of [['lo_live', 'arrived'], ['lo_live_before_move_20261018_2302', 'moved'], ['lo_away', 'moved'], ['lo_arrived', 'arrived']]) {
     const c = await connectTo(d);
     await c.query(note(state));
+    if (d === 'lo_away') {
+      await c.query(`CREATE TABLE companion_pc_status (pc_name text, account_label text);
+        INSERT INTO companion_pc_status VALUES ('LAPTOP', ''), ('DESKTOP', 'Alt')`);
+    }
     await c.end();
   }
 
@@ -48,6 +52,7 @@ const note = (state) => `${MOVE_TABLE};
       ['lo_live_before_move_20261018_2302', 'kept', null],
     ]);
     assert.ok(ours.every((l) => l.bytes > 0), 'with their size');
+    assert.deepStrictEqual(ours[0].pcs, ['DESKTOP (Alt)', 'LAPTOP'], 'the PCs that used the moved-away copy, which may still need it');
     for (const d of ['lo_live', 'lo_arrived', 'lo_other']) assert.ok(found.others.includes(d), `${d} is not a leftover`);
   });
 

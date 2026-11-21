@@ -10,17 +10,18 @@ const SETUP_HELP_PAGES = [
 
 function SetupCopy({ text, label = 'Copy' }) {
   const [done, setDone] = useState(false);
-  const copy = () => navigator.clipboard.writeText(text).then(() => {
-    setDone(true);
-    setTimeout(() => setDone(false), 1500);
-  });
-  return <button className="setup-copy" onClick={copy}>{done ? 'Copied' : label}</button>;
+  const show = (state) => { setDone(state); setTimeout(() => setDone(false), 1500); };
+  const copy = () => navigator.clipboard.writeText(text).then(() => show(true), () => show('failed'));
+  return <button className="setup-copy" onClick={copy}>{done === 'failed' ? "Couldn't copy" : done ? 'Copied' : label}</button>;
 }
 
 // A line to type or paste somewhere, with its own Copy button.
 function SetupLine({ text }) {
   return <div className="setup-line"><code>{text}</code><SetupCopy text={text} /></div>;
 }
+
+// An answer that came (not still loading) and isn't a failure.
+const ok = (answer) => !!answer && answer.success !== false;
 
 function SetupHelpSection() {
   const [page, setPage] = useState('connect');
@@ -41,10 +42,13 @@ function SetupHelpSection() {
           <button key={p.key} role="tab" aria-selected={page === p.key} className={`setup-page${page === p.key ? ' active' : ''}`} onClick={() => setPage(p.key)}>{p.label}</button>
         ))}
       </div>
-      {!details && <div className="status">Loading...</div>}
-      {details && page === 'connect' && <SetupConnect details={details} />}
-      {details && page === 'plugin' && <SetupPlugin details={details} onConnect={() => setPage('connect')} />}
-      {details && page === 'tailscale' && <SetupTailscale details={details} />}
+      {!details && page !== 'problem' && <div className="status">Loading...</div>}
+      {details && details.success === false && page !== 'problem' && (
+        <div className="error">Couldn't read this PC's setup: {details.error} <button onClick={() => { setDetails(null); load(); }}>Try again</button></div>
+      )}
+      {ok(details) && page === 'connect' && <SetupConnect details={details} />}
+      {ok(details) && page === 'plugin' && <SetupPlugin details={details} onConnect={() => setPage('connect')} />}
+      {ok(details) && page === 'tailscale' && <SetupTailscale details={details} />}
       {page === 'problem' && <SetupProblem />}
       <RemoveEverything />
     </section>
@@ -58,6 +62,7 @@ function SetupProblem() {
   const [status, setStatus] = useState('');
   useEffect(() => { window.api.getProblemInfo().then(setInfo); }, []);
   if (!info) return <div className="status">Loading...</div>;
+  if (info.success === false) return <div className="error">Couldn't read the app's details: {info.error}</div>;
   const summary = `XIV Fleet Companion ${info.version} on ${info.system}`;
   const openLogs = async () => {
     const r = await window.api.openLogFolder();
@@ -112,13 +117,13 @@ function RemoveEverything() {
 
   useEffect(() => {
     if (!open) return undefined;
-    window.api.getRemovalPlan().then((r) => { setInfo(r); setForm((f) => ({ ...f, backupFolder: f.backupFolder || r.backupFolder })); });
+    window.api.getRemovalPlan().then((r) => { setInfo(r); if (ok(r)) setForm((f) => ({ ...f, backupFolder: f.backupFolder || r.backupFolder })); });
     return window.api.onRemoveProgress(setSteps);
   }, [open]);
 
   const choose = async () => {
     const folder = await window.api.chooseBackupFolder({ title: 'Folder for the final backup', current: form.backupFolder });
-    if (folder) set('backupFolder', folder);
+    if (typeof folder === 'string' && folder) set('backupFolder', folder);
   };
   const start = async () => {
     setWorking(true);
@@ -143,7 +148,10 @@ function RemoveEverything() {
   return (
     <div className="setup-remove">
       <h4>Remove everything from this PC</h4>
-      {!plan && <div className="status">Checking this PC...</div>}
+      {!info && <div className="status">Checking this PC...</div>}
+      {info && info.success === false && (
+        <div className="setup-test-status setup-problem">Couldn't check this PC: {info.error} <button onClick={() => setOpen(false)}>Close</button></div>
+      )}
       {plan && !result?.ok && (
         <>
           <p>This removes:</p>
@@ -242,7 +250,8 @@ function SetupConnect({ details }) {
       </table>
       <div className="settings-row"><SetupCopy text={setupDetailsText(details, address)} label="Copy these details" /></div>
       <p className="alerts-help">
-        Not connecting? Use <strong>Test connection</strong> on the Tailscale page of the other PC: it says what's wrong.
+        Not connecting? On the other PC, type these into <strong>Settings → Database</strong> and click <strong>Test Connection</strong>
+        (it tries them before saving): it says what's wrong.
       </p>
       {details.databaseHere && details.choices.length > 0 && <SetupOpenConnections details={details} />}
     </div>
@@ -372,7 +381,8 @@ function MoveDatabaseSection({ onMoved }) {
     setInfo(null);
     window.api.getMoveInfo().then((r) => {
       setInfo(r);
-      setForm((f) => ({ ...f, address: f.address || (r.choices[0] ? r.choices[0].address : '') }));
+      const first = ok(r) && Array.isArray(r.choices) && r.choices[0] ? r.choices[0].address : '';
+      setForm((f) => ({ ...f, address: f.address || first }));
     });
   };
   useEffect(() => {
@@ -383,6 +393,7 @@ function MoveDatabaseSection({ onMoved }) {
 
   const suggest = async () => {
     const pw = await window.api.suggestPassword();
+    if (typeof pw !== 'string') return;
     setForm((f) => ({ ...f, adminPassword: pw, repeat: pw }));
   };
   const start = async () => {
@@ -418,7 +429,10 @@ function MoveDatabaseSection({ onMoved }) {
     <section className="settings-section move-database">
       <h3>Move the database to this PC</h3>
       {!info && <div className="status">Checking the database and your PCs...</div>}
-      {info && !result?.ok && (
+      {info && info.success === false && (
+        <div className="setup-test-status setup-problem">Couldn't check the database and your PCs: {info.error} <button onClick={load}>Try again</button></div>
+      )}
+      {ok(info) && !result?.ok && (
         <>
           {info.from && (
             <p>
@@ -469,6 +483,7 @@ function MoveDatabaseSection({ onMoved }) {
             <button onClick={() => { setOpen(false); setResult(null); setSteps(null); }} disabled={working}>Cancel</button>
             {!info.windows && <span className="save-status">Only on Windows.</span>}
           </div>
+          {!working && <p className="alerts-help move-close-apps">The plugins pause on their own while the copy is made, but close the app on your other PCs first: a change made in it during the move isn't copied.</p>}
           {working && <p className="alerts-help">This takes a few minutes, longer for a big database. Keep the app open. The plugins pause while the copy is made and catch up afterwards.</p>}
         </>
       )}
@@ -506,7 +521,8 @@ function LeftoversSection() {
   const [working, setWorking] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   useEffect(() => {
-    window.api.getLeftoversInfo().then((r) => { setInfo(r); setForm((f) => ({ ...f, port: String(r.port) })); });
+    // Not shown at all if it couldn't be checked (it only appears when there's something to tidy).
+    window.api.getLeftoversInfo().then((r) => { setInfo(r); if (ok(r)) setForm((f) => ({ ...f, port: String(r.port) })); });
   }, []);
 
   const look = async () => {
@@ -567,6 +583,10 @@ function LeftoversSection() {
               <RemoveButton what={`"${l.name}"`} label="Remove" title="Remove this unused copy" onRemove={() => remove(l.name)}>
                 <p>This deletes the unused copy "{l.name}" from this PC's PostgreSQL. It can't be undone.</p>
                 <p>The database the app uses isn't touched.</p>
+                {l.kind === 'moved-away' && (
+                  <p className="leftovers-pcs">A PC that was off during the move finds the new address through this copy. Remove it only once every PC
+                    {l.pcs && l.pcs.length ? ` that used it (${l.pcs.join(', ')})` : ''} has synced since the move: the PCs page shows when each last did.</p>
+                )}
               </RemoveButton>
             </li>
           ))}
@@ -642,7 +662,13 @@ function SetupPlugin({ details, onConnect }) {
       <h4>3. Connect it to the database</h4>
       <ol>
         <li>Type <code>/xivfleet</code> and open its settings.</li>
-        <li>Enter the address, port, database name, username and password: the same as in this app (<button className="link-button" onClick={onConnect}>see Connect another PC</button>). The password is kept in Windows Credential Manager.</li>
+        {onConnect ? (
+          <li>Enter the address, port, database name, username and password: the same as in this app (<button className="link-button" onClick={onConnect}>see Connect another PC</button>). The password is kept in Windows Credential Manager.</li>
+        ) : (
+          // A PC that only plays has no connection of its own to copy: the details are on the database PC.
+          <li>Enter the address, port, database name, username and password shown on the database PC, in its app under
+            Settings → Setup Help → Connect another PC. The password is kept in Windows Credential Manager.</li>
+        )}
         <li>Under <strong>Characters</strong>, choose who to sync: everyone AutoRetainer knows (the default), or only the ones you tick.</li>
       </ol>
       <h4>4. Check it</h4>

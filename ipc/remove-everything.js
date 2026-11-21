@@ -14,9 +14,10 @@ const { downloadFolders } = require('../updater');
 const { readInstalled, forgetInstalled, removalPlan, removeEverything, finishScript, startFinish } = require('../setup/remove-everything');
 const { readMoveNote } = require('../db/database-move');
 const { findMovedAwayCopy } = require('../setup/leftovers');
+const { fleetFilePath } = require('../db/fleet-store');
 const { loadBackupSettings } = require('../backups/settings');
 const { settingsFile } = require('../backups/app');
-const { findTools } = require('../backups/tools');
+const { findTools, serverMajor } = require('../backups/tools');
 const { backupNow } = require('../backups/run');
 const backupSchedule = require('../backups/schedule');
 const { OLD_TASK_NAME } = require('../setup/old-discord-alerts');
@@ -64,6 +65,7 @@ async function facts() {
     tailscaleHere: windows && fs.existsSync(tailscaleExe()),
     otherDatabases: dbOnThisPc ? await otherDatabases(connection) : movedAway ? await otherDatabases({ ...connection, host: 'localhost', port: movedAway.port }) : [],
     movedAway,
+    fleetFileHere: fs.existsSync(fleetFilePath(app.getPath('appData'))),
     packaged: app.isPackaged,
   };
 }
@@ -85,7 +87,7 @@ ipcMain.handle('setup:remove-everything', async (event, input) => {
       makeBackup: async (folder) => {
         try {
           const { settings } = loadBackupSettings(settingsFile());
-          const tools = await findTools(settings.pgBin);
+          const tools = await findTools(settings.pgBin, { serverMajor: await serverMajor(loadPostgresConfig()) });
           if (!tools.found) return { ok: false, message: tools.error };
           return await backupNow({ tools, config: loadPostgresConfig(), settings: { folder, copyFolder: null, keep: 1000 } });
         } catch (err) {

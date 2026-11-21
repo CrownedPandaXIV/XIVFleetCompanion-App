@@ -56,7 +56,7 @@ const NAME = 'venture_totals_check';
         FROM companion_venture_result WHERE received_at > $1`, [since])).rows;
       const fromDatabase = (await client.query(VENTURE_TOTALS, [since])).rows;
       const key = (r) => `${r.owner_cid}|${r.item_id}|${r.hq}`;
-      const normal = (rows) => rows.map((r) => ({ key: key(r), quantity: Number(r.quantity), rewards: Number(r.rewards), retainers: [...r.retainers].sort() }))
+      const normal = (rows) => rows.map((r) => ({ key: key(r), quantity: Number(r.quantity), rewards: Number(r.rewards), retainers: [...r.retainer_names].sort() }))
         .sort((a, b) => a.key.localeCompare(b.key));
       assert.deepStrictEqual(normal(fromDatabase), normal(ventureTotals(rewards)));
       console.log(`   ${rewards.length} rewards, ${fromDatabase.length} rows now`);

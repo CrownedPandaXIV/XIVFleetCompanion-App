@@ -10,7 +10,18 @@ const { run } = require('../backups/tools');
 const { parseServices, instanceForPort, firewallDeleteArgs, applyRemoteAccess, undoRemoteAccess } = require('./remote-access');
 const {
   postgresCommand, tailscaleCommand, installSucceeded, TAILSCALE_PRODUCT, productCodeFrom, tailscaleUninstallCommand, postgresUninstallCommand,
+  DOWNLOADS, sha256Of,
 } = require('./installers');
+
+// The installer the request names is checked again here, with administrator rights, against the checksums the app
+// knows (DOWNLOADS): the request and the download sit in the user's temp folder, where anything running as the user
+// could swap them between the app's check and this run. Null when it's one of them, else why not.
+async function notGenuine(file, kind) {
+  const known = Object.values(DOWNLOADS[kind]).filter((d) => d && d.sha256).map((d) => d.sha256.toUpperCase());
+  let sum;
+  try { sum = String(await sha256Of(file)).toUpperCase(); } catch (err) { return `${path.basename(String(file))} couldn't be read: ${err.message}`; }
+  return known.includes(sum) ? null : `${path.basename(String(file))} isn't the genuine ${DOWNLOADS[kind].name} download (its checksum doesn't match), so it wasn't run. Run Set up this PC again to download it afresh.`;
+}
 
 const FLAG = '--fleet-setup';
 
@@ -110,9 +121,13 @@ async function removePostgres(step, deps) {
   return { kind: step.kind, ok: true, message: 'PostgreSQL and its databases are removed.' };
 }
 
-// One step, with administrator rights. deps (for the tests): run, listServices, and for removing, fs and wait.
+// One step, with administrator rights. deps (for the tests): run, listServices, verify (the installer check), and for
+// removing, fs and wait.
 async function runStep(step, deps) {
+  const verify = deps.verify || notGenuine;
   if (step.kind === 'installPostgres') {
+    const fake = await verify(step.installer, 'postgres');
+    if (fake) return { kind: step.kind, ok: false, message: fake };
     const [file, args] = postgresCommand(step.installer, step.optionFile);
     const r = await deps.run(file, args);
     return installSucceeded(r.code)
@@ -120,6 +135,8 @@ async function runStep(step, deps) {
       : { kind: step.kind, ok: false, message: `PostgreSQL's installer stopped with code ${r.code}. ${(r.stderr || r.stdout).trim()}`.trim() };
   }
   if (step.kind === 'installTailscale') {
+    const fake = await verify(step.msi, 'tailscale');
+    if (fake) return { kind: step.kind, ok: false, message: fake };
     const [file, args] = tailscaleCommand(step.msi);
     const r = await deps.run(file, args);
     return installSucceeded(r.code)

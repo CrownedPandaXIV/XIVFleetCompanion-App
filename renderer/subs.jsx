@@ -298,33 +298,43 @@ function SubmarinesView({ refreshKey }) {
   });
   const subRows = subCols.rows;
 
-  useEffect(() => {
+  // The newest load only: an older answer arriving late doesn't replace a newer one.
+  const latestLoad = useRef(0);
+  function load() {
+    const call = ++latestLoad.current;
     window.api.getSubmarines().then((result) => {
+      if (call !== latestLoad.current) return;
       if (result.success) {
-        setRows(result.rows);
+        setRows(sortRows(result.rows)); // characters in the same order as the other tabs
+        setError(null);
       } else {
         setError(result.error);
       }
     });
-  }, [refreshKey]);
+  }
+  useEffect(load, [refreshKey]);
 
-  // Optimistic update: flips the checkbox immediately in local state,
-  // then persists in the background. If the save fails, reverts back -
-  // better feedback than waiting on a round-trip for every click.
+  // The tick shows at once. Once saved, the rows are read again, since Next build, Target route and Target gil/day
+  // follow it (as the plugin does). If it isn't saved, the tick goes back and the reason shows.
+  const [toggleError, setToggleError] = useState(null);
   async function handleToggleCraft(cid, subName, enabled) {
     setRows((prev) =>
       prev.map((r) => (r.cid === cid && r.sub_name === subName ? { ...r, craft_enabled: enabled } : r))
     );
 
     const result = await window.api.setCraftEnabled({ cid, subName, enabled });
-    if (!result.success) {
+    if (result.success) {
+      setToggleError(null);
+      load();
+    } else {
+      setToggleError(`Fight Club builds for ${subName} not saved: ${result.error}`);
       setRows((prev) =>
         prev.map((r) => (r.cid === cid && r.sub_name === subName ? { ...r, craft_enabled: !enabled } : r))
       );
     }
   }
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
   if (rows.length === 0) return <div className="status">No built submarines found.</div>;
 
@@ -332,6 +342,8 @@ function SubmarinesView({ refreshKey }) {
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
+      {toggleError && <div className="error">{toggleError}</div>}
       <div className="controls" style={{ display: 'flex', alignItems: 'center' }}>
         {!subSort.sortColumn && (
           <label>

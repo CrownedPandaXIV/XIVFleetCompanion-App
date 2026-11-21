@@ -41,8 +41,7 @@ module.exports = async (t) => {
     set.call(input, '10'); input.dispatchEvent(new Event('input', { bubbles: true }));
     input.blur();
   })()`);
-  await sleep(1200);
-  row = await bex();
+  for (let i = 0; i < 100 && !((row = await bex()) && row[4].text === '48'); i++) await sleep(150);
   check(row && row[4].text === '48', 'buy enough for 10 days: 48 ceruleum: ' + (row && row[4].text));
   check(/To last 10 days, buy/.test(await ev(`document.querySelector('.supplies-summary').innerText`)), 'the fleet card follows the setting');
   const saved = await t.query(`SELECT setting_key, setting_value FROM fleet_economics_settings WHERE setting_key IN ('supply_window_days', 'restock_target_days') ORDER BY 1`);

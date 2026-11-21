@@ -136,7 +136,7 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Loot per voyage failed to load: {error}</div>;
+  if (error && data === null) return <div className="error">Loot per voyage failed to load: {error}</div>;
   if (data === null) return null;
   if (data.missing) {
     return (
@@ -150,6 +150,7 @@ function IncomeLootSection({ refreshKey, uses = { subs: true, retainers: true } 
   const v = data.ventureTotals;
   return (
     <div className="income-loot">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <MarketNote market={data.market} />
       {uses.subs && (<React.Fragment>
       <h2 style={{ padding: '16px 24px 0' }}>Loot per Voyage</h2>
@@ -203,6 +204,8 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
   const [error, setError] = useState(null);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
   const [saveError, setSaveError] = useState(null);
+  // Loot per Voyage and Retainer Ventures use the same saved window: they load again when it changes.
+  const [windowSaves, setWindowSaves] = useState(0);
 
   function load() {
     window.api.getIncome().then((result) => {
@@ -222,12 +225,13 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
     if (result.success) {
       setSaveError(null);
       load();
+      setWindowSaves((n) => n + 1);
     } else {
       setSaveError(result.error);
     }
   }
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && data === null) return <div className="error">Failed to load: {error}</div>;
   if (data === null) return <div className="status">Loading...</div>;
 
   const windowChoice = (
@@ -246,7 +250,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
           {windowChoice}
           {saveError && <span className="error-inline">{saveError}</span>}
         </div>
-        <IncomeLootSection refreshKey={refreshKey} uses={uses} />
+        <IncomeLootSection refreshKey={`${refreshKey}|${windowSaves}`} uses={uses} />
       </div>
     );
   }
@@ -258,6 +262,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
 
   return (
     <div className="income">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls income-controls">
         {windowChoice}
         <label>
@@ -308,7 +313,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       ))}
       {rows.length > 0 && !groupByAccountEnabled && incomeTable(rows)}
 
-      <IncomeLootSection refreshKey={refreshKey} uses={uses} />
+      <IncomeLootSection refreshKey={`${refreshKey}|${windowSaves}`} uses={uses} />
     </div>
   );
 }

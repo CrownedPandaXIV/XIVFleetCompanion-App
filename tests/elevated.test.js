@@ -36,7 +36,7 @@ test('the administrator steps run in order with the right commands, and stop at 
   const r = await runSteps([
     { kind: 'installPostgres', installer: 'C:\\dl\\pg.exe', optionFile: 'C:\\t\\options.txt' },
     { kind: 'installTailscale', msi: 'C:\\dl\\ts.msi' },
-  ], { run, listServices: async () => [] }, (results) => progress.push(results.length));
+  ], { run, listServices: async () => [], verify: async () => null }, (results) => progress.push(results.length));
   assert.strictEqual(r.ok, true);
   assert.deepStrictEqual(calls, [
     'C:\\dl\\pg.exe --mode unattended --unattendedmodeui none --optionfile C:\\t\\options.txt',
@@ -47,10 +47,26 @@ test('the administrator steps run in order with the right commands, and stop at 
   const failing = await runSteps([
     { kind: 'installPostgres', installer: 'pg.exe', optionFile: 'o.txt' },
     { kind: 'installTailscale', msi: 'ts.msi' },
-  ], { run: async () => ({ ok: false, code: 1, stdout: '', stderr: 'disk full' }), listServices: async () => [] });
+  ], { run: async () => ({ ok: false, code: 1, stdout: '', stderr: 'disk full' }), listServices: async () => [], verify: async () => null });
   assert.strictEqual(failing.ok, false);
   assert.strictEqual(failing.results.length, 1, 'Tailscale is not tried after PostgreSQL failed');
   assert.match(failing.results[0].message, /stopped with code 1\. disk full/);
+});
+
+test('an installer that is not the genuine download is not run with administrator rights', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fake-installer-')), 'postgresql-setup.exe');
+  fs.writeFileSync(file, 'not PostgreSQL');
+  const calls = [];
+  const r = await runSteps([{ kind: 'installPostgres', installer: file, optionFile: 'o.txt' }],
+    { run: async (f, a) => { calls.push(f); return { ok: true, code: 0 }; }, listServices: async () => [] });
+  assert.strictEqual(r.ok, false);
+  assert.match(r.results[0].message, /isn't the genuine PostgreSQL 18 download/);
+  assert.deepStrictEqual(calls, [], 'nothing was run');
+  const gone = await runSteps([{ kind: 'installTailscale', msi: path.join(path.dirname(file), 'missing.msi') }], { run: async () => ({ ok: true, code: 0 }), listServices: async () => [] });
+  assert.match(gone.results[0].message, /missing\.msi couldn't be read/);
 });
 
 test('"let other PCs connect" as a step finds PostgreSQL itself; none installed says so', async () => {

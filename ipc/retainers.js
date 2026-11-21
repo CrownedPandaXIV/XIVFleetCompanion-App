@@ -1,7 +1,7 @@
 // Retainers: gear status against each retainer's target, gear suggestions, saving targets.
 const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
-const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { notSyncedCharacters, readBehindMinutes, readLoginPcs } = require('../characters/not-synced');
 const { retainerSummary } = require('../characters/retainer-summary');
 
 // Equipped-gear slot display order for the Retainers view's ilvl hover
@@ -81,7 +81,7 @@ ipcMain.handle('get-retainer-summary', () => withClient(async (client) => {
     LEFT JOIN ffxiv_classjob cj ON cj.id = rl.job::text
     WHERE rl.job > 0`);
   const behind = notSyncedCharacters(rows.map((r) => ({ cid: r.owner_cid, account_label: r.account_label, last_synced_at: r.last_synced_at })),
-    await readBehindMinutes(client));
+    await readBehindMinutes(client), await readLoginPcs(client));
   return { success: true, ...retainerSummary(rows.filter((r) => !behind.has(String(r.owner_cid)))) };
 }, (err) => ({ success: false, error: err.message })));
 
@@ -113,14 +113,15 @@ ipcMain.handle('get-retainer-targets', async () => {
       LEFT JOIN ffxiv_retainertaskrandom vr ON vt.is_random = 'True' AND vr.id = vt.task
       LEFT JOIN ffxiv_retainertasknormal vn ON vt.is_random = 'False' AND vn.id = vt.task
       LEFT JOIN ffxiv_item vi ON vi.id = vn.item
-      ORDER BY so.sort_index NULLS LAST, c.name, rl.hire_order_index NULLS LAST, rl.retainer_id
+      ORDER BY so.sort_index NULLS LAST, c.name COLLATE "C", rl.hire_order_index NULLS LAST, rl.retainer_id
     `);
 
     const gearResult = await client.query(`
-      SELECT inv.retainer_id, inv.item_id, i.name AS item_name,
+      SELECT inv.retainer_id, inv.item_id, i.name AS item_name, (inv.item_id >= 1000000 AND inv.item_id < 2000000) AS hq,
              i.level_item, i.level_equip, i.equip_slot_category, cjc.*
       FROM companion_inventory_snapshot inv
-      LEFT JOIN ffxiv_item i ON i.id::text = inv.item_id::text
+      -- A high-quality piece is stored at its id + 1,000,000 (the game's numbering): looked up as the item itself.
+      LEFT JOIN ffxiv_item i ON i.id::text = (CASE WHEN inv.item_id >= 1000000 AND inv.item_id < 2000000 THEN inv.item_id - 1000000 ELSE inv.item_id END)::text
       LEFT JOIN ffxiv_classjobcategory cjc ON cjc.id = i.class_job_category
       WHERE inv.sorted_container = 11000
       ORDER BY inv.retainer_id, inv.sorted_slot_index
@@ -154,7 +155,7 @@ ipcMain.handle('get-retainer-targets', async () => {
         }
 
         const status = computeGearStatus(retainer.job_abbreviation, retainer.target_mode, retainer.target_value, g);
-        return { label, itemName: g.item_name || `Item ${g.item_id}`, levelItem, status };
+        return { label, itemName: `${g.item_name || `Item ${g.item_id}`}${g.hq ? ' (HQ)' : ''}`, levelItem, status };
       });
 
       // If a target is set, show every canonical slot even if nothing's
@@ -221,7 +222,7 @@ const SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES = {
 // genuinely craftable, contrary to an earlier wrong assumption that raid
 // gear couldn't be). This is the suggestion list ONLY - status itself
 // (OK/Mismatch/Wrong Job/Empty) stays an exact match, computed separately.
-ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMode, targetValue, onlyCrafted, slotLabel }) => {
+ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMode, targetValue, onlyCrafted, slotLabel } = {}) => {
   return withClient(async (client) => {
     const categories = SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES[slotLabel];
     const jobCol = jobAbbreviation ? jobAbbreviation.toLowerCase() : null;
@@ -253,7 +254,7 @@ ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMo
               CASE WHEN i.level_item ~ '^[0-9]+$' THEN i.level_item::int ELSE NULL END AS level_item
        FROM ffxiv_item i
        LEFT JOIN ffxiv_classjobcategory cjc ON cjc.id = i.class_job_category
-       WHERE i.equip_slot_category::int = ANY($1::int[])
+       WHERE i.equip_slot_category ~ '^[0-9]+$' AND i.equip_slot_category::int = ANY($1::int[])
          AND cjc.${jobCol} = 'True'
          AND i.${valueColumn} ~ '^[0-9]+$'
          AND i.${valueColumn}::int <= $2
@@ -280,7 +281,7 @@ function checkRetainerTarget({ retainerId, targetMode, targetValue }) {
   return null;
 }
 
-ipcMain.handle('save-retainer-target', async (event, { retainerId, targetMode, targetValue, onlyCrafted }) => {
+ipcMain.handle('save-retainer-target', async (event, { retainerId, targetMode, targetValue, onlyCrafted } = {}) => {
   const problem = checkRetainerTarget({ retainerId, targetMode, targetValue });
   if (problem) return { success: false, error: problem };
   return withClient(async (client) => {

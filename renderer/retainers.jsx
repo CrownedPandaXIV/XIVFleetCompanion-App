@@ -5,16 +5,14 @@
 // total. Popup only renders while hovering - no click/toggle state
 // needed, matches a plain tooltip pattern.
 // Done in green; idle in amber when the retainer has a class (it could be out on a venture), dim when it hasn't.
+// The countdowns share the Subs page's one clock (subs.jsx subscribeSubsClock), so hundreds of retainers out don't
+// each run a timer, and they all change together.
 function RetainerStatusCell({ hasVenture, ventureEndsAt, hasJob = true }) {
-  const [nowEpoch, setNowEpoch] = useState(() => Math.floor(Date.now() / 1000));
+  const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
   const endEpoch = ventureEndsAt ? Number(ventureEndsAt) : 0;
+  const ticking = !!hasVenture && endEpoch > Math.max(openedAt, subsClock.now);
+  const nowEpoch = React.useSyncExternalStore(ticking ? subscribeSubsClock : noSubscription, () => Math.max(openedAt, subsClock.now));
   const onVenture = !!hasVenture && endEpoch > 0 && endEpoch > nowEpoch;
-
-  useEffect(() => {
-    if (!onVenture) return;
-    const interval = setInterval(() => setNowEpoch(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(interval);
-  }, [onVenture]);
 
   if (!hasVenture || !endEpoch) return <span className={hasJob ? 'tone-warn' : 'dim'}>Idle</span>;
   if (!onVenture) return <span className="tone-good">Venture Complete</span>;
@@ -210,9 +208,16 @@ const RETAINER_DUPLICATE_EXTRAS = ['x_world'];
 // entirely, per the earlier design decision, rather than just blanking
 // fields in an existing row).
 function RetainerTargetRow({ retainer, cols, onSaveTarget, onClearTarget }) {
-  const [targetMode, setTargetMode] = useState(retainer.target_mode || '');
-  const [targetValue, setTargetValue] = useState(retainer.target_value ?? '');
-  const [onlyCrafted, setOnlyCrafted] = useState(!!retainer.only_crafted);
+  // Edits are kept only until saved: with none, the row shows the target as read last (a target changed in the game
+  // shows after a refresh, as the plugin does), so Save never writes an old copy back over it.
+  const saved = { targetMode: retainer.target_mode || '', targetValue: retainer.target_value ?? '', onlyCrafted: !!retainer.only_crafted };
+  const [draft, setDraft] = useState(null);
+  const shown = draft || saved;
+  const { targetMode, targetValue, onlyCrafted } = shown;
+  const edit = (field) => (value) => setDraft({ ...shown, [field]: value });
+  const setTargetMode = edit('targetMode');
+  const setTargetValue = edit('targetValue');
+  const setOnlyCrafted = edit('onlyCrafted');
   const [saveStatus, setSaveStatus] = useState('');
 
   async function handleSave() {
@@ -222,6 +227,7 @@ function RetainerTargetRow({ retainer, cols, onSaveTarget, onClearTarget }) {
       targetValue: targetValue === '' ? null : Number(targetValue),
       onlyCrafted
     });
+    if (result.success) setDraft(null);
     setSaveStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
@@ -229,9 +235,7 @@ function RetainerTargetRow({ retainer, cols, onSaveTarget, onClearTarget }) {
     setSaveStatus('Clearing...');
     const result = await onClearTarget(retainer.retainer_id);
     if (result.success) {
-      setTargetMode('');
-      setTargetValue('');
-      setOnlyCrafted(false);
+      setDraft(null);
       setSaveStatus('Cleared.');
     } else {
       setSaveStatus(`Failed: ${result.error}`);
@@ -289,7 +293,7 @@ function RetainersView({ refreshKey }) {
     return result;
   }
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   const table = (rowsToShow) => (
@@ -312,6 +316,7 @@ function RetainersView({ refreshKey }) {
 
   return (
     <div className="retainers-view">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls">
         {!retainersSort.sortColumn && (
           <label>

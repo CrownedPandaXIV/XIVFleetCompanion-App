@@ -3,6 +3,113 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.11.0 - 2026-11-21
+
+Fixes from a full check of the app and the plugin. This entry grows until 1.11.0 is released.
+
+- **Remove everything keeps the plugin's fleet file.** The app's settings folder is also where the plugin keeps its
+  fleet file (Just this PC), its choice for the PC and their backups. Remove everything deleted the whole folder;
+  it now deletes only the app's own files, and lists the fleet file under what it keeps.
+- **Restoring a backup works after an update that added fleet views.** Before, any backup made before such an
+  update failed to restore with a PostgreSQL message about CASCADE. The fleet views are now set aside first and made
+  again straight after, whether the restore worked or not.
+- **Summary, Subs, Routes, Salvage, FC Directory and Inventory's Fleet totals recover once the database is back.**
+  After one failed load they kept showing "Failed to load" until you switched pages. Inventory's Fleet totals now
+  also follow the app's refreshes.
+- **Restoring a backup pauses the plugins on your other PCs first**, as moving the database does, so their syncs can't
+  block it or write over it straight after.
+- **Backups use tools new enough for the database:** an older PostgreSQL installed on the PC for something else is
+  passed over for the downloaded tools, and when none are new enough it says so plainly.
+- **A damaged fleet file isn't backed up** by Back up now, so the good backups aren't pushed out.
+- Testing a backup, or getting the backup tools, can't crash the app if the network drops meanwhile.
+- "Let other PCs connect" fixes a firewall rule left on another port (after setting PostgreSQL up again).
+- Set up this PC checks the PostgreSQL and Tailscale installers again just before running them with administrator
+  rights.
+- Moving the database works when the Windows user name has letters outside English, and a refused password with such
+  letters is said so.
+- Removing a copy a move left behind names the PCs that may still need it to find the new address, and the move window
+  says to close the app on your other PCs first.
+- The nightly backup run always quits within a minute of finishing, even if saving the subs' forecasts is held up.
+- **Income is much faster for a big fleet:** on 80 characters with two months of history it took over two minutes;
+  now about two seconds (the same answers). The plugin's Income page uses the same view.
+- **The shared database and the fleet file sort the same way:** names and account labels go letter by letter whatever
+  language the database PC's PostgreSQL was set up in, and missing names sort last on both.
+- Windows of a number of days are exactly that many 24-hour days on both, so they don't shift by an hour after a
+  daylight-saving change.
+- A house warning now says "the game can demolish it in 3 more days" instead of "demolished after 3 more".
+- Database updates wait at most 10 seconds for a table another PC is using, then try again later.
+- **Just this PC: the app no longer freezes while a game is writing the fleet file.** It waited up to 15 seconds
+  with every window stuck; now it waits a moment at a time, staying responsive.
+- **Just this PC: while the game data is first downloading, pages say so** instead of showing an SQL error, and
+  tables a first download missed are fetched again by themselves.
+- Trends charts show connection problems in plain words, and follow a moved database, as every other page does.
+- A saved connection that can't be read on this PC (copied from another PC) says to enter it again, instead of a
+  technical error on every page.
+- Settings only reuses the saved password for the address it was saved for, and checks the address, port, name and
+  username before saving.
+- Safety: the window can't be replaced by a dropped file or a link, a database password in SQL never reaches the log,
+  and a spreadsheet export also guards cells starting with a tab or line break.
+- Another PC updating the database makes pages say so after a minute, instead of waiting forever.
+- Game data tables loaded by hand with number columns can now be updated.
+- **Current gil/day picks the Fight Club row for the sub's own build** (or, failing that, the fastest one its rank
+  clears), not whichever row comes first in the spreadsheet. The plugin does the same.
+- **Shopping List ticks aren't lost** when ticking while the list reloads, or on two PCs at once.
+- **Settings doesn't save stand-in values:** if a section couldn't be read (the database offline), it says so instead
+  of showing 0s that Save would write back. A section with edits not saved yet says "Not saved yet" beside its Save.
+- **Not synced, with no account labels:** characters are grouped by the PC they last logged in on, so closing one
+  game no longer marks another game's characters as not synced.
+- A character whose supplies aren't known yet isn't counted as low on them.
+- Free Companies: an FC short on both rank and days says both ("Rank 2/6, and 25 more days").
+- Just this PC with Live Market Prices: Income's retainer counts are right (they counted letters).
+- Shopping and market prices: the Shadow data centre is known, and Universalis's own list is asked again later if
+  it couldn't be read at first.
+- Sub Rules, the Roster's order, and other changes are checked before saving, and saved all or nothing; the Roster's
+  order is saved in one go. The FC Rank column reads ranks like "Rank 8".
+- **A page that couldn't refresh keeps what it showed**, with "Could not update: ..." above it, instead of replacing
+  it with an error. A screen whose request failed outright (setup, backups, updates, imports) says why and can be
+  closed or tried again, instead of staying on "Loading..." for good.
+- **Inventory follows Refresh and Auto-Refresh** on every tab, keeping the characters or FCs chosen. A load that fails
+  shows under the picker, so another choice can be made.
+- **Sub Rules and retainer gear targets show changes made in the game** after a refresh, unless the row has edits not
+  saved yet ("Not saved yet"). Saving or deleting a Sub Rule updates the parts beside it. Delete asks first (Delete it /
+  Keep), as in the plugin, and saving one new rule no longer throws away other new rows not saved yet.
+- Subs: ticking Fight Club builds updates Next build and Target route straight away; if it can't be saved, it says why.
+- Shopping List: a "Made" number that couldn't be saved goes back, rather than looking shared when it isn't.
+- Income: changing "Income over the last N days" updates Loot per Voyage and Retainer Ventures too.
+- Market and Supplies: a refresh no longer replaces a number being typed; a value that isn't saved goes back, with the
+  reason beside its box.
+- Backups: a second-copy folder on a PC that's switched off no longer freezes the app; it says the folder can't be
+  reached.
+- The Roster keeps a drag's new order when a refresh lands at the same moment.
+- Set up this PC, "This PC only plays the game": says where to find the database PC's details, instead of a link that
+  did nothing.
+- Where Is It?: two FCs (or retainers) with the same name are listed apart.
+- **Trends remembers what was chosen** (value, characters, span) when leaving the tab and coming back, and never shows
+  the previous chart under a new label while the new one loads. A character's "FC points" card says it's recorded
+  only for an FC's leader, rather than looking like missing history.
+- Summary: Venture Income and Listings say why they couldn't load, instead of always asking for a database update;
+  Parts That Need Crafting counts the same characters as the list beside it.
+- Route Optimization: with no sub off its Target route, it says why (no sub at rank 85 yet, or no Fight Club Data
+  imported) instead of always "all on target". A gain of 0 shows without a +.
+- Inventory and Parts: the sub-tab showing is marked, not greyed out as if it couldn't be used.
+- Keyboard and screen readers: table headings sort with Enter, column widths change with the arrow keys, Settings
+  closes with Escape, the Trends picker works with the arrow keys and Enter, and icon buttons are named.
+- Widths of columns added from the Columns menu are remembered after a restart. Copying a table, the shopping list or
+  setup details says so if it fails. Retainer countdowns share one clock. The Subs tab lists characters in the same
+  order as the other tabs. Inventory quantities have thousands separators.
+- Setup Help points to Settings → Database → Test Connection on the other PC, rather than the Tailscale page.
+- Gil & Market: the note under unsold listings no longer says undercutting isn't checked while Live Market Prices is on.
+- Fight Club Data: merged cells are read right when the sheet doesn't start at A1 (as the plugin now does too).
+- Sub Rules' All tick can be unticked (slot 1 stays ticked), as in the plugin. The PCs page and Roster say "another
+  PC or account" instead of "another game", and the note about PCs that haven't reported reads right for several.
+- **High-quality items say "(HQ)"** on Inventory's Character, FC and Fleet tabs (they showed as "Item 10xxxxx"), and
+  in a retainer's gear. The plugin now records which stacks are high quality.
+- **A database move that fails after every PC was sent to the new database keeps it** (nothing is lost, and syncing
+  carries on); only this app's own saved details failing is reported.
+- Views only gain columns from now on, so an older plugin on another PC keeps working when this app updates the views
+  (checked by the tests against every column released so far).
+- Releases are published only after the full tests pass.
+
 ## 1.10.6 - 2026-11-20
 
 - **Removing a character on the Character Roster also removes its market listings.** Before, its retainers' listings

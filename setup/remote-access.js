@@ -132,6 +132,13 @@ const stamp = (d) => d.toISOString().slice(0, 19).replace(/[-:]/g, '').replace('
 // Does it all. request: { port, ranges, services: [{ service, dataDir }] }. deps (for the tests): fs, run
 // (a command: (file, args) -> { ok, stdout, stderr }) and now. Returns { ok, service, dataDir, changed: [...] }
 // or { ok: false, error }.
+// The port a firewall rule opens, from netsh's "show rule" (its LocalPort line); null when it can't be told (a Windows
+// in another language words it differently): the rule is then left as it is.
+function ruleLocalPort(text) {
+  const m = /^\s*LocalPort:\s*(\S+)\s*$/mi.exec(String(text || ''));
+  return m ? m[1] : null;
+}
+
 async function applyRemoteAccess(request, deps = {}) {
   const fsys = deps.fs || fs;
   const run = deps.run;
@@ -157,8 +164,11 @@ async function applyRemoteAccess(request, deps = {}) {
   edit('postgresql.auto.conf', (t) => (/^\s*listen_addresses\s*=/m.test(t) ? setListenAddresses(t) : t), 'PostgreSQL now listens for other PCs (ALTER SYSTEM setting)');
   edit('pg_hba.conf', (t) => addAccessLines(t, request.ranges), `Let in: ${request.ranges.join(', ')}`);
 
+  // The rule from an earlier setup may open another port (PostgreSQL set up again, or moved): then it's made again.
   const rule = await run('netsh.exe', ['advfirewall', 'firewall', 'show', 'rule', `name=${FIREWALL_RULE}`]);
-  if (!rule.ok) {
+  const rulePort = rule.ok ? ruleLocalPort(rule.stdout) : null;
+  if (!rule.ok || (rulePort !== null && rulePort !== String(port))) {
+    if (rule.ok) await run('netsh.exe', ['advfirewall', 'firewall', 'delete', 'rule', `name=${FIREWALL_RULE}`]);
     const added = await run('netsh.exe', firewallArgs(port));
     if (!added.ok) return { ok: false, error: `Windows Firewall wasn't changed: ${(added.stdout || added.stderr).trim()}`, changed };
     changed.push(`Windows Firewall allows port ${port} from Tailscale and this PC's network`);
@@ -206,6 +216,7 @@ async function undoRemoteAccess(request, deps = {}) {
 }
 
 module.exports = {
+  ruleLocalPort,
   TAILSCALE_RANGE, FIREWALL_RULE, setListenAddresses, passwordMethod, addAccessLines, networkOf, rangesToAllow,
   parseServices, instanceForPort, confPort, firewallArgs, firewallDeleteArgs, removeAccessLines, applyRemoteAccess, undoRemoteAccess,
 };

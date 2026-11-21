@@ -166,7 +166,7 @@ test('the last part waits for the app to close, closes what is left of it, runs 
   assert.ok(at('Wait-Process -Id 4321 -Timeout 60') < at("Stop-Process -Force"));
   assert.ok(at("$_.Path -like 'C:\\Users\\Pat''s\\Programs\\xiv-fleet\\*'") < at('QuietUninstallString'));
   assert.ok(at("DisplayName -like 'XIV Fleet Companion*'") < at("-Filter 'Uninstall*.exe'"), 'Windows\' list of programs first, then the folder');
-  assert.ok(at("Log 'The app is removed'") < at("Remove-Item -LiteralPath 'C:\\Users\\Pat\\AppData\\Roaming\\XIV Fleet Companion'"), 'settings go after the app');
+  assert.ok(at("Log 'The app is removed'") < at("Get-ChildItem -LiteralPath 'C:\\Users\\Pat\\AppData\\Roaming\\XIV Fleet Companion'"), 'settings go after the app');
   assert.ok(at("$log = 'C:\\T\\xiv-fleet-remove.log'") < at("Log 'Done'"));
   assert.ok(at("Log 'Done'") < at('Remove-Item -LiteralPath $PSCommandPath'), 'the script file goes only once it has finished');
   assert.ok(/^param\(\[switch\]\$Launch\)$/m.test(s) && s.indexOf('param(') < s.indexOf('$log ='), 'param comes first');
@@ -179,7 +179,44 @@ test('the last part waits for the app to close, closes what is left of it, runs 
     assert.ok(i > withDownloads.indexOf("Log 'The settings folder is deleted'") && i < withDownloads.indexOf("Log 'Done'"), `${f} is deleted with the settings`);
   }
   const fromSource = re.finishScript({ pid: 1, installDir: null, userData: 'C:\\x', log: 'C:\\l' });
-  assert.ok(!/Uninstall|Stop-Process/.test(fromSource) && fromSource.includes("Remove-Item -LiteralPath 'C:\\x'"), 'run from source, only the settings go');
+  assert.ok(!/Uninstall|Stop-Process/.test(fromSource) && fromSource.includes("Remove-Item -LiteralPath 'C:\\x' -Force"), 'run from source, only the settings go');
+});
+
+test("the plugin's fleet file, its choice and its backups stay in the settings folder; the app's own files go", () => {
+  const plan = re.removalPlan(facts({ fleetFileHere: true }));
+  assert.ok(plan.keeps.some((k) => k.startsWith("The plugin's fleet file (fleet.db) and its backups")), JSON.stringify(plan.keeps));
+  assert.ok(!re.removalPlan(facts()).keeps.some((k) => k.includes('fleet.db')));
+  const s = re.finishScript({ pid: 1, installDir: null, userData: 'C:\\x', log: 'C:\\l' });
+  assert.ok(!s.includes("Remove-Item -LiteralPath 'C:\\x' -Recurse"), 'the folder is never deleted whole');
+  for (const f of re.PLUGIN_FILES) assert.ok(s.includes(`'${f}'`), f);
+
+  // The clean-up itself, run in PowerShell where it's here: only the app's files go.
+  const pwsh = ['/usr/local/bin/pwsh', '/usr/bin/pwsh'].find((f) => fs.existsSync(f));
+  if (!pwsh) return;
+  const { execFileSync } = require('child_process');
+  const run = (files) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remove-'));
+    const folder = path.join(dir, 'XIV Fleet Companion');
+    for (const f of files) {
+      fs.mkdirSync(path.dirname(path.join(folder, f)), { recursive: true });
+      fs.writeFileSync(path.join(folder, f), 'x');
+    }
+    const log = path.join(dir, 'remove.log');
+    const script = re.finishScript({ pid: 999999, installDir: null, userData: folder, log });
+    const file = path.join(dir, 'finish.ps1');
+    fs.writeFileSync(file, script);
+    execFileSync(pwsh, ['-NoProfile', '-NonInteractive', '-File', file]);
+    const left = [];
+    const walk = (d, rel) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) walk(path.join(d, e.name), r); else left.push(r); } };
+    if (fs.existsSync(folder)) walk(folder, '');
+    return { left: left.sort(), there: fs.existsSync(folder), log: fs.readFileSync(log, 'utf8') };
+  };
+  const mixed = run(['fleet.db', 'fleet.db-wal', 'fleet.db-shm', 'store.json', 'Backups/fleet-2026-11-20.db', 'pg-credentials.enc', 'backups.json', 'window.json', 'game-data.db', 'logs/app.log', 'postgres-tools/pg_dump.exe']);
+  assert.deepStrictEqual(mixed.left, ['Backups/fleet-2026-11-20.db', 'fleet.db', 'fleet.db-shm', 'fleet.db-wal', 'store.json']);
+  assert.match(mixed.log, /The settings are deleted; the plugin's fleet file and backups are kept/);
+  const appOnly = run(['pg-credentials.enc', 'game-data.db', 'logs/app.log']);
+  assert.strictEqual(appOnly.there, false, 'with no plugin files, the folder goes too');
+  assert.match(appOnly.log, /The settings folder is deleted/);
 });
 
 test("Tailscale's product code is read from Windows' list of programs", () => {

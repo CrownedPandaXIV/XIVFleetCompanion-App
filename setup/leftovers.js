@@ -11,7 +11,8 @@ const KEPT = /_before_move_\d{8}_\d{4}$/;
 
 // admin: a connected client logged in as PostgreSQL's administrator on this PC. connectTo(database) returns a
 // connected client to that database (as the administrator). current: the database the app uses, when it's on this
-// PC. Returns { leftovers: [{ name, kind: 'kept' | 'moved-away', bytes, movedTo }], others: [names] }.
+// PC. Returns { leftovers: [{ name, kind: 'kept' | 'moved-away', bytes, movedTo, pcs }], others: [names] }. pcs: for a
+// copy left when the database moved away, the PCs that used it (its PCs list), which find the new address through it.
 async function findLeftovers(admin, { connectTo, current }) {
   const { rows } = await admin.query(
     `SELECT datname AS name, pg_database_size(datname)::bigint AS bytes FROM pg_database
@@ -29,15 +30,20 @@ async function findLeftovers(admin, { connectTo, current }) {
     }
     let note = null;
     let c = null;
+    let pcs = [];
     try {
       c = await connectTo(name);
       note = await readMoveNote(c);
+      if (note && note.state === 'moved') {
+        pcs = (await c.query(`SELECT pc_name || coalesce(' (' || nullif(account_label, '') || ')', '') AS pc FROM companion_pc_status ORDER BY 1`)
+          .catch(() => ({ rows: [] }))).rows.map((r) => r.pc);
+      }
     } catch {
       note = null;
     } finally {
       if (c) await c.end().catch(() => {});
     }
-    if (note && note.state === 'moved') leftovers.push({ name, kind: 'moved-away', bytes: Number(bytes), movedTo: `${note.host}:${note.port}` });
+    if (note && note.state === 'moved') leftovers.push({ name, kind: 'moved-away', bytes: Number(bytes), movedTo: `${note.host}:${note.port}`, pcs });
     else others.push(name);
   }
   return { leftovers, others };

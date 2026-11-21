@@ -143,26 +143,22 @@ function nextFightClubBuild({ rank, top, currentParts, currentNet, fightClubRows
   return null;
 }
 
-// Current Gil/Day: matches the sub's ACTUAL current route + installed
-// parts against Fight Club. Route-name variants at different durations
-// are the same sectors at different speeds, so among rows sharing this
-// route name, use whichever duration-variant's threshold this sub's
-// actual rank/parts clears.
+// Current Gil/Day: the sub's ACTUAL current route and installed parts against Fight Club. Rows sharing a route name
+// are the same sectors at different durations (builds). Among the rows whose rank this sub clears, the one whose build
+// is the sub's own parts; failing that, the one needing the highest rank it clears (the fastest it can run), not
+// whichever comes first in the spreadsheet. (As the plugin's SubRoutes.CurrentGilPerDay.)
 function computeCurrentGilPerDay(rank, currentRouteLetters, installedPartLetters, fightClubRows, repairKitCost) {
   if (!currentRouteLetters) return '';
   const routeName = currentRouteLetters.replace(/-/g, '');
-  const matchingRows = fightClubRows.filter((r) => r.route === routeName);
-  if (matchingRows.length === 0) return '';
-
-  for (const row of matchingRows) {
-    const unmod = parseRankBuild(row.unmod_min_rank);
-    const modded = parseRankBuild(row.min_rank_build);
-    const qualifies = (unmod && rank >= unmod.rank) || (modded && rank >= modded.rank);
-    if (qualifies) {
-      return Math.round(netGilPerDay(row, installedPartLetters, repairKitCost));
-    }
-  }
-  return '';
+  const qualifying = fightClubRows.filter((r) => r.route === routeName).map((row) => ({
+    row,
+    builds: [parseRankBuild(row.unmod_min_rank), parseRankBuild(row.min_rank_build)].filter((b) => b && rank >= b.rank),
+  })).filter((q) => q.builds.length);
+  if (!qualifying.length) return '';
+  const own = (b) => b.parts.every((p, i) => `${p.letter}${p.modified ? '+' : ''}` === installedPartLetters[i]);
+  const highest = (q) => Math.max(...q.builds.map((b) => b.rank));
+  const pick = qualifying.find((q) => q.builds.some(own)) || qualifying.reduce((best, q) => (highest(q) > highest(best) ? q : best));
+  return Math.round(netGilPerDay(pick.row, installedPartLetters, repairKitCost));
 }
 
 // Decodes the raw points bytea (one byte per waypoint, 0 = unused

@@ -66,10 +66,15 @@ function rewriteCasts(sql) {
     const type = m[1].toLowerCase();
     const start = operandStart(sql, at);
     const operand = sql.slice(start, at);
+    // Shapes this can't turn into SQLite's: refused, rather than changed into something that means another thing.
+    if (/^END$/i.test(operand)) throw new Error(`A cast of a whole CASE (CASE ... END::${type}) isn't translated; write CAST(CASE ... END AS ...) in: ${sql}`);
+    if (/^\s*\(/.test(sql.slice(at + m[0].length)) && !m[2]) throw new Error(`A cast with a size (::${type}(...)) isn't translated in: ${sql}`);
+    if ((type === 'boolean' || type === 'bool') && new RegExp(`^${QUOTE}\\d+${QUOTE}$`).test(operand)) throw new Error(`A text cast to boolean isn't translated; write true or false in: ${sql}`);
     let replaced;
     if (m[2] || type === 'jsonb' || type === 'json' || type === 'boolean' || type === 'bool' || type === 'regclass') replaced = operand;
     else if (type === 'timestamptz' || type === 'timestamp') replaced = `pg_time(${operand})`;
     else if (type === 'date') replaced = `pg_date(${operand})`;
+    else if (CAST_TYPES[type] === 'INTEGER') replaced = `pg_int(${operand})`;
     else if (CAST_TYPES[type]) replaced = type === 'numeric' ? `pg_numeric(${operand})` : `CAST(${operand} AS ${CAST_TYPES[type]})`;
     else throw new Error(`Unknown cast ::${type} in: ${sql}`);
     sql = sql.slice(0, start) + replaced + sql.slice(at + m[0].length);
@@ -131,6 +136,7 @@ function rewriteDistinctOn(sql) {
     const cols = body.slice(0, fromAt);
     const rest = body.slice(fromAt + 4, orderAt);
     const order = body.slice(orderAt).replace(/^ORDER\s+BY\s+/i, '').trim();
+    if (topLevel(order, 'LIMIT') >= 0 || topLevel(order, 'OFFSET') >= 0) throw new Error(`DISTINCT ON ... LIMIT isn't translated; put the LIMIT on an outer SELECT in: ${sql}`);
     const names = splitTopLevel(cols).map(outputName);
     const rewritten = `SELECT ${names.join(', ')} FROM (SELECT ${cols.trim()}, ROW_NUMBER() OVER (PARTITION BY ${keys} ORDER BY ${order}) AS pg_rn, `
       + `ROW_NUMBER() OVER (ORDER BY ${order}) AS pg_ord FROM ${rest.trim()}) WHERE pg_rn = 1 ORDER BY pg_ord`;
@@ -195,8 +201,21 @@ function translate(sql) {
   const Q = `${QUOTE}\\d+${QUOTE}`;
 
   out = out.replace(/\$(\d+)/g, '?$1');
-  // A list parameter: x = ANY($1) / x = ANY($1::int[]) -> x IN (the list's values)
-  out = out.replace(/=\s*ANY\s*\(\s*\?(\d+)(?:\s*::\s*[\w ]+\[\])?\s*\)/gi, 'IN (SELECT value FROM json_each(?$1))');
+  // A list parameter: x = ANY($1) / x = ANY($1::int[]) -> x IN (the list's values), each as the type asked for (as
+  // PostgreSQL would cast them: numbers given for a text column still match).
+  out = out.replace(/=\s*ANY\s*\(\s*\?(\d+)(?:\s*::\s*([\w ]+)\[\])?\s*\)/gi, (whole, n, type) => {
+    const t = (type || '').trim().toLowerCase();
+    const value = t === 'text' || t === 'varchar' ? 'CAST(value AS TEXT)' : 'value';
+    return `IN (SELECT ${value} FROM json_each(?${n}))`;
+  });
+  // What isn't translated: refused, rather than passed on to mean something else (or nothing) in SQLite.
+  for (const [pattern, what] of [[/~\*/, 'a case-blind pattern (~*)'], [/<>\s*ALL\s*\(/i, '<> ALL(...)'], [/\bARRAY\s*\[/i, 'ARRAY[...]'],
+    [/=\s*ANY\s*\(\s*(?!\?)/i, '= ANY(...) of anything but a list parameter']]) {
+    if (pattern.test(out)) throw new Error(`${what} isn't translated for the fleet file in: ${sql}`);
+  }
+  if (/^\s*TRUNCATE\b[^;]*,/i.test(out)) throw new Error(`TRUNCATE of more than one table isn't translated; one statement per table in: ${sql}`);
+  // DELETE FROM t x WHERE ...: SQLite needs AS before the alias.
+  out = out.replace(/^(\s*DELETE\s+FROM\s+[\w.]+)\s+(?!(?:WHERE|USING|RETURNING|AS)\b)(\w+)(?=\s|$)/i, '$1 AS $2');
   // unnest($1, $2) AS s(a, b): the lists side by side, as rows
   out = out.replace(/unnest\s*\(([^()]*)\)\s+AS\s+(\w+)\s*\(([^()]*)\)/gi, (whole, args, alias, cols) => {
     const lists = args.split(',').map((a) => /^\s*\?(\d+)(?:\s*::\s*([\w ]+)\[\])?\s*$/.exec(a));
@@ -237,6 +256,9 @@ function translate(sql) {
     if (conflict > 0) {
       const head = out.slice(0, conflict);
       const select = topLevel(head, 'SELECT', { last: true });
+      if (select >= 0 && (topLevel(head.slice(select), 'GROUP BY') >= 0 || topLevel(head.slice(select), 'ORDER BY') >= 0)) {
+        throw new Error(`INSERT ... SELECT ... GROUP BY/ORDER BY ... ON CONFLICT isn't translated; wrap the SELECT in a subquery in: ${sql}`);
+      }
       if (select >= 0 && topLevel(head.slice(select), 'WHERE') < 0) out = `${head} WHERE true ${out.slice(conflict)}`;
     }
   }
@@ -311,7 +333,8 @@ function addFunctions(db, tableNames) {
     const m = regex(pattern).exec(String(x));
     return m ? (m.length > 1 ? m[1] ?? null : m[0]) : null;
   });
-  // date_trunc('hour', time), on Unix seconds (in UTC, as the app's database sessions run)
+  // date_trunc('hour', time), on Unix seconds, in UTC. (On PostgreSQL it's in the database's own time zone, local time
+  // when the Windows installer set it up: the same hours, except in a time zone a half hour off UTC, such as India's.)
   fn('date_trunc', (unit, t) => {
     if (t === null) return null;
     const step = { minute: 60, hour: 3600, day: 86400 }[String(unit).toLowerCase()];
@@ -325,7 +348,24 @@ function addFunctions(db, tableNames) {
     if (Number.isNaN(ms)) throw new Error(`Not a time: ${t}`);
     return ms / 1000;
   });
-  fn('pg_date', (t) => (t === null ? null : Math.floor(Number(t) / 86400) * 86400));
+  // ::date: the day's start, from a time (Unix seconds) or a date given as text ('2026-11-21').
+  fn('pg_date', (t) => {
+    if (t === null) return null;
+    const seconds = typeof t === 'number' || typeof t === 'bigint' || /^\s*-?\d+(\.\d+)?\s*$/.test(String(t)) ? Number(t) : Date.parse(String(t)) / 1000;
+    if (Number.isNaN(seconds)) throw new Error(`invalid input syntax for type date: "${t}"`);
+    return Math.floor(seconds / 86400) * 86400;
+  });
+  // ::int as PostgreSQL does it: a fraction rounds (half away from zero), where SQLite's CAST cuts it off; a whole
+  // number, even past 2^53, stays exact.
+  fn('pg_int', (x) => {
+    if (x === null || typeof x === 'bigint') return x;
+    if (typeof x === 'number') return Number.isInteger(x) ? x : Math.sign(x) * Math.round(Math.abs(x));
+    const t = String(x).trim();
+    if (/^[+-]?\d+$/.test(t)) return Number.isSafeInteger(Number(t)) ? Number(t) : BigInt(t);
+    if (!/^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i.test(t)) throw new Error(`invalid input syntax for type integer: "${x}"`);
+    const n = Number(t);
+    return Math.sign(n) * Math.round(Math.abs(n));
+  }, { deterministic: true, useBigIntArguments: true });
   // ::numeric: a number, or NULL-safe text that is one (as PostgreSQL would refuse anything else)
   fn('pg_numeric', (x) => {
     if (x === null || typeof x === 'number' || typeof x === 'bigint') return x;
@@ -343,12 +383,39 @@ function addFunctions(db, tableNames) {
 
 // ---- The client ----
 
+// node:sqlite blocks the app's main process while it waits, so a statement that finds the file busy (a game writing to
+// it) waits only a moment there, then tries again after letting everything else run, for up to WAIT_MS in all.
+const BUSY_MS = 50;
+const WAIT_MS = 15000;
+const isBusy = (err) => /database is locked|SQLITE_BUSY|database table is locked/i.test(String(err && err.message));
+async function whenFree(work, waitMs = WAIT_MS) {
+  const until = Date.now() + waitMs;
+  for (;;) {
+    try {
+      return work();
+    } catch (err) {
+      if (!isBusy(err) || Date.now() >= until) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
 class SqliteClient {
   // file: the fleet file; gameData: the app's game data file (made if missing), or null.
-  constructor(file, { gameData = null, readOnly = false, busyMs = 15000 } = {}) {
+  constructor(file, { gameData = null, readOnly = false, busyMs = BUSY_MS } = {}) {
     this.dialect = 'sqlite';
     this.file = file;
     this.db = new DatabaseSync(file, { readOnly, timeout: busyMs });
+    // Anything that fails from here (the game data file locked or damaged, say) closes the file again before saying so.
+    try {
+      this.setUp({ gameData, readOnly, busyMs });
+    } catch (err) {
+      try { this.db.close(); } catch { /* already closed */ }
+      throw err;
+    }
+  }
+
+  setUp({ gameData, readOnly, busyMs }) {
     this.db.exec(`PRAGMA busy_timeout = ${busyMs}`);
     if (!readOnly) {
       // As the plugin opens it: readers and writers don't wait for each other.
@@ -383,19 +450,33 @@ class SqliteClient {
   async connect() {}
 
   // pg's query(sql, params): { rows, rowCount, fields }. Several statements without parameters run one after another.
+  // A missing table or column fails with PostgreSQL's code for it (42P01, 42703), so the pages' "not there yet"
+  // fallbacks work the same on the file.
   async query(sql, params = []) {
+    try {
+      return await this.run(sql, params);
+    } catch (err) {
+      if (!err.code || /^ERR_SQLITE/.test(String(err.code))) {
+        if (/no such table/i.test(err.message)) err.code = '42P01';
+        else if (/no such column/i.test(err.message)) err.code = '42703';
+      }
+      throw err;
+    }
+  }
+
+  async run(sql, params) {
     if (typeof sql === 'object' && sql) { params = sql.values || []; sql = sql.text; }
     // As PostgreSQL: ending a transaction that isn't open is no error.
     if (/^\s*(ROLLBACK|COMMIT)\s*;?\s*$/i.test(sql) && !this.db.isTransaction) return { rows: [], rowCount: 0, fields: [] };
     const lite = translate(sql);
     if (/^\s*(CREATE|DROP|ALTER)\b/i.test(lite)) this.forgetTables();
     if (!params.length && /;\s*\S/.test(lite.replace(/'(?:[^']|'')*'/g, ''))) { // (comments are gone by now)
-      this.db.exec(lite);
+      await whenFree(() => this.db.exec(lite));
       return { rows: [], rowCount: 0, fields: [] };
     }
     let stmt;
     try {
-      stmt = this.db.prepare(lite);
+      stmt = await whenFree(() => this.db.prepare(lite));
     } catch (err) {
       err.message = `${err.message} (in: ${lite.replace(/\s+/g, ' ').trim().slice(0, 400)})`;
       throw err;
@@ -404,10 +485,10 @@ class SqliteClient {
     const args = params.map(param);
     const columns = stmt.columns();
     if (!columns.length) {
-      const r = stmt.run(...args);
+      const r = await whenFree(() => stmt.run(...args));
       return { rows: [], rowCount: Number(r.changes), fields: [] };
     }
-    const raw = stmt.all(...args);
+    const raw = await whenFree(() => stmt.all(...args));
     const kinds = columns.map((c) => RESULT_TYPES[c.name] || null);
     const rows = raw.map((r) => {
       const row = {};

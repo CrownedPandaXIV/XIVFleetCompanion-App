@@ -346,7 +346,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       assert.strictEqual(rows[0].kind, 'house', 'worst first: the oldest houses');
       assert.strictEqual(rows[0].subject, 'Gone soon');
       assert.match(rows[0].detail, /past 45, the game can demolish it any time/);
-      assert.match(rows.find((r) => r.subject === 'Getting old').detail, /not entered for 9 days; demolished after 36 more/);
+      assert.match(rows.find((r) => r.subject === 'Getting old').detail, /not entered for 9 days; the game can demolish it in 36 more days/);
       assert.match(rows.find((r) => r.subject === 'No date').detail, /no date yet/);
       const { rows: [s] } = await client.query('SELECT low_ceruleum, low_repair_kits FROM fleet_summary_view');
       assert.deepStrictEqual([s.low_ceruleum, s.low_repair_kits], [1, 1], 'the summary leaves out Bex (no longer synced) too');
@@ -387,7 +387,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       }
       const [aki, bex, cal, dee] = rows;
       assert.deepStrictEqual([aki.low_ceruleum, aki.low_repair_kits, bex.low_ceruleum, cal.low_ceruleum, dee.low_ceruleum, dee.low_repair_kits],
-        [true, true, false, false, true, false], 'Aki low on both; Bex no longer synced; Cal has no sub; Dee has no ceruleum recorded');
+        [true, true, false, false, false, false], 'Aki low on both; Bex no longer synced; Cal has no sub; Dee has no ceruleum recorded (not known, so not low)');
       assert.deepStrictEqual([aki.house, dee.house, cal.house, bex.house], ['Mist W12 P30', 'City 999 W1 P2', null, null]);
       assert.deepStrictEqual([aki.fc_name, aki.fc_points, aki.login_pc, aki.login_label, aki.sort_index, bex.sort_index, cal.sort_index],
         ['Cute Kittehs!', 52000, 'DESKTOP-1', 'A', 2, 0, null]);

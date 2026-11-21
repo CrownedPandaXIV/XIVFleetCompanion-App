@@ -18,9 +18,11 @@ function chestHolders(characters) {
     const sa = a.sort_index == null ? Infinity : Number(a.sort_index);
     const sb = b.sort_index == null ? Infinity : Number(b.sort_index);
     if (sa !== sb) return sa - sb;
-    const byName = String(a.name || '').localeCompare(String(b.name || ''));
+    // Letter by letter, as the views' COLLATE "C" (a language-aware compare could pick another member).
+    const byte = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+    const byName = byte(String(a.name || ''), String(b.name || ''));
     if (byName !== 0) return byName;
-    return String(a.cid).localeCompare(String(b.cid));
+    return byte(String(a.cid), String(b.cid));
   };
   const holders = new Map();
   for (const [fcId, members] of byFc) {
