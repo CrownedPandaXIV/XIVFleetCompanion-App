@@ -305,7 +305,7 @@ function SubmarinesView({ refreshKey }) {
     window.api.getSubmarines().then((result) => {
       if (call !== latestLoad.current) return;
       if (result.success) {
-        setRows(result.rows);
+        setRows(sortRows(result.rows)); // characters in the same order as the other tabs
         setError(null);
       } else {
         setError(result.error);

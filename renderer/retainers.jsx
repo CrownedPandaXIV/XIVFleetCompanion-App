@@ -5,16 +5,14 @@
 // total. Popup only renders while hovering - no click/toggle state
 // needed, matches a plain tooltip pattern.
 // Done in green; idle in amber when the retainer has a class (it could be out on a venture), dim when it hasn't.
+// The countdowns share the Subs page's one clock (subs.jsx subscribeSubsClock), so hundreds of retainers out don't
+// each run a timer, and they all change together.
 function RetainerStatusCell({ hasVenture, ventureEndsAt, hasJob = true }) {
-  const [nowEpoch, setNowEpoch] = useState(() => Math.floor(Date.now() / 1000));
+  const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
   const endEpoch = ventureEndsAt ? Number(ventureEndsAt) : 0;
+  const ticking = !!hasVenture && endEpoch > Math.max(openedAt, subsClock.now);
+  const nowEpoch = React.useSyncExternalStore(ticking ? subscribeSubsClock : noSubscription, () => Math.max(openedAt, subsClock.now));
   const onVenture = !!hasVenture && endEpoch > 0 && endEpoch > nowEpoch;
-
-  useEffect(() => {
-    if (!onVenture) return;
-    const interval = setInterval(() => setNowEpoch(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(interval);
-  }, [onVenture]);
 
   if (!hasVenture || !endEpoch) return <span className={hasJob ? 'tone-warn' : 'dim'}>Idle</span>;
   if (!onVenture) return <span className="tone-good">Venture Complete</span>;

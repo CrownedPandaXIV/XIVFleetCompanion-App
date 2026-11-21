@@ -84,6 +84,20 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
 - Set up this PC, "This PC only plays the game": says where to find the database PC's details, instead of a link that
   did nothing.
 - Where Is It?: two FCs (or retainers) with the same name are listed apart.
+- **Trends remembers what was chosen** (value, characters, span) when leaving the tab and coming back, and never shows
+  the previous chart under a new label while the new one loads. A character's "FC points" card says it's recorded
+  only for an FC's leader, rather than looking like missing history.
+- Summary: Venture Income and Listings say why they couldn't load, instead of always asking for a database update;
+  Parts That Need Crafting counts the same characters as the list beside it.
+- Route Optimization: with no sub off its Target route, it says why (no sub at rank 85 yet, or no Fight Club Data
+  imported) instead of always "all on target". A gain of 0 shows without a +.
+- Inventory and Parts: the sub-tab showing is marked, not greyed out as if it couldn't be used.
+- Keyboard and screen readers: table headings sort with Enter, column widths change with the arrow keys, Settings
+  closes with Escape, the Trends picker works with the arrow keys and Enter, and icon buttons are named.
+- Widths of columns added from the Columns menu are remembered after a restart. Copying a table, the shopping list or
+  setup details says so if it fails. Retainer countdowns share one clock. The Subs tab lists characters in the same
+  order as the other tabs. Inventory quantities have thousands separators.
+- Setup Help points to Settings → Database → Test Connection on the other PC, rather than the Tailscale page.
 
 ## 1.10.6 - 2026-11-20
 

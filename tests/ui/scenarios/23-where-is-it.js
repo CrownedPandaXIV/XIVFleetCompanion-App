@@ -13,7 +13,7 @@ module.exports = async (t) => {
   const { ev, sleep, waitFor, check, nav, shot } = t;
   await ev(`window.localStorage.clear()`);
   await nav('Inventory');
-  await waitFor(`[...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Where Is It?' && b.disabled)`, 'Where Is It? to open first', 20000);
+  await waitFor(`[...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Where Is It?' && b.getAttribute('aria-pressed') === 'true')`, 'Where Is It? to open first', 20000);
   const type = async (text) => {
     await ev(`(() => {
       const input = document.querySelector('.where-is-it input');

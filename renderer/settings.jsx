@@ -779,8 +779,12 @@ function SpeedCheckSection() {
   };
 
   const copy = async () => {
-    await navigator.clipboard.writeText(result.report);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(result.report);
+      setCopied(true);
+    } catch {
+      setCopied('failed');
+    }
   };
 
   return (
@@ -791,7 +795,7 @@ function SpeedCheckSection() {
         a minute.</p>
       <div className="settings-row">
         <button onClick={run} disabled={!!step}>{step ? 'Checking...' : 'Run speed check'}</button>
-        {result && <button onClick={copy}>{copied ? 'Copied' : 'Copy results'}</button>}
+        {result && <button onClick={copy}>{copied === 'failed' ? "Couldn't copy: try again" : copied ? 'Copied' : 'Copy results'}</button>}
         {step && <span className="save-status">{step}</span>}
       </div>
       {error && <div className="setup-test-status setup-problem">The speed check couldn't run: {error}</div>}
@@ -1008,9 +1012,21 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   // --- Fight Club Import section ---
   const [showFightClubImport, setShowFightClubImport] = useState(false);
 
+  // Escape closes Settings (unless a window opened from it is on top, which closes first), and the keyboard starts
+  // inside it.
+  const modalRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (modalRef.current) modalRef.current.focus();
+    const onKey = (e) => { if (e.key === 'Escape' && document.querySelectorAll('.modal').length === 1) closeRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="modal-overlay">
-      <div className="modal settings-modal">
+      <div className="modal settings-modal" ref={modalRef} tabIndex={-1} role="dialog" aria-label="Settings" style={{ outline: 'none' }}>
         <div className="settings-header">
           <h2>Settings</h2>
           <span className="status">{appVersion ? `Version ${appVersion}` : ''}</span>

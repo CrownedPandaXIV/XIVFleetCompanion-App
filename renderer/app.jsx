@@ -1,26 +1,24 @@
 // The app window: the sidebar, the header's plugin data note, and the tab that is showing.
 
-// Central list of every view in the sidebar - one place to add a new
-// view later rather than touching multiple spots. `built: false` views
-// render the ComingSoonView placeholder instead of real content.
+// Central list of every view in the sidebar.
 // The pages, in sidebar order, by group (the same groups as the plugin's sidebar).
 // helper: also shown in the Database Helper (this PC shows only the database tools); helperOnly: only there.
 const VIEWS = [
-  { key: 'helper', label: 'Home', title: 'Database Helper', group: 'Database Helper', built: true, helper: true, helperOnly: true },
-  { key: 'summary', label: 'Summary', group: 'Overview', built: true },
-  { key: 'trends', label: 'Trends', group: 'Overview', built: true },
-  { key: 'subs', label: 'Subs', group: 'Submarines', built: true },
-  { key: 'routeOpt', label: 'Route Optimization', group: 'Submarines', built: true },
-  { key: 'parts', label: 'Parts', group: 'Submarines', built: true },
-  { key: 'supplies', label: 'Supplies', group: 'Submarines', built: true },
-  { key: 'salvage', label: 'Salvage', group: 'Submarines', built: true },
-  { key: 'roster', label: 'Character Roster', group: 'Characters', built: true },
-  { key: 'retainers', label: 'Retainers', group: 'Characters', built: true },
-  { key: 'fcDirectory', label: 'Free Companies', group: 'Characters', built: true },
-  { key: 'inventory', label: 'Inventory', group: 'Characters', built: true },
-  { key: 'income', label: 'Income', group: 'Gil', built: true },
-  { key: 'market', label: 'Gil & Market', group: 'Gil', built: true },
-  { key: 'pcs', label: 'PCs', group: 'System', built: true, helper: true },
+  { key: 'helper', label: 'Home', title: 'Database Helper', group: 'Database Helper', helper: true, helperOnly: true },
+  { key: 'summary', label: 'Summary', group: 'Overview' },
+  { key: 'trends', label: 'Trends', group: 'Overview' },
+  { key: 'subs', label: 'Subs', group: 'Submarines' },
+  { key: 'routeOpt', label: 'Route Optimization', group: 'Submarines' },
+  { key: 'parts', label: 'Parts', group: 'Submarines' },
+  { key: 'supplies', label: 'Supplies', group: 'Submarines' },
+  { key: 'salvage', label: 'Salvage', group: 'Submarines' },
+  { key: 'roster', label: 'Character Roster', group: 'Characters' },
+  { key: 'retainers', label: 'Retainers', group: 'Characters' },
+  { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
+  { key: 'inventory', label: 'Inventory', group: 'Characters' },
+  { key: 'income', label: 'Income', group: 'Gil' },
+  { key: 'market', label: 'Gil & Market', group: 'Gil' },
+  { key: 'pcs', label: 'PCs', group: 'System', helper: true },
 ];
 
 // hidden: the views left out for what the player does not run (Settings → What do you run?).
@@ -40,20 +38,11 @@ function SidebarNav({ currentView, onSelect, hidden = [] }) {
                 onClick={() => onSelect(v.key)}
               >
                 <div>{v.label}</div>
-                {!v.built && <div className="coming-soon-tag">Coming soon</div>}
               </button>
             ))}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function ComingSoonView({ label }) {
-  return (
-    <div className="status">
-      {label} view — coming soon.
     </div>
   );
 }
@@ -601,7 +590,7 @@ function App() {
             >
               Refresh
             </button>
-            <button className="gear-button" onClick={() => setShowSettings(true)} title="Settings">
+            <button className="gear-button" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
               ⚙
             </button>
           </div>
@@ -726,7 +715,7 @@ function App() {
 
         {currentView === 'fcDirectory' && <FCDirectoryView refreshKey={refreshKey} />}
 
-        {currentView === 'trends' && <TrendsView refreshKey={refreshKey} preset={trendsPreset} />}
+        {currentView === 'trends' && <TrendsView refreshKey={refreshKey} preset={trendsPreset} onPresetUsed={() => setTrendsPreset(null)} />}
 
         {currentView === 'supplies' && <SuppliesView refreshKey={refreshKey} />}
 
@@ -738,9 +727,8 @@ function App() {
 
         {currentView === 'helper' && <HelperView refreshKey={refreshKey} onOpenSettings={(tab) => setShowSettings(tab)} onNavigate={setCurrentView} />}
 
-        {currentView !== 'roster' && currentView !== 'subs' && currentView !== 'parts' && currentView !== 'salvage' && currentView !== 'routeOpt' && currentView !== 'summary' && currentView !== 'inventory' && currentView !== 'retainers' && currentView !== 'fcDirectory' && currentView !== 'trends' && currentView !== 'supplies' && currentView !== 'income' && currentView !== 'market' && currentView !== 'pcs' && currentView !== 'helper' && (
-          <ComingSoonView label={activeViewLabel} />
-        )}
+        {/* A page key that isn't in VIEWS (an old saved one) shows a pointer rather than a blank page. */}
+        {!activeView && <div className="status">Choose a page on the left.</div>}
       </div>
       <TableExportMenu />
     </div>

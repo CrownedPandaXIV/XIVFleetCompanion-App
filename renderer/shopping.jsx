@@ -317,10 +317,8 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   }
 
   function copy() {
-    navigator.clipboard.writeText(shoppingListText(list)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const show = (state) => { setCopied(state); setTimeout(() => setCopied(false), 2000); };
+    navigator.clipboard.writeText(shoppingListText(list)).then(() => show(true), () => show('failed'));
   }
 
   async function saveMade(part, made) {
@@ -347,7 +345,7 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
         {list.market && list.market.enabled && list.market.choices && list.market.choices.length > 0 && (
           <ShoppingPriceScope market={list.market} onChange={choosePriceScope} />
         )}
-        <button style={{ marginLeft: '16px' }} onClick={copy}>{copied ? 'Copied' : 'Copy as Text'}</button>
+        <button style={{ marginLeft: '16px' }} onClick={copy}>{copied === 'failed' ? "Couldn't copy: try again" : copied ? 'Copied' : 'Copy as Text'}</button>
         {updating && <span className="shopping-note shopping-updating" style={{ marginLeft: '16px' }}>Updating...</span>}
       </div>
       {error && <div className="error">Could not update the shopping list: {error}. Showing the last one.</div>}

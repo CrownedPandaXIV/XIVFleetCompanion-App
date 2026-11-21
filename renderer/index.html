@@ -405,6 +405,8 @@
     /* Settings: Setup Help */
     .setup-pages { display: flex; gap: 6px; margin-bottom: 14px; }
     .setup-page { font-size: 12px; padding: 4px 12px; font-weight: 400; }
+    /* Sub-tabs on a page (Inventory, Parts): the one showing is marked, not greyed out as if it couldn't be used. */
+    .sub-tab.active { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); border-color: color-mix(in srgb, var(--accent) 70%, var(--bg)); color: var(--text); }
     .setup-page.active { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); border-color: color-mix(in srgb, var(--accent) 70%, var(--bg)); color: var(--text); }
     .setup-help { font-size: 13px; line-height: 1.55; color: var(--text-soft); }
     .setup-help p { margin: 0 0 10px; }
@@ -585,13 +587,6 @@
       border-left-color: var(--accent);
       color: var(--text);
     }
-    .coming-soon-tag {
-      font-size: 10px;
-      color: var(--faint);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-top: 2px;
-    }
     .column-chooser-wrap { position: relative; display: inline-block; }
     .column-chooser {
       position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 4px; min-width: 300px; max-height: 80vh; overflow-y: auto;
@@ -639,6 +634,7 @@
     }
     .trend-menu-item { padding: 5px 10px; cursor: pointer; font-size: 13px; }
     .trend-menu-item:hover { background: var(--hover); }
+    .trend-menu-item.active { background: var(--hover); }
     .trend-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 6px 0 4px; font-size: 13px; }
     .trend-legend-item { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); }
     .trend-legend-item strong { color: var(--text); font-weight: 600; }

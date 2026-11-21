@@ -207,7 +207,7 @@ function CharacterInventoryTab({ refreshKey }) {
           ? rowsToShow.map((r, i) => (
               <tr key={i}>
                 <td>{r.item_name}</td>
-                <td>{r.quantity}</td>
+                <td>{Number(r.quantity).toLocaleString()}</td>
               </tr>
             ))
           : rowsToShow.map((r, i) => (
@@ -409,7 +409,7 @@ function FcInventoryTab({ refreshKey }) {
           ? rowsToShow.map((r, i) => (
               <tr key={i}>
                 <td>{r.item_name}</td>
-                <td>{r.quantity}</td>
+                <td>{Number(r.quantity).toLocaleString()}</td>
               </tr>
             ))
           : rowsToShow.map((r, i) => (
@@ -626,10 +626,10 @@ function InventoryView({ refreshKey }) {
   return (
     <div>
       <div className="controls">
-        <button onClick={() => setSubView('where')} disabled={subView === 'where'}>Where Is It?</button>{' '}
-        <button onClick={() => setSubView('character')} disabled={subView === 'character'}>Character</button>{' '}
-        <button onClick={() => setSubView('fc')} disabled={subView === 'fc'}>FC</button>{' '}
-        <button onClick={() => setSubView('fleet')} disabled={subView === 'fleet'}>Fleet</button>
+        <button onClick={() => setSubView('where')} className={`sub-tab${subView === 'where' ? ' active' : ''}`} aria-pressed={subView === 'where'}>Where Is It?</button>{' '}
+        <button onClick={() => setSubView('character')} className={`sub-tab${subView === 'character' ? ' active' : ''}`} aria-pressed={subView === 'character'}>Character</button>{' '}
+        <button onClick={() => setSubView('fc')} className={`sub-tab${subView === 'fc' ? ' active' : ''}`} aria-pressed={subView === 'fc'}>FC</button>{' '}
+        <button onClick={() => setSubView('fleet')} className={`sub-tab${subView === 'fleet' ? ' active' : ''}`} aria-pressed={subView === 'fleet'}>Fleet</button>
       </div>
       {subView === 'where' && <WhereIsItTab refreshKey={refreshKey} />}
       {subView === 'character' && <CharacterInventoryTab refreshKey={refreshKey} />}

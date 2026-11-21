@@ -611,13 +611,13 @@ function PartsView({ refreshKey }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
         <div className="controls">
-          <button onClick={() => setSubView('summary')} disabled={subView === 'summary'}>
+          <button onClick={() => setSubView('summary')} className={`sub-tab${subView === 'summary' ? ' active' : ''}`} aria-pressed={subView === 'summary'}>
             Summary
           </button>{' '}
-          <button onClick={() => setSubView('detail')} disabled={subView === 'detail'}>
+          <button onClick={() => setSubView('detail')} className={`sub-tab${subView === 'detail' ? ' active' : ''}`} aria-pressed={subView === 'detail'}>
             Detail
           </button>{' '}
-          <button onClick={() => setSubView('shopping')} disabled={subView === 'shopping'}>
+          <button onClick={() => setSubView('shopping')} className={`sub-tab${subView === 'shopping' ? ' active' : ''}`} aria-pressed={subView === 'shopping'}>
             Shopping List
           </button>
           <label style={{ marginLeft: '16px', whiteSpace: 'nowrap' }} title={LOOK_AHEAD_HELP}>

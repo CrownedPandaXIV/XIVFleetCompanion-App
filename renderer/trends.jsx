@@ -286,6 +286,8 @@ function TrendSubjectPicker({ items, selection, onAdd, onRemove, noun, latest })
   const { useState } = React;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // The highlighted suggestion, for the keyboard: Down / Up move it, Enter adds it, Escape closes the list.
+  const [active, setActive] = useState(0);
   const chosen = new Set(selection.map((s) => s.id));
   const matches = items.filter((it) => !chosen.has(it.id) && matchesWords(it.label, query)).slice(0, 60);
   const full = selection.length >= TREND_MAX_SERIES;
@@ -300,7 +302,7 @@ function TrendSubjectPicker({ items, selection, onAdd, onRemove, noun, latest })
               <span className="trend-key" style={{ background: TREND_COLORS[s.slot] }} />
               <span>{item ? item.label : s.id}</span>
               {latest && latest[s.id] !== undefined && <strong>{trendFullNumber(latest[s.id])}</strong>}
-              <button onClick={() => onRemove(s.id)} title="Remove" style={{ fontSize: '0.8em', padding: '0 4px', marginLeft: '6px' }}>x</button>
+              <button onClick={() => onRemove(s.id)} title="Remove" aria-label={`Remove ${item ? item.label : s.id}`} style={{ fontSize: '0.8em', padding: '0 4px', marginLeft: '6px' }}>x</button>
             </span>
           );
         })}
@@ -313,15 +315,24 @@ function TrendSubjectPicker({ items, selection, onAdd, onRemove, noun, latest })
             type="text"
             value={query}
             placeholder={`Add a ${noun}...`}
-            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, matches.length - 1)); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+              else if (e.key === 'Enter' && open && matches[active]) { e.preventDefault(); onAdd(matches[active].id); setQuery(''); setOpen(false); setActive(0); }
+              else if (e.key === 'Escape') setOpen(false);
+            }}
+            role="combobox"
+            aria-expanded={open && matches.length > 0}
+            aria-label={`Add a ${noun}`}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
             style={{ width: '100%' }}
           />
           {open && matches.length > 0 && (
-            <div className="trend-menu">
-              {matches.map((it) => (
-                <div key={it.id} className="trend-menu-item" onMouseDown={() => { onAdd(it.id); setQuery(''); setOpen(false); }}>
+            <div className="trend-menu" role="listbox">
+              {matches.map((it, i) => (
+                <div key={it.id} role="option" aria-selected={i === active} className={`trend-menu-item${i === active ? ' active' : ''}`} onMouseDown={() => { onAdd(it.id); setQuery(''); setOpen(false); }}>
                   {it.label}
                 </div>
               ))}
@@ -368,14 +379,27 @@ function TrendTableBox({ dimmed, children }) {
   );
 }
 
-function TrendsView({ refreshKey, preset }) {
+// What was chosen on Trends, kept while the app is open, so leaving the tab and coming back finds it as it was.
+const TRENDS_CHOICES = 'trendsChoices';
+function savedTrendsChoices() {
+  try {
+    const c = JSON.parse(sessionStorage.getItem(TRENDS_CHOICES) || 'null');
+    return c && typeof c === 'object' ? c : {};
+  } catch {
+    return {};
+  }
+}
+
+// preset: opened from a Summary tile or a trend card (applied once, then onPresetUsed clears it).
+function TrendsView({ refreshKey, preset, onPresetUsed = () => {} }) {
   const { useState, useEffect, useRef, useMemo } = React;
   const [meta, setMeta] = useState(null);
   const [metaError, setMetaError] = useState(null);
-  const [metricKey, setMetricKey] = useState('gil');
-  const [scope, setScope] = useState('fleet'); // fleet | characters | fcs
-  const [selection, setSelection] = useState([]); // [{ id, slot }]
-  const [rangeKey, setRangeKey] = useState('30d');
+  const [saved] = useState(savedTrendsChoices);
+  const [metricKey, setMetricKey] = useState(typeof saved.metricKey === 'string' ? saved.metricKey : 'gil');
+  const [scope, setScope] = useState(['fleet', 'characters', 'fcs'].includes(saved.scope) ? saved.scope : 'fleet'); // fleet | characters | fcs
+  const [selection, setSelection] = useState(Array.isArray(saved.selection) ? saved.selection : []); // [{ id, slot }]
+  const [rangeKey, setRangeKey] = useState(typeof saved.rangeKey === 'string' ? saved.rangeKey : '30d');
   const [zoom, setZoom] = useState(null); // { from, to } in ms, replaces the preset range
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -410,7 +434,12 @@ function TrendsView({ refreshKey, preset }) {
     }
     setRangeKey(preset.rangeKey || '30d');
     setZoom(null);
+    onPresetUsed();
   }, [preset]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(TRENDS_CHOICES, JSON.stringify({ metricKey, scope, selection, rangeKey })); } catch { /* only a convenience */ }
+  }, [metricKey, scope, selection, rangeKey]);
 
   const metrics = useMemo(() => (meta ? buildTrendMetrics(meta.prices) : []), [meta]);
   const metric = metrics.find((m) => m.key === metricKey) || metrics[0];
@@ -491,18 +520,21 @@ function TrendsView({ refreshKey, preset }) {
       return;
     }
     const id = ++requestId.current;
+    // Which value and scope this answer is for: until the answer for a new one comes, the old one isn't drawn under its name.
+    const askedFor = `${scope}|${metricKey}`;
     setLoading(true);
     window.api.getMetricSeries(request)
       .then((res) => {
         if (id !== requestId.current) return;
-        if (res.success) { setResult(res); setError(null); } else { setError(res.error); }
+        if (res.success) { setResult({ ...res, askedFor }); setError(null); } else { setError(res.error); }
       })
       .catch((err) => id === requestId.current && setError(String(err.message || err)))
       .finally(() => id === requestId.current && setLoading(false));
   }, [request]);
 
+  const resultMatches = !!result && result.askedFor === `${scope}|${metricKey}`;
   const chartSeries = useMemo(() => {
-    if (!result) return [];
+    if (!result || !resultMatches) return [];
     if (scope === 'fleet') return [{ name: 'Whole fleet', color: TREND_COLORS[0], values: result.series[0].values }];
     return selection.map((s) => {
       const item = itemsForScope.find((it) => it.id === s.id);
@@ -510,7 +542,7 @@ function TrendsView({ refreshKey, preset }) {
       return { name: item ? item.label : s.id, color: TREND_COLORS[s.slot], values: found ? found.values : result.timestamps.map(() => null) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, scope, selection, meta]);
+  }, [result, resultMatches, scope, selection, meta]);
 
   if (metaError) return <div className="status">Could not load trend data: {metaError}</div>;
   if (!meta) return <div className="status">Loading...</div>;
@@ -616,7 +648,9 @@ function TrendsView({ refreshKey, preset }) {
             );
           })()}
 
-          {!hasData ? (
+          {!hasData && loading ? (
+            <div className="trend-note" style={{ marginTop: '12px' }}>Loading...</div>
+          ) : !hasData ? (
             <div className="trend-note" style={{ marginTop: '12px' }}>
               No history recorded for this yet in this time span.
               {firstRecorded ? ` Recording of this value began ${trendFormatTime(firstRecorded)}.` : ''}
@@ -818,7 +852,7 @@ function TrendDetailLink({ kind, id, name }) {
 
 // A compact chart of one value for the whole fleet, one character or one Free Company. Used at the
 // top of some tabs and in the detail panel. `days` sets the span; the parent may change it.
-function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, refreshKey, height = 160, collapsible, storageKey, controls }) {
+function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, refreshKey, height = 160, collapsible, storageKey, controls, emptyNote = 'No history recorded for this yet.' }) {
   const { useState, useEffect, useMemo } = React;
   const [open, setOpen] = useState(() => {
     if (!collapsible) return true;
@@ -907,7 +941,7 @@ function TrendCard({ title, metricKey, scope = 'fleet', subjectId, days = 30, re
       {open && error && <div className="trend-note">Could not load this chart: {error}</div>}
       {open && !error && !series && !(result && result.none) && <div className="trend-note">Loading...</div>}
       {open && result && result.none && <div className="trend-note">Not recorded for this.</div>}
-      {open && series && known.length === 0 && <div className="trend-note">No history recorded for this yet.</div>}
+      {open && series && known.length === 0 && <div className="trend-note">{emptyNote}</div>}
       {open && series && known.length > 0 && <TrendChart timestamps={result.timestamps} series={series} dimmed={loading} height={height} />}
     </div>
   );
@@ -929,7 +963,8 @@ function TrendDetailPanel({ kind, id, name, onClose, refreshKey }) {
         { title: 'Gil', metricKey: 'gil' },
         { title: 'Ceruleum', metricKey: 'ceruleum' },
         { title: 'Repair kits', metricKey: 'repair_kits' },
-        { title: 'FC points (this character leads the FC)', metricKey: 'fc_points' },
+        // Recorded only for an FC's leader: for anyone else it's empty, and says why rather than looking like a gap.
+        { title: 'FC points (as FC leader)', metricKey: 'fc_points', emptyNote: "Recorded only for a character that leads its Free Company. See the Free Company's own trends." },
         { title: 'Salvage value, bags and retainers (gil)', metricKey: 'salvage_value' },
       ]
     : [
@@ -960,6 +995,7 @@ function TrendDetailPanel({ kind, id, name, onClose, refreshKey }) {
             <TrendCard
               key={c.metricKey}
               title={c.title}
+              emptyNote={c.emptyNote}
               metricKey={c.metricKey}
               scope={kind}
               subjectId={id}

@@ -10,11 +10,9 @@ const SETUP_HELP_PAGES = [
 
 function SetupCopy({ text, label = 'Copy' }) {
   const [done, setDone] = useState(false);
-  const copy = () => navigator.clipboard.writeText(text).then(() => {
-    setDone(true);
-    setTimeout(() => setDone(false), 1500);
-  });
-  return <button className="setup-copy" onClick={copy}>{done ? 'Copied' : label}</button>;
+  const show = (state) => { setDone(state); setTimeout(() => setDone(false), 1500); };
+  const copy = () => navigator.clipboard.writeText(text).then(() => show(true), () => show('failed'));
+  return <button className="setup-copy" onClick={copy}>{done === 'failed' ? "Couldn't copy" : done ? 'Copied' : label}</button>;
 }
 
 // A line to type or paste somewhere, with its own Copy button.
@@ -252,7 +250,8 @@ function SetupConnect({ details }) {
       </table>
       <div className="settings-row"><SetupCopy text={setupDetailsText(details, address)} label="Copy these details" /></div>
       <p className="alerts-help">
-        Not connecting? Use <strong>Test connection</strong> on the Tailscale page of the other PC: it says what's wrong.
+        Not connecting? On the other PC, type these into <strong>Settings → Database</strong> and click <strong>Test Connection</strong>
+        (it tries them before saving): it says what's wrong.
       </p>
       {details.databaseHere && details.choices.length > 0 && <SetupOpenConnections details={details} />}
     </div>
