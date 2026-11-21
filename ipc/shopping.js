@@ -222,9 +222,27 @@ async function loadVendorPrices(client, itemIds) {
 
 const PROGRESS_KEY = 'shopping_progress';
 
-async function readProgress(client) {
-  const { rows } = await client.query('SELECT setting_value FROM tier3_settings WHERE setting_key = $1', [PROGRESS_KEY]);
-  return parseProgress(rows.length ? rows[0].setting_value : null);
+// The saved ticks, and their text as saved (to tell later whether anyone changed them). lock: inside a transaction,
+// hold the row until it ends (PostgreSQL), so a tick saved at the same moment on another PC isn't lost.
+async function readProgressText(client, { lock = false } = {}) {
+  const forUpdate = lock && client.dialect !== 'sqlite' ? ' FOR UPDATE' : '';
+  const { rows } = await client.query(`SELECT setting_value FROM tier3_settings WHERE setting_key = $1${forUpdate}`, [PROGRESS_KEY]);
+  const text = rows.length ? rows[0].setting_value : null;
+  return { progress: parseProgress(text), text };
+}
+
+// Changes the ticks in one transaction: change(progress) gives the new ones, or null to leave them.
+async function updateProgress(client, change) {
+  await client.query(client.dialect === 'sqlite' ? 'BEGIN IMMEDIATE' : 'BEGIN');
+  try {
+    const now = await readProgressText(client, { lock: true });
+    const next = change(now);
+    if (next) await writeProgress(client, next);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
 }
 
 async function writeProgress(client, progress) {
@@ -276,7 +294,9 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
     // look-ahead are checked against that look-ahead's list (shopping-progress.js), so parts are worked out
     // once for the longest needed and each shorter list is the part of it due soon enough.
     const ahead = lookAheadDays(options && options.aheadDays);
-    const stored = await readProgress(client);
+    const { progress: stored, text: storedText } = await readProgressText(client);
+    // The checked ticks are written back only if nobody ticked meanwhile (this list takes a while to work out).
+    const saveChecked = (next) => updateProgress(client, (now) => (now.text === storedText ? next : null));
     const aheads = [...new Set([ahead, ...Object.values(stored).map((entry) => lookAheadDays(entry && entry.ahead))])];
     const needs = await computePartsNeeded(client, { aheadDays: Math.max(...aheads) });
     const now = Date.now();
@@ -294,7 +314,7 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
     const parts = partsByAhead.get(ahead);
     const longest = partsByAhead.get(Math.max(...aheads));
     if (!longest.size) {
-      if (Object.keys(stored).length) await writeProgress(client, {});
+      if (Object.keys(stored).length) await saveChecked({});
       return { success: true, empty: true };
     }
 
@@ -331,7 +351,7 @@ ipcMain.handle('get-shopping-list', async (event, options = {}) => {
 
     // Ticks for parts already crafted (shopping-progress.js), with any the plugin now sees taken back off.
     const progress = reconcileByAhead(stored, new Map([...lists].map(([days, l]) => [days, l.parts])));
-    if (JSON.stringify(progress) !== JSON.stringify(stored)) await writeProgress(client, progress);
+    if (JSON.stringify(progress) !== JSON.stringify(stored)) await saveChecked(progress);
     if (!parts.size) return { success: true, empty: true };
     const madeOf = (entry) => (progress[entry.itemId] ? Math.min(progress[entry.itemId].made, entry.crafts) : 0);
     const described = {
@@ -363,7 +383,7 @@ ipcMain.handle('save-shopping-progress', async (event, input = {}) => {
     return { success: false, error: 'Not a part on the list.' };
   }
   return withClient(async (client) => {
-    await writeProgress(client, setProgress(await readProgress(client), itemId, made, crafts, lookAheadDays(input.aheadDays)));
+    await updateProgress(client, ({ progress }) => setProgress(progress, itemId, made, crafts, lookAheadDays(input.aheadDays)));
     return { success: true };
   }, (err) => ({ success: false, error: err.message }));
 });

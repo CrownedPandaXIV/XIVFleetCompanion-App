@@ -2,7 +2,7 @@
 // cost, low-level and house warnings.
 const { app, ipcMain } = require('electron');
 const { portProblem } = require('../setup/create-database');
-const { createPgClient, loadPostgresConfig, savePostgresConfig, withClient, connectionStatus } = require('../db');
+const { createPgClient, loadPostgresConfig, savePostgresConfig, withClient, connectionStatus, inTransaction } = require('../db');
 const { DEMOLITION_DAYS, warnDaysSetting } = require('../characters/house-warning');
 const { autoRefreshSetting, autoRefreshProblem } = require('../auto-refresh');
 const { BEHIND_MINUTES_KEY, BEHIND_MINUTES_DEFAULT, BEHIND_MINUTES_LIMITS, behindMinutesSetting } = require('../characters/not-synced');
@@ -61,7 +61,7 @@ function detailsProblem({ host, port, database, user }) {
 
 // Saves new Postgres connection details from the Settings form. If newPassword is blank, the EXISTING saved password
 // is kept (for the same address), so the address's details can be changed without typing the password again.
-ipcMain.handle('settings:save-postgres-config', async (event, { host, port, database, user, newPassword }) => {
+ipcMain.handle('settings:save-postgres-config', async (event, { host, port, database, user, newPassword } = {}) => {
   try {
     const problem = detailsProblem({ host, port, database, user });
     if (problem) return { success: false, error: problem };
@@ -76,7 +76,7 @@ ipcMain.handle('settings:save-postgres-config', async (event, { host, port, data
 
 // Tests a connection WITHOUT saving first - lets the person verify new details work before committing them. If
 // newPassword is blank, the saved password is used (for the same address only).
-ipcMain.handle('settings:test-postgres-connection', async (event, { host, port, database, user, newPassword }) => {
+ipcMain.handle('settings:test-postgres-connection', async (event, { host, port, database, user, newPassword } = {}) => {
   const problem = detailsProblem({ host, port, database, user });
   if (problem) return { success: false, error: problem };
   const { password, error } = passwordFor(host, newPassword);
@@ -183,7 +183,7 @@ ipcMain.handle('settings:get-low-thresholds', async () => {
   });
 });
 
-ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshold, ceruleumThreshold, houseWarnDays, notSyncedMinutes }) => {
+ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshold, ceruleumThreshold, houseWarnDays, notSyncedMinutes } = {}) => {
   if (!wholeUpTo(repairKitThreshold, 99999)) return { success: false, error: 'Low repair kits must be a whole number from 0 to 99999 (0 turns it off).' };
   if (!wholeUpTo(ceruleumThreshold, 99999)) return { success: false, error: 'Low ceruleum must be a whole number from 0 to 99999 (0 turns it off).' };
   // The house warning (days since an FC house was last entered) is saved alongside, when given.
@@ -195,34 +195,37 @@ ipcMain.handle('settings:save-low-thresholds', async (event, { repairKitThreshol
     return { success: false, error: `Not synced must be a whole number of minutes from ${minBehind} to ${maxBehind}.` };
   }
   return withClient(async (client) => {
-    await client.query(
-      `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
-       VALUES ('low_repair_kit_threshold', $1, now())
-       ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
-      [repairKitThreshold]
-    );
-    await client.query(
-      `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
-       VALUES ('low_ceruleum_threshold', $1, now())
-       ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
-      [ceruleumThreshold]
-    );
-    if (houseWarnDays !== undefined) {
+    // All four or none (a connection dropping part way would otherwise save some).
+    await inTransaction(client, async () => {
       await client.query(
         `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
-         VALUES ('house_warn_days', $1, now())
+         VALUES ('low_repair_kit_threshold', $1, now())
          ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
-        [houseWarnDays]
+        [repairKitThreshold]
       );
-    }
-    if (notSyncedMinutes !== undefined) {
       await client.query(
         `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
-         VALUES ($1, $2, now())
+         VALUES ('low_ceruleum_threshold', $1, now())
          ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
-        [BEHIND_MINUTES_KEY, notSyncedMinutes]
+        [ceruleumThreshold]
       );
-    }
+      if (houseWarnDays !== undefined) {
+        await client.query(
+          `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
+           VALUES ('house_warn_days', $1, now())
+           ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
+          [houseWarnDays]
+        );
+      }
+      if (notSyncedMinutes !== undefined) {
+        await client.query(
+          `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at)
+           VALUES ($1, $2, now())
+           ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
+          [BEHIND_MINUTES_KEY, notSyncedMinutes]
+        );
+      }
+    });
     return { success: true };
   }, (err) => {
     return { success: false, error: err.message };

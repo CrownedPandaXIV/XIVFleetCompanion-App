@@ -108,6 +108,7 @@ const RESULT_TYPES = {
   made_at: 'time',
   map: 'text',
   member_names: 'array',
+  retainer_names: 'array',
   metric: 'text',
   min_rank_build: 'text',
   moved_at: 'time',

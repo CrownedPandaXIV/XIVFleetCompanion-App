@@ -846,10 +846,14 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [refreshMinutes, setRefreshMinutes] = useState('');
   const [refreshLoaded, setRefreshLoaded] = useState(false);
   const [refreshStatus, setRefreshStatus] = useState('');
+  // What's saved (to mark an edit not saved yet), and why it couldn't be read (then nothing is shown to save over it).
+  const [refreshSaved, setRefreshSaved] = useState('');
+  const [refreshError, setRefreshError] = useState(null);
 
   useEffect(() => {
     window.api.getAutoRefreshInterval().then((result) => {
-      setRefreshMinutes(String(result.minutes));
+      if (result.success === false) setRefreshError(result.error);
+      else { setRefreshMinutes(String(result.minutes)); setRefreshSaved(String(result.minutes)); }
       setRefreshLoaded(true);
     });
   }, []);
@@ -857,6 +861,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   async function saveRefreshInterval() {
     setRefreshStatus('Saving...');
     const result = await window.api.saveAutoRefreshInterval(Number(refreshMinutes));
+    if (result.success) setRefreshSaved(refreshMinutes);
     setRefreshStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
@@ -924,14 +929,21 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [warnings, setWarnings] = useState(null);
   const [warningsStatus, setWarningsStatus] = useState('');
 
+  const [warningsSaved, setWarningsSaved] = useState(null);
+  const [warningsError, setWarningsError] = useState(null);
+
   useEffect(() => {
     window.api.getLowThresholds().then((result) => {
-      setWarnings({
+      // Stand-in values from a read that failed would be saved back over the real ones: shown as a problem instead.
+      if (result.success === false) { setWarningsError(result.error); return; }
+      const loaded = {
         repairKitThreshold: String(result.repairKitThreshold),
         ceruleumThreshold: String(result.ceruleumThreshold),
         houseWarnDays: String(result.houseWarnDays),
         notSyncedMinutes: String(result.notSyncedMinutes),
-      });
+      };
+      setWarnings(loaded);
+      setWarningsSaved(loaded);
     });
   }, []);
 
@@ -943,6 +955,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
       houseWarnDays: Number(warnings.houseWarnDays),
       notSyncedMinutes: Number(warnings.notSyncedMinutes),
     });
+    if (result.success) setWarningsSaved(warnings);
     setWarningsStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
@@ -951,9 +964,17 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   const [repairKitLoaded, setRepairKitLoaded] = useState(false);
   const [repairKitStatus, setRepairKitStatus] = useState('');
 
+  const [repairKitSaved, setRepairKitSaved] = useState('');
+  const [repairKitError, setRepairKitError] = useState(null);
+
   useEffect(() => {
     window.api.getRepairKitCost().then((result) => {
-      setRepairKitCost(result.value !== null ? String(result.value) : '');
+      if (result.success === false) setRepairKitError(result.error);
+      else {
+        const loaded = result.value !== null ? String(result.value) : '';
+        setRepairKitCost(loaded);
+        setRepairKitSaved(loaded);
+      }
       setRepairKitLoaded(true);
     });
   }, []);
@@ -961,8 +982,15 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
   async function saveRepairKitCost() {
     setRepairKitStatus('Saving...');
     const result = await window.api.saveRepairKitCost(Number(repairKitCost));
+    if (result.success) setRepairKitSaved(repairKitCost);
     setRepairKitStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
+
+  // A section whose boxes were changed but not saved says so beside its Save (Close doesn't save them).
+  const notSaved = (changed) => (changed ? <span className="unsaved-note">Not saved yet</span> : null);
+  const loadProblem = (error) => (
+    <div className="error">Couldn't load these settings: {error} Close Settings and open it again once the database is back.</div>
+  );
 
   // --- Fight Club Import section ---
   const [showFightClubImport, setShowFightClubImport] = useState(false);
@@ -997,7 +1025,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         <section className="settings-section">
           <h3>Auto-Refresh</h3>
           {!refreshLoaded && <div className="status">Loading...</div>}
-          {refreshLoaded && (
+          {refreshError && loadProblem(refreshError)}
+          {refreshLoaded && !refreshError && (
             <div className="settings-row">
               <label>
                 Refresh every{' '}
@@ -1013,6 +1042,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
                 minute(s)
               </label>
               <button onClick={saveRefreshInterval}>Save</button>
+              {notSaved(refreshMinutes !== refreshSaved)}
               {refreshStatus && <span className="save-status">{refreshStatus}</span>}
             </div>
           )}
@@ -1021,7 +1051,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         <section className="settings-section">
           <h3>Fleet Economics</h3>
           {!repairKitLoaded && <div className="status">Loading...</div>}
-          {repairKitLoaded && (
+          {repairKitError && loadProblem(repairKitError)}
+          {repairKitLoaded && !repairKitError && (
             <div className="settings-row">
               <label>
                 Repair Kit Cost{' '}
@@ -1035,6 +1066,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
                 />
               </label>
               <button onClick={saveRepairKitCost}>Save</button>
+              {notSaved(repairKitCost !== repairKitSaved)}
               {repairKitStatus && <span className="save-status">{repairKitStatus}</span>}
             </div>
           )}
@@ -1042,7 +1074,8 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
 
         <section className="settings-section settings-warnings">
           <h3>Warnings</h3>
-          {!warnings && <div className="status">Loading...</div>}
+          {!warnings && !warningsError && <div className="status">Loading...</div>}
+          {warningsError && loadProblem(warningsError)}
           {warnings && (
             <div>
               <div className="settings-row">
@@ -1072,6 +1105,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
               <div className="alerts-help">Used by the Summary and the Character Roster's red numbers and not-synced marks. 0 turns a low-supply warning off; the house warning is 1 to 44 days (the game demolishes at 45); not synced is 10 to 1440 minutes.</div>
               <div className="settings-row">
                 <button onClick={saveWarnings}>Save</button>
+                {notSaved(JSON.stringify(warnings) !== JSON.stringify(warningsSaved))}
                 {warningsStatus && <span className="save-status">{warningsStatus}</span>}
               </div>
             </div>

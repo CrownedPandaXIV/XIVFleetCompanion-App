@@ -29,6 +29,7 @@ const KNOWN_DATA_CENTERS = [
   ['Dynamis', 'North-America', 'Cuchulainn Golem Halicarnassus Kraken Maduin Marilith Rafflesia Seraph'],
   ['Chaos', 'Europe', 'Cerberus Louisoix Moogle Omega Phantom Ragnarok Sagittarius Spriggan'],
   ['Light', 'Europe', 'Alpha Lich Odin Phoenix Raiden Shiva Twintania Zodiark'],
+  ['Shadow', 'Europe', 'Innocence Pixie Titania Tycoon'],
   ['Materia', 'Oceania', 'Bismarck Ravana Sephirot Sophia Zurvan'],
   ['Elemental', 'Japan', 'Aegis Atomos Carbuncle Garuda Gungnir Kujata Tonberry Typhon'],
   ['Gaia', 'Japan', 'Alexander Bahamut Durandal Fenrir Ifrit Ridill Tiamat Ultima'],
@@ -118,16 +119,21 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
   }
 
   // World name -> { dc, region, regionLabel }: Universalis's list of data centers, or the built-in one.
+  // The built-in list is used for an answer while Universalis's can't be read, but not kept: it's asked again after a
+  // while (a network blip at the start shouldn't leave newer data centers out until the app restarts).
+  let placesAskAgainAt = 0;
   async function placesOf() {
     if (places) return places;
+    if (Date.now() < placesAskAgainAt) return worldPlaces(KNOWN_DATA_CENTERS);
     try {
       const [dcs, worlds] = await Promise.all([getJson('/api/v2/data-centers'), getJson('/api/v2/worlds')]);
       const names = new Map(worlds.map((w) => [Number(w.id), w.name]));
       const list = dcs.map((dc) => ({ name: dc.name, region: dc.region, worlds: (dc.worlds || []).map((id) => names.get(Number(id))).filter(Boolean) }));
       if (list.some((dc) => dc.worlds.length)) places = worldPlaces(list);
     } catch { /* the built-in list below */ }
-    if (!places) places = worldPlaces(KNOWN_DATA_CENTERS);
-    return places;
+    if (places) return places;
+    placesAskAgainAt = Date.now() + 30 * 60 * 1000;
+    return worldPlaces(KNOWN_DATA_CENTERS);
   }
 
   // Requests to Universalis at once (it allows several): the rest wait their turn.

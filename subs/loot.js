@@ -94,7 +94,7 @@ function lootSummary(voyages, { prices, letterFor = new Map(), windowDays }) {
 }
 
 // Venture rewards per character over `windowDays`: [{ ownerCid, rewards, items (Map), gil, perDay,
-// retainers }] from rows { owner_cid, item_id, hq, quantity, rewards, retainers }, the rewards already added up
+// retainers }] from rows { owner_cid, item_id, hq, quantity, rewards, retainer_names }, the rewards already added up
 // per character, item and quality by the database (or by ventureTotals).
 function ventureSummary(rows, { prices, windowDays }) {
   const byOwner = new Map();
@@ -103,7 +103,7 @@ function ventureSummary(rows, { prices, windowDays }) {
     if (!byOwner.has(key)) byOwner.set(key, { ownerCid: key, rewards: 0, items: new Map(), retainers: new Set() });
     const o = byOwner.get(key);
     o.rewards += Number(r.rewards);
-    for (const name of r.retainers) o.retainers.add(name);
+    for (const name of r.retainer_names) o.retainers.add(name);
     const id = Number(r.item_id);
     o.items.set(id, (o.items.get(id) || 0) + (Number(r.quantity) || 0));
   }
@@ -115,7 +115,8 @@ function ventureSummary(rows, { prices, windowDays }) {
 
 // Single venture rewards ({ owner_cid, retainer_name, item_id, quantity, hq }) added up per character, item and
 // quality, as the database does in ipc/details.js (VENTURE_TOTALS): { owner_cid, item_id, hq, quantity, rewards,
-// retainers (names) }. For the tests.
+// retainer_names }. For the tests. (Not `retainers`: on the fleet file a column's kind goes by its name, and that
+// name is a count elsewhere, db/sqlite/result-types.js.)
 function ventureTotals(rewards) {
   const groups = new Map();
   for (const r of rewards) {
@@ -126,7 +127,7 @@ function ventureTotals(rewards) {
     g.rewards += 1;
     g.retainers.add(r.retainer_name);
   }
-  return [...groups.values()].map((g) => ({ ...g, retainers: [...g.retainers] }));
+  return [...groups.values()].map(({ retainers, ...g }) => ({ ...g, retainer_names: [...retainers] }));
 }
 
 // One character's venture rewards (ventureSummary's rows for it) at market prices: `prices` and `hqPrices`,

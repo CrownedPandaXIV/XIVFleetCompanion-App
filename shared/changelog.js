@@ -54,18 +54,8 @@ function parseChangelog(text) {
   return versions;
 }
 
-// -1, 0 or 1 for "1.4.10" against "1.5.0". A test version ("1.6.0-test.3") counts as its version number, so it
-// shows that version's changes.
-function compareVersions(a, b) {
-  const parts = (v) => String(v || '0').split('-')[0].split('.').map(Number);
-  const pa = parts(a);
-  const pb = parts(b);
-  for (let i = 0; i < 3; i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return d < 0 ? -1 : 1;
-  }
-  return 0;
-}
+// One rule for the whole app (shared/versions.js).
+const { compareVersions } = require('./versions');
 
 // The versions to show someone now on `current` who last saw `seen` (null: unknown, so only `current`): every
 // version after `seen` up to `current`, newest first.

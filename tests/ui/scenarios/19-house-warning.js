@@ -75,7 +75,10 @@ module.exports = async (t) => {
 
   // Raising the warning to 10 days drops the 9-day house once Settings is closed.
   await setValue('10');
+  const note = `(document.querySelector('.settings-warnings .unsaved-note') || {}).innerText`;
+  check(await ev(note) === 'Not saved yet', 'an edit not saved yet says so beside Save');
   check(await save() === 'Saved.', 'a warning of 10 days is saved');
+  check(!(await ev(note)), 'and the note goes once it is saved');
   await clickText('.settings-modal .modal-actions button', 'Close');
   await waitFor(`document.querySelectorAll('table.house-warnings tbody tr').length === 3`, 'three houses after raising the warning', 10000);
   list = await rows();

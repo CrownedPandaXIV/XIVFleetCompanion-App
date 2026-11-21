@@ -81,6 +81,11 @@ test('a query on a file answers as pg would', async () => {
     assert.deepStrictEqual([r.a, r.b, String(r.c), r.d], [3, -3, '18014498578000001', 7], '::int rounds as PostgreSQL does, and whole numbers stay exact');
     assert.strictEqual(Number(r.e instanceof Date ? r.e.getTime() / 1000 : r.e), Date.UTC(2026, 10, 21) / 1000, 'a date given as text');
     assert.deepStrictEqual((await c.query('SELECT name FROM ffxiv_item WHERE id = ANY($1::text[])', [[5]])).rows, [{ name: 'Thing' }], 'numbers given for a text column still match');
+    c.db.exec(`CREATE TABLE companion_venture_result (owner_cid INTEGER, retainer_name TEXT, received_at REAL, item_id INTEGER, quantity INTEGER, hq INTEGER);
+      INSERT INTO companion_venture_result VALUES (1, 'Amy', 9e9, 5, 1, 0), (1, 'Bob', 9e9, 5, 2, 0)`);
+    const v = (await c.query(`SELECT owner_cid::text AS owner_cid, item_id, hq, sum(quantity) AS quantity, count(*)::int AS rewards,
+      array_agg(DISTINCT retainer_name) AS retainer_names FROM companion_venture_result WHERE received_at > $1 GROUP BY owner_cid, item_id, hq`, [new Date(0)])).rows[0];
+    assert.deepStrictEqual([...v.retainer_names].sort(), ['Amy', 'Bob'], 'the venture totals\' retainers come back as a list (live prices, Income)');
     await assert.rejects(c.query('SELECT 1 FROM companion_pc_status'), (e) => e.code === '42P01', 'a missing table has PostgreSQL\'s code');
     await assert.rejects(c.query('SELECT nope FROM companion_character_current'), (e) => e.code === '42703', 'a missing column too');
   } finally {

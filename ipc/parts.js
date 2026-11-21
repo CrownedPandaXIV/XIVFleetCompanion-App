@@ -400,14 +400,31 @@ ipcMain.handle('get-sub-build-rules', async () => {
   });
 });
 
+// What's wrong with a Sub Rule from the window, in plain words, or null: a whole rank, a part letter (or none) per
+// slot, a character's id in digits, and for a change, the rule's id. (PostgreSQL would refuse a rank of 85.5 with a
+// technical message, and the fleet file would keep it.)
+function ruleProblem(rule, { needsId = false } = {}) {
+  if (!rule || typeof rule !== 'object') return 'Not a Sub Rule.';
+  const rank = Number(rule.rank);
+  if (!Number.isInteger(rank) || rank < 0 || rank > 999) return 'The rank must be a whole number from 0 to 999.';
+  for (const slot of ['hull', 'stern', 'bow', 'bridge']) {
+    if (rule[slot] && !/^[SUWCY]\+?$/.test(String(rule[slot]))) return `The ${slot} must be a part letter (S, U, W, C or Y, + for modified), or none.`;
+  }
+  if (rule.cid_override && !/^\d{1,20}$/.test(String(rule.cid_override))) return 'Not a character.';
+  if (needsId && !/^\d{1,18}$/.test(String(rule.id))) return 'Not a Sub Rule.';
+  return null;
+}
+
 ipcMain.handle('add-sub-build-rule', async (event, rule) => {
+  const problem = ruleProblem(rule);
+  if (problem) return { success: false, error: problem };
   return withClient(async (client) => {
     const result = await client.query(
       `INSERT INTO sub_build_rules (rank, cid_override, sub_filter, hull, stern, bow, bridge, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, now())
        RETURNING id`,
       [
-        rule.rank,
+        Number(rule.rank),
         rule.cid_override || null,
         rule.sub_filter || '',
         rule.hull || '',
@@ -423,6 +440,8 @@ ipcMain.handle('add-sub-build-rule', async (event, rule) => {
 });
 
 ipcMain.handle('update-sub-build-rule', async (event, rule) => {
+  const problem = ruleProblem(rule, { needsId: true });
+  if (problem) return { success: false, error: problem };
   return withClient(async (client) => {
     await client.query(
       `UPDATE sub_build_rules
@@ -447,6 +466,7 @@ ipcMain.handle('update-sub-build-rule', async (event, rule) => {
 });
 
 ipcMain.handle('delete-sub-build-rule', async (event, id) => {
+  if (!/^\d{1,18}$/.test(String(id))) return { success: false, error: 'Not a Sub Rule.' };
   return withClient(async (client) => {
     await client.query(`DELETE FROM sub_build_rules WHERE id = $1`, [id]);
     return { success: true };

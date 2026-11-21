@@ -2,7 +2,7 @@
 // them over the last few days (the history Trends charts), and how many to buy so they last a chosen
 // number of days. The working out is in supply-runway.js.
 const { ipcMain } = require('electron');
-const { withClient, snapshotFragments } = require('../db');
+const { withClient, snapshotFragments, inTransaction } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const { loadFcDirectory } = require('../characters/fc-directory');
 const { DEFAULT_TANK_COST, MAX_TANK_COST, creditPlan } = require('../subs/fc-credits');
@@ -129,12 +129,14 @@ ipcMain.handle('save-supply-settings', async (event, input = {}) => {
   }
   return withClient(async (client) => {
     const values = [[WINDOW_KEY, windowDays], [TARGET_KEY, targetDays], ...(tankCost !== null ? [[TANK_COST_KEY, tankCost]] : [])];
-    for (const [key, value] of values) {
-      await client.query(
-        `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at) VALUES ($1, $2, now())
-         ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
-        [key, value]);
-    }
+    await inTransaction(client, async () => {
+      for (const [key, value] of values) {
+        await client.query(
+          `INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at) VALUES ($1, $2, now())
+           ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = now()`,
+          [key, value]);
+      }
+    });
     return { success: true };
   }, (err) => {
     return { success: false, error: err.message };

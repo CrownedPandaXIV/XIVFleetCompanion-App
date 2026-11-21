@@ -163,7 +163,12 @@ function shapeExtrasResult(rows, checked) {
     for (const column of checked.columns) {
       const raw = row[column.key];
       if (raw === null || raw === undefined) entry[column.key] = null;
-      else if (column.type === 'number') entry[column.key] = Number(raw);
+      // A number stored as text ("8", or "Rank 8" for an FC's rank): its first whole number, as the views read it.
+      else if (column.type === 'number') {
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        const lead = /(-?\d+(?:\.\d+)?)/.exec(String(raw));
+        entry[column.key] = Number.isFinite(n) ? n : lead ? Number(lead[1]) : null;
+      }
       else if (column.type === 'date') entry[column.key] = new Date(raw).toISOString();
       else entry[column.key] = String(raw);
     }

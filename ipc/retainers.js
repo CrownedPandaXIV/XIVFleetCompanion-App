@@ -1,7 +1,7 @@
 // Retainers: gear status against each retainer's target, gear suggestions, saving targets.
 const { ipcMain } = require('electron');
 const { withClient, snapshotFragments } = require('../db');
-const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { notSyncedCharacters, readBehindMinutes, readLoginPcs } = require('../characters/not-synced');
 const { retainerSummary } = require('../characters/retainer-summary');
 
 // Equipped-gear slot display order for the Retainers view's ilvl hover
@@ -81,7 +81,7 @@ ipcMain.handle('get-retainer-summary', () => withClient(async (client) => {
     LEFT JOIN ffxiv_classjob cj ON cj.id = rl.job::text
     WHERE rl.job > 0`);
   const behind = notSyncedCharacters(rows.map((r) => ({ cid: r.owner_cid, account_label: r.account_label, last_synced_at: r.last_synced_at })),
-    await readBehindMinutes(client));
+    await readBehindMinutes(client), await readLoginPcs(client));
   return { success: true, ...retainerSummary(rows.filter((r) => !behind.has(String(r.owner_cid)))) };
 }, (err) => ({ success: false, error: err.message })));
 
@@ -221,7 +221,7 @@ const SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES = {
 // genuinely craftable, contrary to an earlier wrong assumption that raid
 // gear couldn't be). This is the suggestion list ONLY - status itself
 // (OK/Mismatch/Wrong Job/Empty) stays an exact match, computed separately.
-ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMode, targetValue, onlyCrafted, slotLabel }) => {
+ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMode, targetValue, onlyCrafted, slotLabel } = {}) => {
   return withClient(async (client) => {
     const categories = SLOT_LABEL_TO_EQUIP_SLOT_CATEGORIES[slotLabel];
     const jobCol = jobAbbreviation ? jobAbbreviation.toLowerCase() : null;
@@ -253,7 +253,7 @@ ipcMain.handle('get-gear-suggestions', async (event, { jobAbbreviation, targetMo
               CASE WHEN i.level_item ~ '^[0-9]+$' THEN i.level_item::int ELSE NULL END AS level_item
        FROM ffxiv_item i
        LEFT JOIN ffxiv_classjobcategory cjc ON cjc.id = i.class_job_category
-       WHERE i.equip_slot_category::int = ANY($1::int[])
+       WHERE i.equip_slot_category ~ '^[0-9]+$' AND i.equip_slot_category::int = ANY($1::int[])
          AND cjc.${jobCol} = 'True'
          AND i.${valueColumn} ~ '^[0-9]+$'
          AND i.${valueColumn}::int <= $2
@@ -280,7 +280,7 @@ function checkRetainerTarget({ retainerId, targetMode, targetValue }) {
   return null;
 }
 
-ipcMain.handle('save-retainer-target', async (event, { retainerId, targetMode, targetValue, onlyCrafted }) => {
+ipcMain.handle('save-retainer-target', async (event, { retainerId, targetMode, targetValue, onlyCrafted } = {}) => {
   const problem = checkRetainerTarget({ retainerId, targetMode, targetValue });
   if (problem) return { success: false, error: problem };
   return withClient(async (client) => {

@@ -29,7 +29,7 @@ ipcMain.handle('setup:wizard-info', async () => ({
   downloads: { postgres: DOWNLOADS.postgres.name, tailscale: DOWNLOADS.tailscale.name },
 }));
 
-ipcMain.handle('setup:plan', async (event, { role, sameNetwork }) => {
+ipcMain.handle('setup:plan', async (event, { role, sameNetwork } = {}) => {
   const plan = setupPlan(role, { sameNetwork, installed: await detect() });
   return plan ? { plan, steps: stepsFor(plan) } : null;
 });

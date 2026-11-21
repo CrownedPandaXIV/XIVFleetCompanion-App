@@ -387,7 +387,7 @@ const setting = (client, key, value) => client.query(`INSERT INTO fleet_economic
       }
       const [aki, bex, cal, dee] = rows;
       assert.deepStrictEqual([aki.low_ceruleum, aki.low_repair_kits, bex.low_ceruleum, cal.low_ceruleum, dee.low_ceruleum, dee.low_repair_kits],
-        [true, true, false, false, true, false], 'Aki low on both; Bex no longer synced; Cal has no sub; Dee has no ceruleum recorded');
+        [true, true, false, false, false, false], 'Aki low on both; Bex no longer synced; Cal has no sub; Dee has no ceruleum recorded (not known, so not low)');
       assert.deepStrictEqual([aki.house, dee.house, cal.house, bex.house], ['Mist W12 P30', 'City 999 W1 P2', null, null]);
       assert.deepStrictEqual([aki.fc_name, aki.fc_points, aki.login_pc, aki.login_label, aki.sort_index, bex.sort_index, cal.sort_index],
         ['Cute Kittehs!', 52000, 'DESKTOP-1', 'A', 2, 0, null]);

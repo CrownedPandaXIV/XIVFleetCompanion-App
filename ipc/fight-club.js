@@ -178,7 +178,10 @@ ipcMain.handle('import-fight-club:pick-file', async () => {
 // replace: the whole table is emptied and reloaded inside a single
 // transaction, so a failure partway through leaves the OLD data intact
 // rather than a half-imported table.
-ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) => {
+ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel } = {}) => {
+  if (!Array.isArray(rows) || !rows.every((row) => row && typeof row === 'object' && row.data && typeof row.data === 'object')) {
+    return { success: false, error: 'Nothing to import: read the spreadsheet again.' };
+  }
   const dbColumns = FIGHT_CLUB_COLUMNS.map((c) => c.dbColumn);
 
   return withClient(async (client) => {
@@ -191,8 +194,8 @@ ipcMain.handle('import-fight-club:commit', async (event, { rows, patchLabel }) =
       const patchPlaceholder = `$${dbColumns.length + 1}`;
 
       await client.query(
-        `INSERT INTO fight_club_routes (${dbColumns.join(', ')}, patch_label)
-         VALUES (${placeholders}, ${patchPlaceholder})`,
+        `INSERT INTO fight_club_routes (${dbColumns.join(', ')}, patch_label, imported_at)
+         VALUES (${placeholders}, ${patchPlaceholder}, now())`,
         [...values, patchLabel || null]
       );
     }

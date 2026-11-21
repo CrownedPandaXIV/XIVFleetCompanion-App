@@ -62,6 +62,10 @@ function fcDirectoryRows(dbRows, warnDays, now = Date.now()) {
       eligibleAt = new Date(referenceMs + 30 * 86400000).toISOString();
       if (rankOk && daysOk) {
         eligibility = 'Eligible';
+      } else if (!daysOk && !rankOk) {
+        // Both still to come: say both, so nobody plans to bid on a day the rank still won't allow.
+        const daysLeft = Math.ceil(30 - daysSince);
+        eligibility = `Rank ${Number.isFinite(rank) ? rank : '?'}/6, and ${daysLeft} more day${daysLeft === 1 ? '' : 's'}`;
       } else if (!daysOk) {
         const daysLeft = Math.ceil(30 - daysSince);
         eligibility = `Eligible in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;

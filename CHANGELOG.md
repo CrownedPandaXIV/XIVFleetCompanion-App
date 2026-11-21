@@ -51,6 +51,20 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
   and a spreadsheet export also guards cells starting with a tab or line break.
 - Another PC updating the database makes pages say so after a minute, instead of waiting forever.
 - Game data tables loaded by hand with number columns can now be updated.
+- **Current gil/day picks the Fight Club row for the sub's own build** (or, failing that, the fastest one its rank
+  clears), not whichever row comes first in the spreadsheet. The plugin does the same.
+- **Shopping List ticks aren't lost** when ticking while the list reloads, or on two PCs at once.
+- **Settings doesn't save stand-in values:** if a section couldn't be read (the database offline), it says so instead
+  of showing 0s that Save would write back. A section with edits not saved yet says "Not saved yet" beside its Save.
+- **Not synced, with no account labels:** characters are grouped by the PC they last logged in on, so closing one
+  game no longer marks another game's characters as not synced.
+- A character whose supplies aren't known yet isn't counted as low on them.
+- Free Companies: an FC short on both rank and days says both ("Rank 2/6, and 25 more days").
+- Just this PC with Live Market Prices: Income's retainer counts are right (they counted letters).
+- Shopping and market prices: the Shadow data centre is known, and Universalis's own list is asked again later if
+  it couldn't be read at first.
+- Sub Rules, the Roster's order, and other changes are checked before saving, and saved all or nothing; the Roster's
+  order is saved in one go. The FC Rank column reads ranks like "Rank 8".
 
 ## 1.10.6 - 2026-11-20
 

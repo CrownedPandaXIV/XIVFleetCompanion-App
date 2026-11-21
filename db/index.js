@@ -218,6 +218,19 @@ function fillFileGameData() {
   });
 }
 
+// work(client) in one transaction: all of it saved, or (on any error) none of it.
+async function inTransaction(client, work) {
+  await client.query('BEGIN');
+  try {
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
+}
+
 // Runs `work(client)` against a fresh, connected Postgres client and always
 // closes it. `onError(err, client)` supplies the handler's error result. Config is
 // loaded outside the try on purpose: a missing connection config still
@@ -376,6 +389,7 @@ function savePostgresConfig(config) {
 }
 
 module.exports = {
+  inTransaction,
   createPgClient, loadPostgresConfig, savePostgresConfig, withClient, snapshotFragments, followMoveNow,
   openClient, fleetLocation, fleetFile: FLEET_FILE, gameDataFile: GAME_DATA_FILE,
   // (file: this PC's fleet is in the plugin's file, for the header)

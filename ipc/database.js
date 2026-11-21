@@ -77,7 +77,7 @@ ipcMain.handle('database:speed-detail', async () => {
   return { success: true, details };
 });
 
-ipcMain.handle('database:speed-findings', (event, { measured, tabs, details }) => {
+ipcMain.handle('database:speed-findings', (event, { measured, tabs, details } = {}) => {
   const findings = speedFindings(measured, tabs);
   return { findings, report: speedReport({ measured, tabs, findings, details, appVersion: app.getVersion() }) };
 });

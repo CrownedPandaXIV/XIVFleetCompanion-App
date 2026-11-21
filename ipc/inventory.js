@@ -127,7 +127,9 @@ ipcMain.handle('get-salvage', async () => {
 // sentinel for "this is the character's own bag, not a retainer"
 // (confirmed against real data earlier).
 ipcMain.handle('get-character-inventory', async (event, cids) => {
-  if (!Array.isArray(cids)) {
+  // Whole-number ids only, and not too many (PostgreSQL would refuse anything else with a technical message, and the
+  // fleet file would quietly match nothing).
+  if (!Array.isArray(cids) || cids.length > 2000 || !cids.every((id) => /^\d{1,20}$/.test(String(id)))) {
     return { success: false, error: 'Invalid request.' };
   }
   return withClient(async (client) => {
@@ -234,7 +236,9 @@ ipcMain.handle('get-house-warnings', async () => {
 // One FC's full chest contents, real item names, grouped by tab via
 // sorted_container (20000-20004 -> Tab 1-5).
 ipcMain.handle('get-fc-inventory', async (event, fcIds) => {
-  if (!Array.isArray(fcIds)) {
+  // Whole-number ids only, and not too many (PostgreSQL would refuse anything else with a technical message, and the
+  // fleet file would quietly match nothing).
+  if (!Array.isArray(fcIds) || fcIds.length > 2000 || !fcIds.every((id) => /^\d{1,20}$/.test(String(id)))) {
     return { success: false, error: 'Invalid request.' };
   }
   return withClient(async (client) => {

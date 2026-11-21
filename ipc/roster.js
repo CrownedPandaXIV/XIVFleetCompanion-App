@@ -1,6 +1,6 @@
 // Roster: the character list, when the plugin last wrote data, and drag-to-reorder.
 const { ipcMain } = require('electron');
-const { notSyncedCharacters, readBehindMinutes } = require('../characters/not-synced');
+const { notSyncedCharacters, readBehindMinutes, readLoginPcs } = require('../characters/not-synced');
 const { loadOwnerSkips } = require('../characters/owner-skips');
 const { rosterWarnings } = require('../characters/roster-warnings');
 const { withClient, snapshotFragments } = require('../db');
@@ -46,7 +46,7 @@ ipcMain.handle('get-roster', async () => {
 
     // Characters the plugin no longer syncs (behind the rest of their account), marked on the Roster, and the
     // supply warnings (characters/roster-warnings.js, which the in-game Roster is checked against).
-    const behind = notSyncedCharacters(result.rows.map((r) => ({ ...r, last_synced_at: r.snapshot_at })), await readBehindMinutes(client));
+    const behind = notSyncedCharacters(result.rows.map((r) => ({ ...r, last_synced_at: r.snapshot_at })), await readBehindMinutes(client), await readLoginPcs(client));
     const rows = rosterWarnings(result.rows, behind, { ceruleum: ceruleumThreshold, repairKits: repairKitThreshold });
 
     return { success: true, rows, ownerSkips: await loadOwnerSkips(client, latestCharacter) };
@@ -80,30 +80,21 @@ ipcMain.handle('get-data-freshness', async () => {
   });
 });
 
-// Writes a full new ordering for a set of characters — called after a drag
-// reorder completes. Upserts one row per cid with its new position.
+// Writes a full new ordering for a set of characters — called after a drag reorder completes: every position in one
+// statement (one round trip, not one per character, over a slow connection), all or nothing.
 ipcMain.handle('update-sort-order', async (event, orderedCids) => {
-  if (!Array.isArray(orderedCids)) {
+  if (!Array.isArray(orderedCids) || !orderedCids.every((cid) => /^\d{1,20}$/.test(String(cid)))) {
     return { success: false, error: 'Invalid request.' };
   }
   return withClient(async (client) => {
-    await client.query('BEGIN');
-
-    for (let i = 0; i < orderedCids.length; i++) {
-      await client.query(
-        `INSERT INTO character_sort_order (cid, sort_index, updated_at)
-         VALUES ($1, $2, now())
-         ON CONFLICT (cid) DO UPDATE SET sort_index = EXCLUDED.sort_index, updated_at = now()`,
-        [orderedCids[i], i]
-      );
-    }
-
-    await client.query('COMMIT');
+    await client.query(
+      `INSERT INTO character_sort_order (cid, sort_index, updated_at)
+       SELECT u.cid, u.idx, now() FROM unnest($1::numeric[], $2::int[]) AS u(cid, idx)
+       ON CONFLICT (cid) DO UPDATE SET sort_index = EXCLUDED.sort_index, updated_at = now()`,
+      [orderedCids.map(String), orderedCids.map((_, i) => i)]
+    );
     return { success: true };
-  }, async (err, client) => {
-    await client.query('ROLLBACK');
-    return { success: false, error: err.message };
-  });
+  }, (err) => ({ success: false, error: err.message }));
 });
 
 // Removes one character and what is stored for it: its current row, subs and their Fight Club builds settings,

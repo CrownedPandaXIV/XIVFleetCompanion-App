@@ -12,8 +12,9 @@ function rosterWarnings(rows, behind, { ceruleum = 0, repairKits = 0 } = {}) {
     return {
       ...r,
       not_synced_ms: behind.get(String(r.cid)) ?? null,
-      low_repair: subsBuilt && synced && r.repair_kits < repairKits,
-      low_ceruleum: subsBuilt && synced && r.ceruleum < ceruleum,
+      // Not known yet (null) isn't low: null < 10 would be true.
+      low_repair: subsBuilt && synced && r.repair_kits != null && Number(r.repair_kits) < repairKits,
+      low_ceruleum: subsBuilt && synced && r.ceruleum != null && Number(r.ceruleum) < ceruleum,
       ceruleum_tone: supplyTone(r.ceruleum, ceruleum, subsBuilt && synced),
       repair_tone: supplyTone(r.repair_kits, repairKits, subsBuilt && synced),
     };
