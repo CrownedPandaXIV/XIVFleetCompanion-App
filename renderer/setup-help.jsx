@@ -469,6 +469,7 @@ function MoveDatabaseSection({ onMoved }) {
             <button onClick={() => { setOpen(false); setResult(null); setSteps(null); }} disabled={working}>Cancel</button>
             {!info.windows && <span className="save-status">Only on Windows.</span>}
           </div>
+          {!working && <p className="alerts-help move-close-apps">The plugins pause on their own while the copy is made, but close the app on your other PCs first: a change made in it during the move isn't copied.</p>}
           {working && <p className="alerts-help">This takes a few minutes, longer for a big database. Keep the app open. The plugins pause while the copy is made and catch up afterwards.</p>}
         </>
       )}
@@ -567,6 +568,10 @@ function LeftoversSection() {
               <RemoveButton what={`"${l.name}"`} label="Remove" title="Remove this unused copy" onRemove={() => remove(l.name)}>
                 <p>This deletes the unused copy "{l.name}" from this PC's PostgreSQL. It can't be undone.</p>
                 <p>The database the app uses isn't touched.</p>
+                {l.kind === 'moved-away' && (
+                  <p className="leftovers-pcs">A PC that was off during the move finds the new address through this copy. Remove it only once every PC
+                    {l.pcs && l.pcs.length ? ` that used it (${l.pcs.join(', ')})` : ''} has synced since the move: the PCs page shows when each last did.</p>
+                )}
               </RemoveButton>
             </li>
           ))}

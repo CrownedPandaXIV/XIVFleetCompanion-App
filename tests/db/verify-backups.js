@@ -7,7 +7,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { backupNow, testBackup, restoreBackup } = require('../../backups/run');
+const { backupNow, testBackup, restoreBackup, pausePlugins } = require('../../backups/run');
 const { findTools } = require('../../backups/tools');
 const { listBackups } = require('../../backups/files');
 
@@ -120,6 +120,37 @@ async function scenario(name, fn) {
     const undo = await restoreBackup({ tools, config, settings: { ...settings, copyFolder: '' }, file: r.safety.file });
     assert.strictEqual(undo.ok, true, undo.message);
     assert.deepStrictEqual(await gil(), was);
+  });
+
+  await scenario('a restore pauses the plugins on other PCs first: it waits for one still syncing, gives up after a while, and takes its note down', async () => {
+    await live.query(`CREATE TABLE IF NOT EXISTS companion_database_move (id int PRIMARY KEY DEFAULT 1, state text NOT NULL, host text NOT NULL,
+      port int NOT NULL, from_host text, started_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), moved_at timestamptz)`);
+    const plugin = new Client({ ...config, application_name: 'XIV Fleet Companion plugin' });
+    await plugin.connect();
+    const syncing = plugin.query('SELECT pg_sleep(2)');
+    const started = Date.now();
+    const paused = await pausePlugins(config, { tries: 100, everyMs: 300 }); // a plugin counts as busy for 15 s after it last asked
+    const waited = Date.now() - started;
+    const note = (await live.query(`SELECT state, from_host FROM companion_database_move`)).rows;
+    await paused.end();
+    await syncing;
+    assert.ok(paused.ok && waited >= 1500, `waited for the sync (${waited} ms)`);
+    assert.deepStrictEqual(note, [{ state: 'pausing', from_host: 'restore' }], 'the plugins are told to wait');
+    assert.strictEqual((await live.query(`SELECT count(*)::int AS n FROM companion_database_move`)).rows[0].n, 0, 'and told to carry on after');
+
+    const long = plugin.query('SELECT pg_sleep(3)');
+    const gaveUp = await pausePlugins(config, { tries: 3, everyMs: 200 });
+    await long;
+    assert.strictEqual(gaveUp.ok, false);
+    assert.match(gaveUp.message, /still syncing after 3 minutes, so nothing was restored/);
+    assert.strictEqual((await live.query(`SELECT count(*)::int AS n FROM companion_database_move`)).rows[0].n, 0);
+
+    await live.query(`INSERT INTO companion_database_move (state, host, port) VALUES ('moved', '100.64.0.9', 5432)`);
+    const away = await pausePlugins(config, { tries: 3, everyMs: 100 });
+    await away.end();
+    assert.deepStrictEqual((await live.query(`SELECT state FROM companion_database_move`)).rows, [{ state: 'moved' }], 'a note saying it moved away is left alone');
+    await live.query('DROP TABLE companion_database_move');
+    await plugin.end();
   });
 
   await scenario('a restore that fails part way changes nothing', async () => {

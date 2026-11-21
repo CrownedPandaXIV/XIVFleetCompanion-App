@@ -16,6 +16,20 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
 - **Summary, Subs, Routes, Salvage, FC Directory and Inventory's Fleet totals recover once the database is back.**
   After one failed load they kept showing "Failed to load" until you switched pages. Inventory's Fleet totals now
   also follow the app's refreshes.
+- **Restoring a backup pauses the plugins on your other PCs first**, as moving the database does, so their syncs can't
+  block it or write over it straight after.
+- **Backups use tools new enough for the database:** an older PostgreSQL installed on the PC for something else is
+  passed over for the downloaded tools, and when none are new enough it says so plainly.
+- **A damaged fleet file isn't backed up** by Back up now, so the good backups aren't pushed out.
+- Testing a backup, or getting the backup tools, can't crash the app if the network drops meanwhile.
+- "Let other PCs connect" fixes a firewall rule left on another port (after setting PostgreSQL up again).
+- Set up this PC checks the PostgreSQL and Tailscale installers again just before running them with administrator
+  rights.
+- Moving the database works when the Windows user name has letters outside English, and a refused password with such
+  letters is said so.
+- Removing a copy a move left behind names the PCs that may still need it to find the new address, and the move window
+  says to close the app on your other PCs first.
+- The nightly backup run always quits within a minute of finishing, even if saving the subs' forecasts is held up.
 
 ## 1.10.6 - 2026-11-20
 

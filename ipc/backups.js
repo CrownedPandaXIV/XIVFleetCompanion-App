@@ -3,12 +3,18 @@
 const { app, ipcMain, dialog, shell, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { loadPostgresConfig, recheckDatabase } = require('../db');
+const { loadPostgresConfig, recheckDatabase, createPgClient } = require('../db');
 const { loadBackupSettings, validateBackupSettings, saveBackupSettings } = require('../backups/settings');
 const { listBackups, backupTime } = require('../backups/files');
 const os = require('os');
-const { findTools, run } = require('../backups/tools');
-const { Client } = require('pg');
+const { findTools, run, serverMajor } = require('../backups/tools');
+
+// The backup tools for the database the app uses: at least its PostgreSQL version (pg_dump refuses a newer server).
+async function toolsFor(pgBin) {
+  let config = null;
+  try { config = loadPostgresConfig(); } catch { /* none saved: any tools */ }
+  return findTools(pgBin, { serverMajor: await serverMajor(config) });
+}
 const { chooseDownload, getTools } = require('../backups/get-tools');
 const installers = require('../setup/installers');
 const { testBackup, checkBackupFile, restoreBackup } = require('../backups/run');
@@ -47,7 +53,7 @@ function knownBackup(settings, file) {
 
 ipcMain.handle('backups:get', async () => {
   const { settings, last } = loadBackupSettings(settingsFile());
-  const [tools, scheduleStatus] = await Promise.all([findTools(settings.pgBin), schedule.backupScheduleStatus(expectedCommand())]);
+  const [tools, scheduleStatus] = await Promise.all([toolsFor(settings.pgBin), schedule.backupScheduleStatus(expectedCommand())]);
   return {
     success: true,
     settings,
@@ -69,7 +75,7 @@ ipcMain.handle('backups:save', async (event, input) => {
   if (!checked.ok) return { success: false, error: checked.error };
   const s = checked.settings;
   if (s.pgBin) {
-    const tools = await findTools(s.pgBin);
+    const tools = await toolsFor(s.pgBin);
     if (!tools.found) return { success: false, error: tools.error };
   }
   saveBackupSettings(settingsFile(), s);
@@ -99,7 +105,7 @@ ipcMain.handle('backups:get-tools', (event) => exclusive('getting the backup too
   let versionNum;
   try {
     const config = loadPostgresConfig();
-    const client = new Client({ ...config, port: Number(config.port || 5432), connectionTimeoutMillis: 10000 });
+    const client = createPgClient({ ...config, port: Number(config.port || 5432), connectionTimeoutMillis: 10000 });
     await client.connect();
     try {
       versionNum = (await client.query('SHOW server_version_num')).rows[0].server_version_num;
@@ -148,7 +154,7 @@ ipcMain.handle('backups:test', (event, file) => exclusive('testing a backup', as
   const { settings } = loadBackupSettings(settingsFile());
   const backup = knownBackup(settings, file);
   if (!backup) return { success: false, error: 'That backup is not in the backup folders.' };
-  const tools = await findTools(settings.pgBin);
+  const tools = await toolsFor(settings.pgBin);
   if (!tools.found) return { success: false, error: tools.error };
   const result = await testBackup({ tools, config: loadPostgresConfig(), file: backup.file });
   return result.ok ? { success: true, ...result } : { success: false, error: result.message, rows: result.rows };
@@ -158,7 +164,7 @@ ipcMain.handle('backups:test', (event, file) => exclusive('testing a backup', as
 async function restoreFile(file) {
   const { settings } = loadBackupSettings(settingsFile());
   if (!settings.folder) return { success: false, error: 'Choose a backup folder first (the database is backed up there before restoring).' };
-  const tools = await findTools(settings.pgBin);
+  const tools = await toolsFor(settings.pgBin);
   if (!tools.found) return { success: false, error: tools.error };
   const result = await restoreBackup({ tools, config: loadPostgresConfig(), settings, file });
   // The restored database may be on an older layout, and its views were set aside: check the database again
@@ -193,7 +199,7 @@ ipcMain.handle('backups:choose-file', async (event) => {
   }
   try {
     const { settings } = loadBackupSettings(settingsFile());
-    const tools = await findTools(settings.pgBin);
+    const tools = await toolsFor(settings.pgBin);
     if (!tools.found) return { success: false, error: tools.error };
     const checked = await checkBackupFile({ tools, file });
     if (!checked.ok) return { success: false, error: checked.message };

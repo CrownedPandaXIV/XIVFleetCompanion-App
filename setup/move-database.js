@@ -337,8 +337,9 @@ async function moveDatabase(input, deps, report = () => {}) {
       await snap.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
       const snapshot = (await snap.query('SELECT pg_export_snapshot() AS s')).rows[0].s;
       before = await countTables(snap);
-      fs.mkdirSync(deps.tmpDir || os.tmpdir(), { recursive: true });
-      undo.dump = path.join(deps.tmpDir || os.tmpdir(), `xiv-fleet-move-${now().getTime()}.dump`);
+      const tmp = deps.tmpDir || require('../backups/tools').toolTempDir();
+      fs.mkdirSync(tmp, { recursive: true });
+      undo.dump = path.join(tmp, `xiv-fleet-move-${now().getTime()}.dump`);
       const growing = setInterval(() => {
         try { set('copy', 'working', `${mb(fs.statSync(undo.dump).size)} so far...`); } catch { /* not started */ }
       }, 2000);

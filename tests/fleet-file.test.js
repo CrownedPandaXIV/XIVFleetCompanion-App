@@ -115,5 +115,16 @@ test('the fleet file\'s backups, named and kept as the plugin keeps them', () =>
   const kept = backups.listBackups(file).map((b) => b.name);
   assert.strictEqual(kept.length, 7, `the newest 7 kept: ${kept.join(', ')}`);
   assert.ok(kept.includes('fleet-2026-11-09.db') && !kept.includes('fleet-2026-10-01.db'));
+
+  // A damaged file isn't backed up, so the good backups stay.
+  const hurt = new DatabaseSync(file);
+  hurt.exec("CREATE TABLE big (x); WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 3000) INSERT INTO big SELECT printf('%0200d', i) FROM n");
+  hurt.close();
+  const fd = fs.openSync(file, 'r+');
+  fs.writeSync(fd, Buffer.alloc(4096, 0x5a), 0, 4096, 4096 * 5);
+  fs.closeSync(fd);
+  const before = backups.listBackups(file).map((b) => b.name).join(',');
+  assert.throws(() => backups.backUpNow(file, new Date(2026, 10, 10, 10, 0, 0)), /damaged|malformed/);
+  assert.strictEqual(backups.listBackups(file).map((b) => b.name).join(','), before, 'the 7 kept are the same');
   fs.rmSync(dir, { recursive: true, force: true });
 });

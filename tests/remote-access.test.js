@@ -78,11 +78,11 @@ function dataDir(conf, hba) {
   fs.writeFileSync(path.join(dir, 'pg_hba.conf'), hba);
   return dir;
 }
-function fakeRun(firewallRuleExists = false) {
+function fakeRun(firewallRuleExists = false, ruleText = '') {
   const calls = [];
   const run = async (file, args) => {
     calls.push([file, ...args].join(' '));
-    if (args.includes('show')) return { ok: firewallRuleExists, stdout: '', stderr: '' };
+    if (args.includes('show')) return { ok: firewallRuleExists, stdout: ruleText, stderr: '' };
     return { ok: true, stdout: '', stderr: '' };
   };
   return { run, calls };
@@ -110,6 +110,18 @@ test('the whole run: picks the PostgreSQL on the port, edits both files with cop
   const r2 = await ra.applyRemoteAccess(request, { run: again.run, now });
   assert.deepStrictEqual([r2.ok, r2.changed], [true, []], 'a second run changes nothing');
   assert.ok(!again.calls.some((c) => c.includes('Restart-Service') || c.includes('add rule')), 'and neither restarts nor adds a rule');
+});
+
+test('a firewall rule left on another port is made again for this one; one on this port, or unreadable, is kept', async () => {
+  const rule = (port) => `\r\nRule Name:                            XIV Fleet Companion PostgreSQL\r\n----\r\nProtocol:                             TCP\r\nLocalPort:                            ${port}\r\n`;
+  assert.strictEqual(ra.ruleLocalPort(rule(5432)), '5432');
+  for (const [text, remade] of [[rule(5432), true], [rule(5433), false], ['Regelname: x\r\nLokaler Port: 5432', false]]) {
+    const dir = dataDir(CONF, HBA);
+    const { run, calls } = fakeRun(true, text);
+    const r = await ra.applyRemoteAccess({ port: 5433, ranges: ['100.64.0.0/10'], services: [{ service: 'pg', dataDir: dir }] }, { run });
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(calls.some((c) => c.includes('delete rule')) && calls.some((c) => c.includes('add rule') && c.includes('localport=5433')), remade, text);
+  }
 });
 
 test('an ALTER SYSTEM listen_addresses is changed too; no PostgreSQL on the port says so', async () => {
