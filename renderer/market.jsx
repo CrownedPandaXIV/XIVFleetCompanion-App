@@ -164,8 +164,8 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
             {saveError && <span className="error-inline">{saveError}</span>}
           </div>
           <div className="supplies-note">
-            Since the plugin first saw each listing (a repriced listing keeps its time). Prices are what you listed them at; whether
-            they are undercut is not checked.
+            Since the plugin first saw each listing (a repriced listing keeps its time). Prices are what you listed them at
+            {live ? '.' : '; whether they are undercut is checked only with Live Market Prices on (Settings).'}
           </div>
           {m.stale.length === 0 && <div className="status">Nothing has been up for {data.minDays} days or more.</div>}
           {m.stale.length > 0 && (

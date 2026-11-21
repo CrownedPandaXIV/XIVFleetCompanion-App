@@ -98,6 +98,7 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
   setup details says so if it fails. Retainer countdowns share one clock. The Subs tab lists characters in the same
   order as the other tabs. Inventory quantities have thousands separators.
 - Setup Help points to Settings → Database → Test Connection on the other PC, rather than the Tailscale page.
+- Gil & Market: the note under unsold listings no longer says undercutting isn't checked while Live Market Prices is on.
 
 ## 1.10.6 - 2026-11-20
 
