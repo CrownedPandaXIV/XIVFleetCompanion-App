@@ -326,7 +326,9 @@ function ShoppingListView({ refreshKey, aheadDays = 0 }) {
   async function saveMade(part, made) {
     setList((l) => ({ ...l, parts: l.parts.map((p) => (p.itemId === part.itemId ? { ...p, made } : p)) }));
     const result = await window.api.saveShoppingProgress({ itemId: part.itemId, made, crafts: part.crafts, aheadDays });
-    setProgressError(result.success ? null : result.error);
+    setProgressError(result.success ? null : `${part.name}: ${result.error}. It's back as it was.`);
+    // Not saved: the number goes back, so the list doesn't show what other PCs won't see.
+    if (!result.success) setList((l) => ({ ...l, parts: l.parts.map((p) => (p.itemId === part.itemId ? { ...p, made: part.made } : p)) }));
   }
 
   const noRecipe = list.parts.filter((p) => p.noRecipe);

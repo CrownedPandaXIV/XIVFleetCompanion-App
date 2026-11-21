@@ -96,7 +96,7 @@ function SalvageView({ refreshKey }) {
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   const fleetTotal = rows.reduce((sum, r) => sum + Number(r.calculated_gil), 0);
@@ -120,6 +120,7 @@ function SalvageView({ refreshKey }) {
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls">
         {!salvageSort.sortColumn && (
           <label>

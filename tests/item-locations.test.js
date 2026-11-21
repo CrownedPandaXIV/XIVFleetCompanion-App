@@ -103,3 +103,13 @@ test('equipped gear: worn by a character or a retainer, never in an FC chest', (
   ]);
   assert.deepStrictEqual(item.places.map((p) => [p.where, p.equipped]), [['Armoury chest', false], ['Equipped', true], ['Retainer Ret (equipped)', true]]);
 });
+
+test('two FC chests with the same name stay apart, each with its own row key', () => {
+  const [item] = groupByItem([
+    { itemId: 7, name: 'Ore', who: 'Same Name', kind: 'fc', container: 20000, holderId: 'fc:1', qty: 3 },
+    { itemId: 7, name: 'Ore', who: 'Same Name', kind: 'fc', container: 20000, holderId: 'fc:2', qty: 4 },
+    { itemId: 7, name: 'Ore', who: 'Same Name', kind: 'fc', container: 20000, holderId: 'fc:2', qty: 1 },
+  ]);
+  assert.deepStrictEqual(item.places.map((p) => p.qty).sort(), [3, 5]);
+  assert.strictEqual(new Set(item.places.map((p) => p.key)).size, 2);
+});

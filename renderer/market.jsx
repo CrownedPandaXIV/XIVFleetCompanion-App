@@ -67,12 +67,14 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
   const [error, setError] = useState(null);
   const [daysInput, setDaysInput] = useState('');
   const [saveError, setSaveError] = useState(null);
+  // A refresh doesn't replace what is being typed in the box.
+  const typing = useRef(false);
 
   function load() {
     window.api.getMarket().then((result) => {
       if (result.success) {
         setData(result);
-        setDaysInput(String(result.minDays));
+        if (!typing.current) setDaysInput(String(result.minDays));
         setError(null);
       } else {
         setError(result.error);
@@ -86,16 +88,21 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
     const minDays = Number(daysInput);
     if (minDays === data.minDays) return;
     const result = await window.api.saveMarketSettings({ minDays });
-    if (result.success) { setSaveError(null); load(); } else setSaveError(result.error);
+    if (result.success) { setSaveError(null); load(); } else {
+      // Not saved: the box goes back to what is saved, and the reason shows beside it.
+      setSaveError(result.error);
+      setDaysInput(String(data.minDays));
+    }
   }
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && data === null) return <div className="error">Failed to load: {error}</div>;
   if (data === null) return <div className="status">Loading...</div>;
   const f = data.fleet;
   const m = uses.retainers ? data.market : null;
 
   return (
     <div className="market">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="supplies-summary">
         <div className="account-group supply-card">
           <div className="supply-card-label">Fleet gil</div>
@@ -148,7 +155,8 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
             <label>
               Up for at least{' '}
               <input type="number" min={1} max={data.maxStaleDays} value={daysInput} style={{ width: '60px' }}
-                onChange={(e) => setDaysInput(e.target.value)} onBlur={saveDays}
+                onChange={(e) => setDaysInput(e.target.value)} onFocus={() => { typing.current = true; }}
+                onBlur={() => { typing.current = false; saveDays(); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
               {' '}days
             </label>
@@ -162,7 +170,7 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
           {m.stale.length === 0 && <div className="status">Nothing has been up for {data.minDays} days or more.</div>}
           {m.stale.length > 0 && (
             <ColumnTable cols={listingCols} sort={listingSort} rows={m.stale} className="market-stale"
-              rowKey={(l) => `${l.retainer_id}|${l.item_id}|${l.first_seen_at}|${l.quantity}|${l.unit_price}`} />
+              rowKey={(l) => `${l.retainer_id}|${l.slot}`} />
           )}
         </React.Fragment>
       )}

@@ -126,7 +126,7 @@ function HideEquippedBox({ hide, onChange }) {
   );
 }
 
-function CharacterInventoryTab() {
+function CharacterInventoryTab({ refreshKey }) {
   const [roster, setRoster] = useState([]);
   const [selectedCids, setSelectedCids] = useState([]);
   const [rows, setRows] = useState(null);
@@ -144,14 +144,19 @@ function CharacterInventoryTab() {
         setRoster(sortRows(result.rows.map((r) => ({ cid: r.cid, name: r.name, world: r.world, sort_index: r.sort_index }))));
       }
     });
-  }, []);
+  }, [refreshKey]);
 
+  // A new choice shows "Loading..."; a refresh of the same one keeps what's shown until the answer comes.
+  const shownFor = useRef('');
   useEffect(() => {
+    setError(null);
     if (selectedCids.length === 0) {
       setRows([]);
       return;
     }
-    setRows(null);
+    const key = selectedCids.join(',');
+    if (shownFor.current !== key) setRows(null);
+    shownFor.current = key;
     // Only the answer for what's chosen now is shown: an earlier, slower one is left out.
     let current = true;
     window.api.getCharacterInventory(selectedCids).then((result) => {
@@ -164,9 +169,7 @@ function CharacterInventoryTab() {
       }
     });
     return () => { current = false; };
-  }, [selectedCids]);
-
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  }, [selectedCids, refreshKey]);
 
   const filtered = (rows || []).filter((r) =>
     matchesWords(r.item_name, search) && !(hideEquipped && r.equipped)
@@ -219,6 +222,8 @@ function CharacterInventoryTab() {
       <div className="controls">
         <MultiCharacterPicker roster={roster} selectedCids={selectedCids} onChange={setSelectedCids} />
       </div>
+      {/* Under the picker, so another choice (or the same again) can be tried. */}
+      {error && <div className="error">Couldn't load these bags: {error}</div>}
       {selectedCids.length > 0 && (
         <div className="controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <label>
@@ -327,7 +332,7 @@ function MultiFcPicker({ fcList, selectedFcIds, onChange }) {
   );
 }
 
-function FcInventoryTab() {
+function FcInventoryTab({ refreshKey }) {
   const [fcList, setFcList] = useState([]);
   const [selectedFcIds, setSelectedFcIds] = useState([]);
   const [rows, setRows] = useState(null);
@@ -342,14 +347,18 @@ function FcInventoryTab() {
     window.api.getFcList().then((result) => {
       if (result.success) setFcList(result.rows);
     });
-  }, []);
+  }, [refreshKey]);
 
+  const shownFor = useRef('');
   useEffect(() => {
+    setError(null);
     if (selectedFcIds.length === 0) {
       setRows([]);
       return;
     }
-    setRows(null);
+    const key = selectedFcIds.join(',');
+    if (shownFor.current !== key) setRows(null);
+    shownFor.current = key;
     // Only the answer for what's chosen now is shown: an earlier, slower one is left out.
     let current = true;
     window.api.getFcInventory(selectedFcIds).then((result) => {
@@ -362,9 +371,7 @@ function FcInventoryTab() {
       }
     });
     return () => { current = false; };
-  }, [selectedFcIds]);
-
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  }, [selectedFcIds, refreshKey]);
 
   const filtered = (rows || []).filter((r) =>
     matchesWords(r.item_name, search)
@@ -417,6 +424,7 @@ function FcInventoryTab() {
       <div className="controls">
         <MultiFcPicker fcList={fcList} selectedFcIds={selectedFcIds} onChange={setSelectedFcIds} />
       </div>
+      {error && <div className="error">Couldn't load these chests: {error}</div>}
       {selectedFcIds.length > 0 && (
         <div className="controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <label>
@@ -464,7 +472,7 @@ function FleetInventoryTab({ refreshKey }) {
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   // Hiding equipped gear counts only what isn't being worn; an item that is only worn drops out.
@@ -480,6 +488,7 @@ function FleetInventoryTab({ refreshKey }) {
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <input type="text" placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <HideEquippedBox hide={hideEquipped} onChange={setHideEquipped} />
@@ -515,7 +524,7 @@ const WHERE_COLUMN_DEFS = [
   { key: 'qty', label: 'Quantity', cell: (p) => p.qty.toLocaleString(), sort: (p) => p.qty },
 ];
 
-function WhereIsItTab() {
+function WhereIsItTab({ refreshKey }) {
   const whereSort = useColumnSort();
   const whereCols = useTableColumns({ tableKey: 'whereIsIt', ownDefs: WHERE_COLUMN_DEFS, rows: null, idOf: () => null });
   const [term, setTerm] = useState(() => {
@@ -548,7 +557,7 @@ function WhereIsItTab() {
       });
     }, 300);
     return () => clearTimeout(timer);
-  }, [term]);
+  }, [term, refreshKey]);
 
   const places = (n) => `${n} place${n === 1 ? '' : 's'}`;
   // Hiding equipped gear leaves out the places where it's being worn, and the items held only as worn gear.
@@ -595,7 +604,7 @@ function WhereIsItTab() {
                 <React.Fragment key={group.label || 'all'}>
                   {group.label && <tr className="where-account"><td colSpan={whereCols.visibleDefs.length}>{group.label}</td></tr>}
                   {applyColumnSort(group.rows, whereSort.sortColumn, whereSort.sortDirection, whereCols.accessors).map((p) => (
-                    <tr key={`${p.who}|${p.world}|${p.where}`}><ColumnBodyCells cols={whereCols} row={p} /></tr>
+                    <tr key={p.key}><ColumnBodyCells cols={whereCols} row={p} /></tr>
                   ))}
                 </React.Fragment>
               ))}
@@ -610,7 +619,7 @@ function WhereIsItTab() {
   );
 }
 
-// refreshKey: only the Fleet totals follow the refreshes; the other tabs are browsed, so they're left as they are.
+// refreshKey: every tab follows Refresh, Auto-Refresh and a reconnect, keeping its choices.
 function InventoryView({ refreshKey }) {
   const [subView, setSubView] = useState('where'); // where | character | fc | fleet
 
@@ -622,9 +631,9 @@ function InventoryView({ refreshKey }) {
         <button onClick={() => setSubView('fc')} disabled={subView === 'fc'}>FC</button>{' '}
         <button onClick={() => setSubView('fleet')} disabled={subView === 'fleet'}>Fleet</button>
       </div>
-      {subView === 'where' && <WhereIsItTab />}
-      {subView === 'character' && <CharacterInventoryTab />}
-      {subView === 'fc' && <FcInventoryTab />}
+      {subView === 'where' && <WhereIsItTab refreshKey={refreshKey} />}
+      {subView === 'character' && <CharacterInventoryTab refreshKey={refreshKey} />}
+      {subView === 'fc' && <FcInventoryTab refreshKey={refreshKey} />}
       {subView === 'fleet' && <FleetInventoryTab refreshKey={refreshKey} />}
     </div>
   );

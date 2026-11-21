@@ -413,7 +413,7 @@ function App() {
       setAppMode(mode);
       setCurrentView(mode === 'tools' ? 'helper' : 'summary');
     };
-    window.api.getAppMode().then(apply).catch(() => apply('fleet'));
+    window.api.getAppMode().then((mode) => apply(typeof mode === 'string' ? mode : 'fleet'));
     return window.api.onAppModeChanged(apply);
   }, []);
   const helperMode = appMode === 'tools';
@@ -483,8 +483,15 @@ function App() {
   });
   const rosterRows = rosterCols.rows;
 
+  // Only the newest roster load counts, and none that started before a drag's save finished (it would put the old
+  // order back until the next refresh).
+  const rosterLoad = useRef(0);
+  const orderSaves = useRef({ started: 0, running: 0 });
   const fetchRoster = React.useCallback(async () => {
+    const call = ++rosterLoad.current;
+    const savesAtStart = orderSaves.current.started;
     const result = await window.api.getRoster();
+    if (call !== rosterLoad.current || savesAtStart !== orderSaves.current.started || orderSaves.current.running > 0) return;
     if (result.success) {
       setRows(sortRows(result.rows));
       setOwnerSkips(result.ownerSkips || []);
@@ -554,8 +561,16 @@ function App() {
 
     const fullOrderCids = merged.map((r) => r.cid);
     setSaveStatus('Saving...');
-    const result = await window.api.updateSortOrder(fullOrderCids);
+    orderSaves.current.started++;
+    orderSaves.current.running++;
+    let result;
+    try {
+      result = await window.api.updateSortOrder(fullOrderCids);
+    } finally {
+      orderSaves.current.running--;
+    }
     setSaveStatus(result.success ? 'Saved.' : `Failed to save: ${result.error}`);
+    fetchRoster(); // what is saved now, and anything a load dropped meanwhile
   }
 
   const activeView = VIEWS.find((v) => v.key === currentView);

@@ -211,13 +211,14 @@ function SummaryView({ onNavigate, onOpenTrend, refreshKey, onOpenSettings, uses
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && warnings === null && houseWarnings === null) return <div className="error">Failed to load: {error}</div>;
   // Characters no longer synced keep their old subs; they are left out here as in the alerts.
   const notSyncedCids = new Set(notSynced.map((c) => String(c.cid)));
   const readyShown = readyCols.rows === null ? null : readyCols.rows.filter((s) => !notSyncedCids.has(String(s.cid)));
 
   return (
     <div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <SharedSyncWarning characters={sharedSync} />
       <div className="controls summary-thresholds">
         <span>

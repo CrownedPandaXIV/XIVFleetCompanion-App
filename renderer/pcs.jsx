@@ -121,7 +121,7 @@ function PcsView({ refreshKey }) {
     return true;
   };
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && data === null) return <div className="error">Failed to load: {error}</div>;
   if (data === null) return <div className="status">Loading...</div>;
   if (data.missing) {
     return (
@@ -137,6 +137,7 @@ function PcsView({ refreshKey }) {
 
   return (
     <div className="pcs">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="supplies-note" style={{ paddingTop: '12px' }}>
         Each PC running the plugin, per account label, as of its last sync. The plugin's "Check what I can see" (/xivfleet check)
         on a PC also shows its result here. A PC no longer used can be removed with the × beside its name.

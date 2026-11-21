@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadPostgresConfig, recheckDatabase, createPgClient } = require('../db');
 const { loadBackupSettings, validateBackupSettings, saveBackupSettings } = require('../backups/settings');
-const { listBackups, backupTime } = require('../backups/files');
+const { listBackupsSoon, backupTime } = require('../backups/files');
 const os = require('os');
 const { findTools, run, serverMajor } = require('../backups/tools');
 
@@ -46,14 +46,19 @@ function logTail(folder, lines = 15) {
 }
 
 // A backup the window asked for: only files listed in this PC's backup or copy folder.
-function knownBackup(settings, file) {
-  return [settings.folder, settings.copyFolder].filter(Boolean)
-    .flatMap((f) => listBackups(f)).find((b) => b.file === file) || null;
+async function knownBackup(settings, file) {
+  const lists = await Promise.all([settings.folder, settings.copyFolder].filter(Boolean).map((f) => listBackupsSoon(f)));
+  return lists.flatMap((l) => l.list).find((b) => b.file === file) || null;
 }
 
 ipcMain.handle('backups:get', async () => {
   const { settings, last } = loadBackupSettings(settingsFile());
-  const [tools, scheduleStatus] = await Promise.all([toolsFor(settings.pgBin), schedule.backupScheduleStatus(expectedCommand())]);
+  // The second copy's folder can be on a PC that's off: listed without holding up the window (listBackupsSoon).
+  const [tools, scheduleStatus, own, copies] = await Promise.all([
+    toolsFor(settings.pgBin), schedule.backupScheduleStatus(expectedCommand()),
+    settings.folder ? listBackupsSoon(settings.folder) : { list: [], unreachable: false },
+    settings.copyFolder ? listBackupsSoon(settings.copyFolder) : { list: [], unreachable: false },
+  ]);
   return {
     success: true,
     settings,
@@ -61,8 +66,10 @@ ipcMain.handle('backups:get', async () => {
     busy,
     tools,
     schedule: scheduleStatus,
-    backups: settings.folder ? listBackups(settings.folder) : [],
-    copies: settings.copyFolder ? listBackups(settings.copyFolder) : [],
+    backups: own.list,
+    backupsUnreachable: own.unreachable,
+    copies: copies.list,
+    copiesUnreachable: copies.unreachable,
     log: settings.folder ? logTail(settings.folder) : [],
     // Get the backup tools is Windows only; the UI tests (on Linux) show its button to check it answers.
     windows: process.platform === 'win32' || !!process.env.XIV_FLEET_TEST_GET_TOOLS,
@@ -152,7 +159,7 @@ ipcMain.handle('backups:run-now', () => exclusive('backing up', async () => {
 
 ipcMain.handle('backups:test', (event, file) => exclusive('testing a backup', async () => {
   const { settings } = loadBackupSettings(settingsFile());
-  const backup = knownBackup(settings, file);
+  const backup = await knownBackup(settings, file);
   if (!backup) return { success: false, error: 'That backup is not in the backup folders.' };
   const tools = await toolsFor(settings.pgBin);
   if (!tools.found) return { success: false, error: tools.error };
@@ -176,7 +183,7 @@ async function restoreFile(file) {
 
 ipcMain.handle('backups:restore', (event, file) => exclusive('restoring a backup', async () => {
   const { settings } = loadBackupSettings(settingsFile());
-  const backup = knownBackup(settings, file);
+  const backup = await knownBackup(settings, file);
   if (!backup) return { success: false, error: 'That backup is not in the backup folders.' };
   return restoreFile(backup.file);
 }));

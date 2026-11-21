@@ -65,6 +65,25 @@ Fixes from a full check of the app and the plugin. This entry grows until 1.11.0
   it couldn't be read at first.
 - Sub Rules, the Roster's order, and other changes are checked before saving, and saved all or nothing; the Roster's
   order is saved in one go. The FC Rank column reads ranks like "Rank 8".
+- **A page that couldn't refresh keeps what it showed**, with "Could not update: ..." above it, instead of replacing
+  it with an error. A screen whose request failed outright (setup, backups, updates, imports) says why and can be
+  closed or tried again, instead of staying on "Loading..." for good.
+- **Inventory follows Refresh and Auto-Refresh** on every tab, keeping the characters or FCs chosen. A load that fails
+  shows under the picker, so another choice can be made.
+- **Sub Rules and retainer gear targets show changes made in the game** after a refresh, unless the row has edits not
+  saved yet ("Not saved yet"). Saving or deleting a Sub Rule updates the parts beside it. Delete asks first (Delete it /
+  Keep), as in the plugin, and saving one new rule no longer throws away other new rows not saved yet.
+- Subs: ticking Fight Club builds updates Next build and Target route straight away; if it can't be saved, it says why.
+- Shopping List: a "Made" number that couldn't be saved goes back, rather than looking shared when it isn't.
+- Income: changing "Income over the last N days" updates Loot per Voyage and Retainer Ventures too.
+- Market and Supplies: a refresh no longer replaces a number being typed; a value that isn't saved goes back, with the
+  reason beside its box.
+- Backups: a second-copy folder on a PC that's switched off no longer freezes the app; it says the folder can't be
+  reached.
+- The Roster keeps a drag's new order when a refresh lands at the same moment.
+- Set up this PC, "This PC only plays the game": says where to find the database PC's details, instead of a link that
+  did nothing.
+- Where Is It?: two FCs (or retainers) with the same name are listed apart.
 
 ## 1.10.6 - 2026-11-20
 

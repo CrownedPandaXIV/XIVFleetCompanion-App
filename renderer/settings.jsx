@@ -34,6 +34,13 @@ function FightClubImportModal({ onClose }) {
     });
   }, []);
 
+  // Escape closes it too, except while importing (that finishes by itself and then says how it went).
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && stage !== 'importing') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stage]);
+
   function toggleRow(rowNumber) {
     setCheckedRows((prev) => ({ ...prev, [rowNumber]: !prev[rowNumber] }));
   }
@@ -58,7 +65,7 @@ function FightClubImportModal({ onClose }) {
       <div className="modal">
         <h2>Import Fight Club Data</h2>
 
-        {stage === 'loading' && <div className="status">Reading file...</div>}
+        {stage === 'loading' && <div className="status">Reading file... <button onClick={onClose}>Close</button></div>}
 
         {stage === 'error' && (
           <div>
@@ -482,11 +489,14 @@ function UpdatesSection() {
   const [info, setInfo] = useState(null);
   const [recent, setRecent] = useState(null);
   const showRecent = () => (recent ? setRecent(null) : window.api.getRecentChanges().then((r) => setRecent(r.versions)));
+  // A failed answer doesn't replace what is shown; it says why instead.
+  const [problem, setProblem] = useState(null);
+  const answered = (r) => { if (r && r.success === false) setProblem(r.error); else { setProblem(null); setInfo(r); } };
   useEffect(() => {
-    window.api.getUpdateStatus().then(setInfo);
+    window.api.getUpdateStatus().then(answered);
     return window.api.onUpdateStatus((status) => setInfo((i) => ({ ...(i || {}), status })));
   }, []);
-  if (!info) return <section className="settings-section updates-section"><h3>Updates</h3><div className="status">Loading...</div></section>;
+  if (!info) return <section className="settings-section updates-section"><h3>Updates</h3><div className="status">{problem ? `Couldn't check: ${problem}` : 'Loading...'}</div></section>;
   const { status } = info;
   const busy = ['checking', 'downloading', 'ready'].includes(status.state);
   return (
@@ -494,15 +504,16 @@ function UpdatesSection() {
       <h3>Updates</h3>
       <div className="settings-row">
         <span>This is version {info.version}.</span>
-        {!status.source && <button className="updates-check" onClick={() => window.api.checkForUpdates().then(setInfo)} disabled={busy}>Check for updates</button>}
+        {!status.source && <button className="updates-check" onClick={() => window.api.checkForUpdates().then(answered)} disabled={busy}>Check for updates</button>}
         <span className={`save-status updates-status${status.state === 'error' ? ' supply-warn' : ''}`}>{status.text}</span>
       </div>
+      {problem && <div className="error-inline">Couldn't check: {problem}</div>}
       {!status.source && <div className="alerts-help">The app also looks by itself when it starts and every hour, and downloads a new version in the background.</div>}
       {!status.source && (
         <div className="settings-row test-versions">
           <label>
             <input type="checkbox" className="test-versions-toggle" checked={!!status.testing}
-              onChange={(e) => window.api.setTestVersions(e.target.checked).then(setInfo)} />
+              onChange={(e) => window.api.setTestVersions(e.target.checked).then(answered)} />
             {' '}Get test versions
           </label>
           <span className="alerts-help">
@@ -760,7 +771,9 @@ function SpeedCheckSection() {
     setStep('Timing each database question behind Income and Summary...');
     const detail = await window.api.getSpeedDetail();
     const details = detail.success ? detail.details : [{ part: 'Income and Summary', error: detail.error }];
-    const { findings, report } = await window.api.getSpeedFindings({ measured: db.measured, tabs, details });
+    const found = await window.api.getSpeedFindings({ measured: db.measured, tabs, details });
+    if (found.success === false) { setStep(null); setError(found.error); return; }
+    const { findings, report } = found;
     setResult({ findings, report, tabs, details });
     setStep(null);
   };
@@ -832,7 +845,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
 
   const [appVersion, setAppVersion] = useState('');
   useEffect(() => {
-    window.api.getAppVersion().then(setAppVersion);
+    window.api.getAppVersion().then((v) => { if (typeof v === 'string') setAppVersion(v); });
   }, []);
 
   // Where the fleet is (db/fleet-store.js): the fleet file has no connection to set up, and backups and game data of its own.

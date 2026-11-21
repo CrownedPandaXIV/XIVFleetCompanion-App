@@ -22,7 +22,13 @@ function BackupsSection() {
   };
   useEffect(() => { load(false); }, []);
 
-  if (error) return <section className="settings-section backups-section"><h3>Backups</h3><div className="status">{error}</div></section>;
+  if (error && !data) {
+    return (
+      <section className="settings-section backups-section"><h3>Backups</h3>
+        <div className="status">{error} <button onClick={() => { setError(null); load(false); }}>Try again</button></div>
+      </section>
+    );
+  }
   if (!data || !form) return <section className="settings-section backups-section"><h3>Backups</h3><div className="status">Loading...</div></section>;
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -37,14 +43,17 @@ function BackupsSection() {
     } catch (err) {
       message = err.message;
     }
-    // What was saved or made is shown before the message, so the buttons match it.
-    await load(true);
-    setWorking('');
-    setStatus(message);
+    // What was saved or made is shown before the message, so the buttons match it. The buttons come back whatever happens.
+    try {
+      await load(true);
+    } finally {
+      setWorking('');
+      setStatus(message);
+    }
   };
   const choose = async (key, title) => {
     const folder = await window.api.chooseBackupFolder({ title, current: form[key] });
-    if (folder) set(key, folder);
+    if (typeof folder === 'string' && folder) set(key, folder);
   };
   const save = () => act('Saving...', () => window.api.saveBackupSettings(form),
     (r) => `Saved.${form.enabled ? ` Backs up every day at ${form.time}.` : ''}${r.note ? ` ${r.note}` : ''}`);
@@ -74,6 +83,7 @@ function BackupsSection() {
         app on the PC that has the database, or on any PC once it has the backup tools. Everything here is for this
         PC only.
       </div>
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
 
       <div className="backups-last">
         {last
@@ -173,7 +183,8 @@ function BackupsSection() {
             </tbody>
           </table>
         )}
-      {data.settings.copyFolder && <div className="alerts-help">Second copies in {data.settings.copyFolder}: {data.copies.length}{data.copies[0] ? `, newest ${backupWhen(data.copies[0].takenAt)}` : ''}.</div>}
+      {data.settings.copyFolder && !data.copiesUnreachable && <div className="alerts-help">Second copies in {data.settings.copyFolder}: {data.copies.length}{data.copies[0] ? `, newest ${backupWhen(data.copies[0].takenAt)}` : ''}.</div>}
+      {data.settings.copyFolder && data.copiesUnreachable && <div className="alerts-help tone-warn">Second copies in {data.settings.copyFolder}: that folder can't be reached right now (is the PC it's on switched off?).</div>}
       <div className="alerts-help">Test loads a backup into a temporary database and compares it with the live one; nothing is changed.</div>
 
       {data.log.length > 0 && (

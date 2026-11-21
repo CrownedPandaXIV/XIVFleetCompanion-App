@@ -77,7 +77,7 @@ function FCDirectoryView({ refreshKey }) {
     });
   }, [refreshKey]);
 
-  if (error) return <div className="error">Failed to load: {error}</div>;
+  if (error && rows === null) return <div className="error">Failed to load: {error}</div>;
   if (rows === null) return <div className="status">Loading...</div>;
 
   const shownRows = fcCols.rows;
@@ -98,6 +98,7 @@ function FCDirectoryView({ refreshKey }) {
 
   return (
     <div className="fc-directory-view">
+      {error && <div className="error">Could not update: {error}. Showing what was loaded before.</div>}
       <div className="controls">
         {!fcSort.sortColumn && (
           <label>

@@ -24,10 +24,24 @@ function SetupWizard({ onClose, firstRun = false }) {
   useEffect(() => window.api.onSetupProgress(setSteps), []);
 
   if (!info) return <div className="modal-overlay"><div className="modal setup-wizard"><div className="status">Loading...</div></div></div>;
+  // Couldn't find out what this PC has: said so, with a way out (rather than a page that can't be closed).
+  if (info.success === false) {
+    return (
+      <div className="modal-overlay"><div className="modal setup-wizard" role="dialog" aria-label="Set up this PC">
+        <h2>Set up this PC</h2>
+        <div className="setup-test-status setup-problem">Couldn't check this PC: {info.error}</div>
+        <div className="modal-actions">
+          <button onClick={() => onClose(false)}>Close</button>
+          <button onClick={() => { setInfo(null); window.api.getWizardInfo().then(setInfo); }}>Try again</button>
+        </div>
+      </div></div>
+    );
+  }
   const chosen = info.roles.find((r) => r.key === role);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const suggest = async (a, b) => {
     const pw = await window.api.suggestPassword();
+    if (typeof pw !== 'string') return setProblem(`Couldn't make a password: ${(pw && pw.error) || 'no answer'}`);
     setForm((f) => ({ ...f, [a]: pw, [b]: pw }));
     setShown((s) => ({ ...s, [a]: pw }));
   };
@@ -35,6 +49,7 @@ function SetupWizard({ onClose, firstRun = false }) {
 
   const toDetails = async () => {
     const p = await window.api.getSetupPlan({ role, sameNetwork });
+    if (!p || !p.plan) return setProblem(`Couldn't work out what to do: ${(p && p.error) || 'no answer'}`);
     setPlanned(p);
     setProblem('');
     const nothingToRun = !p.plan.installPostgres && !p.plan.installTailscale && !p.plan.createDatabase && !p.plan.openConnections;
@@ -111,6 +126,7 @@ function SetupWizard({ onClose, firstRun = false }) {
                   <button className="setup-next" disabled={!role} onClick={toDetails}>Next</button>
                 </>}
             </div>
+            {problem && <div className="setup-test-status setup-problem">{problem}</div>}
           </>
         )}
 
@@ -250,6 +266,14 @@ function SetupWizardFinish({ role, onClose }) {
     if (r.success) onClose(true); else setStatus(`Failed: ${r.error}`);
   };
   if (!details) return <div className="status">Loading...</div>;
+  if (details.success === false) {
+    return (
+      <div>
+        <div className="setup-test-status setup-problem">Couldn't read this PC's setup: {details.error}</div>
+        <div className="modal-actions"><button onClick={() => onClose(true)}>Close</button></div>
+      </div>
+    );
+  }
   return (
     <div className="setup-finish">
       {role === 'dbhost' && (
@@ -286,7 +310,7 @@ function SetupWizardFinish({ role, onClose }) {
       {role === 'plugin' && (
         <>
           <p><strong>This PC is ready.</strong> Now install the plugin in the game and enter the database PC's details in it:</p>
-          <SetupPlugin details={details} onConnect={() => {}} />
+          <SetupPlugin details={details} onConnect={null} />
           <div className="modal-actions"><button className="setup-done" onClick={() => onClose(true)}>Done</button></div>
         </>
       )}
