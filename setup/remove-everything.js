@@ -221,8 +221,9 @@ const FINISH_RUNNING = 'The clean-up is running';
 // the log. Started that way it isn't one of the app's own processes, which Windows may stop along with the app.
 // installDir: the app's program folder (null when run from source).
 // The plugin's files in the app's settings folder (Windows wildcards), which Remove everything leaves alone:
-// the fleet file with its working files, the plugin's choice for this PC, and the fleet file's backups.
-const PLUGIN_FILES = ['fleet.db', 'fleet.db-*', 'fleet.db.*', 'store.json', 'store.json.*', 'Backups'];
+// the fleet file with its working files, the plugin's choice for this PC, its note of the games on this PC, and the
+// fleet file's backups.
+const PLUGIN_FILES = ['fleet.db', 'fleet.db-*', 'fleet.db.*', 'store.json', 'store.json.*', 'games.json', 'games.json.*', 'Backups'];
 
 function finishScript({ pid, installDir, userData, folders = [], log }) {
   const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
