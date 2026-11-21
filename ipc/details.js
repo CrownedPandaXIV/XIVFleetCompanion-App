@@ -409,4 +409,4 @@ ipcMain.handle('save-market-settings', async (event, input = {}) => {
   }, (err) => ({ success: false, error: err.message }));
 });
 
-module.exports = { loadLoot, loadMarket, VENTURE_TOTALS, ventureValues, topItems };
+module.exports = { loadLoot, loadMarket, VENTURE_TOTALS, ventureValues, topItems, itemNames, itemPrices };

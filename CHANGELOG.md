@@ -7,6 +7,15 @@ All notable changes to the app are recorded here. Versions follow
 
 The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
 
+- **Sub Calculator → Planner (new page).** Pick a rank, four parts and up to five sectors, or load one of your
+  subs, and see:
+  - the build's surveillance, retrieval, speed, range and favor;
+  - the range the route uses against the sub's, the voyage length, experience and ceruleum, and a Best order
+    button that puts the sectors in the order using the least range;
+  - for each sector, the loot tier, retrieval and double dip the build reaches, in amber where XIVStats and
+    Pepper's guide disagree, and how much more of a stat it needs;
+  - the loot it can bring back, gil per voyage and per day, experience per day, and repair kits a day (parts' wear
+    as Submarine Tracker predicts it).
 - **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
   retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
   release reads them again, so new findings arrive with updates. Nothing shows it yet: the Sub Calculator pages

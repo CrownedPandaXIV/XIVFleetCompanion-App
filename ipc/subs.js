@@ -485,4 +485,4 @@ ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled } = {}
   });
 });
 
-module.exports = { loadSubmarines, loadSubmarinesWithRankUps, saveForecastsNow, loadForecastAccuracy };
+module.exports = { loadSubmarines, loadSubmarinesWithRankUps, saveForecastsNow, loadForecastAccuracy, loadStatTables, loadRankUpGameData };

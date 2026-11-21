@@ -12,6 +12,7 @@ const VIEWS = [
   { key: 'parts', label: 'Parts', group: 'Submarines' },
   { key: 'supplies', label: 'Supplies', group: 'Submarines' },
   { key: 'salvage', label: 'Salvage', group: 'Submarines' },
+  { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
   { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
@@ -704,6 +705,7 @@ function App() {
         {currentView === 'parts' && <PartsView refreshKey={refreshKey} />}
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
+        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} />}
 
         {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} />}
 

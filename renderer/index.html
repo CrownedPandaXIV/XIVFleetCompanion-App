@@ -463,6 +463,26 @@
     /* Supplies */
     .supplies-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
     .supplies-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 24px 12px; }
+    .planner-row { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 24px 12px; }
+    .planner-row > .planner-panel { flex: 1 1 380px; margin: 0; padding: 12px 16px; box-sizing: border-box; min-width: 0; }
+    .planner-summary { padding: 0 24px 12px; }
+    .planner-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
+    .planner-fields label { display: flex; flex-direction: column; gap: 3px; color: var(--dim); font-size: 12px; }
+    .planner-fields select, .planner-fields input { width: 100%; box-sizing: border-box; }
+    .planner-add { display: flex; gap: 6px; }
+    .planner-add select { flex: 1; min-width: 0; }
+    .planner-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+    .planner-stat { border: 1px solid var(--hover); border-radius: 4px; padding: 6px 4px; text-align: center; }
+    .planner-stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+    .planner-stat span { font-size: 11px; color: var(--dim); }
+    .planner-route { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; min-height: 28px; }
+    .planner-chip { border: 1px solid var(--hover); border-radius: 14px; padding: 2px 4px 2px 10px; }
+    .planner-chip button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 4px; }
+    .planner-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; font-size: 12px; }
+    .planner-facts span { color: var(--dim); display: block; }
+    .planner-facts b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .planner-pill { font-weight: 600; }
+    .planner-foot { padding: 4px 24px 24px; font-size: 12px; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }
@@ -701,6 +721,7 @@
   <script src="salvage.js"></script>
   <script src="fc-directory.js"></script>
   <script src="routes.js"></script>
+  <script src="planner.js"></script>
   <script src="summary.js"></script>
   <script src="inventory.js"></script>
   <script src="trends.js"></script>
