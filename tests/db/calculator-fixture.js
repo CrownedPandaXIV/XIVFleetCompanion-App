@@ -1,4 +1,4 @@
-// The Sub Calculator's answers (subs/calculator.js, the Planner page's working out) for made-up game data and a set of
+// The Sub Calculator's answers (subs/calculator.js, the Planner page's working out, and subs/build-finder.js, the Build Finder's) for made-up game data and a set of
 // builds and routes, for the plugin's own working out (its SubCalculator.cs) to be checked against. The loot and
 // breakpoints are the shipped subs/calculator-data.json, as both sides ship the same file.
 //
@@ -90,12 +90,45 @@ const answers = cases.map((c) => {
   };
 });
 
-console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines)`);
+// The Build Finder's answers: goals on sectors (sector ids the data has), what they need, and the builds sorted each way
+// (the first 25 of each), against the same made-up game.
+const finder = require('../../subs/build-finder');
+const dataOf = new Map(data.sectors.map((d) => [d.id, d]));
+const someItem = (id, tier) => { const d = dataOf.get(id); return d && d.pools[tier] && d.pools[tier].loot.length ? d.pools[tier].loot[0][0] : null; };
+const finderGoals = [
+  [{ sectorId: 15, tier: 3, optimal: false, doubleDip: false, items: [] }],
+  [{ sectorId: 15, tier: 2, optimal: true, doubleDip: false, items: [] }, { sectorId: 18, tier: 0, optimal: false, doubleDip: true, items: [] }],
+  [{ sectorId: 10, tier: 0, optimal: false, doubleDip: false, items: [someItem(10, 3)].filter(Boolean) }, { sectorId: 26, tier: 0, optimal: true, doubleDip: true, items: [] }],
+  [{ sectorId: 32, tier: 3, optimal: true, doubleDip: true, items: [] }, { sectorId: 35, tier: 2, optimal: false, doubleDip: false, items: [] }, { sectorId: 40, tier: 0, optimal: false, doubleDip: false, items: [] }],
+  [{ sectorId: 1, tier: 0, optimal: false, doubleDip: false, items: [] }],
+];
+const owned = new Set(['W+|0', 'C+|1', 'W+|2', 'C+|3', 'S|0', 'Y|1', 'U+|2']);
+const finderAnswers = [];
+for (const goals of finderGoals) {
+  for (const sureOnly of [false, true]) {
+    const sectorsHere = goals.map((g) => game.sectors.get(g.sectorId));
+    const start = calc.startFor(sectorsHere[0].id, game.startingPoints);
+    const route = sectorsHere.length > 1 ? calc.bestOrder(sectorsHere, start, 100) : sectorsHere;
+    const { need, why, missing } = finder.needsFor(goals, dataOf, (id) => game.sectors.get(id).letter);
+    const minRank = Math.max(1, ...sectorsHere.map((s) => s.rankReq));
+    const rows = finder.findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank, maxRank: 125, route, start, owned, sureOnly });
+    const sorted = {};
+    for (const by of Object.keys(finder.SORTS)) {
+      sorted[by] = finder.sortBuilds(rows, by).slice(0, 25).map((r) => ({ parts: r.parts, rank: r.rank, sure: r.sure, sureRank: r.sureRank, stats: r.stats, spare: r.spare,
+        rangeShort: r.rangeShort, inRangeFrom: r.inRangeFrom, hours: r6(r.hours), missing: r.missingParts.map((m) => `${m.letter}|${m.slot}`) }));
+    }
+    finderAnswers.push({ goals, sureOnly, route: route.map((s) => s.id), need, why, missing, minRank, rangeNeeded: calc.rangeUsed(route, start),
+      total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length, sorted });
+  }
+}
+
+console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds`);
 const file = process.argv[2];
 if (file) {
   fs.writeFileSync(file, JSON.stringify({
     about: 'Written by XIVFleetCompanion-App tests/db/calculator-fixture.js: made-up game data and the app\'s Sub Calculator answers (subs/calculator.js).',
     game: { sectors, ranks, parts }, repairKitCost, priceRule: '(itemId % 97) * 10', cases: answers,
+    finder: { owned: [...owned], cases: finderAnswers },
   }));
   console.log(`wrote ${file}`);
 }

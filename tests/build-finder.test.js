@@ -72,3 +72,23 @@ test('sorting: in range first, then by the chosen order', () => {
   assert.deepStrictEqual(finder.sortBuilds(rows, 'parts').map((r) => r.rank), [5, 4, 3, 1]);
   assert.deepStrictEqual(finder.sortBuilds(rows, 'range').map((r) => r.rank), [3, 5, 4, 1]);
 });
+
+test('parts owned by the fleet: fitted, or spare in a bag, a retainer or an FC chest (Syldra is Y)', async () => {
+  const Module = require('module');
+  const original = Module._load;
+  Module._load = function load(request, ...rest) {
+    if (request === 'electron') return { ipcMain: { handle() {} }, app: { getPath: () => '.', getVersion: () => '0' }, safeStorage: {}, BrowserWindow: { getAllWindows: () => [] } };
+    return original.call(this, request, ...rest);
+  };
+  const { ownedParts } = require('../ipc/calculator');
+  Module._load = original;
+  // Item numbers: bow, bridge, hull, stern from each class's base (W+ 24356, S 21792, Y 24344, U 21796).
+  const client = { query: async (sql) => {
+    if (sql.includes('companion_submarine_snapshot')) return { rows: [{ part1: 24358, part2: 24359, part3: 24356, part4: 24357 }, { part1: 21794, part2: 21795, part3: 21792, part4: 21793 }] };
+    if (sql.includes('companion_inventory_snapshot')) return { rows: [{ item_id: 21792 }, { item_id: 21797 }] };
+    if (sql.includes('companion_fc_inventory_snapshot')) return { rows: [{ item_id: 24347 }] };
+    return { rows: [] };
+  } };
+  const owned = await ownedParts(client, null);
+  assert.deepStrictEqual([...owned].sort(), ['S|0', 'S|1', 'S|2', 'S|3', 'U|3', 'W+|0', 'W+|1', 'W+|2', 'W+|3', 'Y|1']);
+});

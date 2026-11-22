@@ -124,6 +124,9 @@ function planFor({ rank, parts, route, bestOrder } = {}) {
   };
 }
 
+// A part class's letter (Syldra is Y, not S).
+const LETTER_OF_CLASS = { Shark: 'S', Unkiu: 'U', Whale: 'W', Coelacanth: 'C', Syldra: 'Y' };
+
 // The parts the player has, as "letter|slot": fitted on their subs or spare in a bag, a retainer or an FC chest.
 // cid: only that character's (its subs, its bags and retainers, its Free Company's chest); null for the whole fleet.
 async function ownedParts(client, cid = null) {
@@ -134,7 +137,7 @@ async function ownedParts(client, cid = null) {
   const addSpare = (itemId) => {
     const p = sparePartLookup.get(Number(itemId));
     if (!p) return;
-    const letter = `${p.class[0]}${p.modified ? '+' : ''}`;
+    const letter = `${LETTER_OF_CLASS[p.class]}${p.modified ? '+' : ''}`;
     owned.add(`${letter}|${SLOT_KEYS.indexOf(p.slot)}`);
   };
   const bags = await client.query(`SELECT item_id FROM companion_inventory_snapshot

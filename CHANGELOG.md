@@ -19,6 +19,17 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   Its two tables work like every other page's: columns to size, move, sort and choose.
   - bonus experience as Pepper's guide gives it: what the build is sure of (optimal retrieval's +25%) and the most
     luck can add (T2/T3 loot, HQ materials, a double dip; up to +100% a sector).
+- **Sub Calculator → Build Finder (new page).** Pick up to five sectors and what you want from each: a loot tier (T2
+  or T3), optimal retrieval, a double dip, or particular items (an item asks for the lowest tier that drops it there).
+  It checks every rank and part combination (10,000 builds a rank) and lists the builds that get it, each at the
+  lowest rank it works:
+  - what the goals need (surveillance, retrieval, favor), the rank the sectors need, and the range of the route;
+  - each build's five stats with what it has to spare, its voyage, and the parts you'd still need to get (for the
+    whole fleet or one of your subs' characters);
+  - in amber where only the lower of XIVStats' and Pepper's figures is met, with the rank it's sure from, or tick
+    "Only builds sure to reach it";
+  - out of range builds listed last, saying how much more range they need and the rank they're in range from;
+  - Sort by lowest rank, fastest voyage, fewest parts still needed or most range to spare; Open in Planner on each.
 - **Choosing one of your subs on the Planner.** The dropdown is replaced by a panel grouped by account, then
   character (with world and Free Company), each group folding away, with a search for character, world, account,
   Free Company or sub name. Each sub shows its rank, build, route and where it is: at sea until a time, back and
