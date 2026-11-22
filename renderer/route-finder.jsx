@@ -37,12 +37,25 @@ function RfTiers({ stops }) {
   );
 }
 
+// A route's chances at new sectors, by the stop that may open them: "J and M open from I, P from L, Q from E: each voyage
+// there is about a 20–30% chance (Pepper's guess); stats don't change the odds."
+function rfChancesText(route, ctx) {
+  const parts = route.map((id) => {
+    const opens = [...ctx.sectorOf.values()].filter((s) => s.from === id && ctx.stateOf(s.id) === 'chance').sort((a, b) => a.id - b.id).map((s) => s.letter);
+    if (!opens.length) return null;
+    const list = opens.length === 1 ? opens[0] : `${opens.slice(0, -1).join(', ')} and ${opens[opens.length - 1]}`;
+    return { list, from: ctx.sectorOf.get(id).letter, many: opens.length > 1 };
+  }).filter(Boolean);
+  const text = parts.map((p, i) => (i === 0 ? `${p.list} ${p.many ? 'open' : 'opens'} from ${p.from}` : `${p.list} from ${p.from}`)).join(', ');
+  return `${text}: each voyage there is about a 20–30% chance (Pepper's guess); stats don't change the odds.`;
+}
+
 const RF_COLUMN_DEFS = [
   { key: 'route', label: 'Route', locked: true, td: (r, ctx) => (
     <td>
       <span className="rf-route">{r.route.map((id) => <RfLetter key={id} sector={ctx.sectorOf.get(id)} state={ctx.stateOf(id) === 'discovered' ? 'discovered' : null} must={ctx.must.includes(id)} />)}</span>
       {r.explores > 0 && <span className="rf-tag new" title="Sectors discovered but not explored yet: this voyage explores them">explores {r.route.filter((id) => ctx.stateOf(id) === 'discovered').map((id) => ctx.sectorOf.get(id).letter).join(', ')}</span>}
-      {r.chances > 0 && <span className="rf-tag chance" title={RF_ODDS}>{r.chances} chance{r.chances === 1 ? '' : 's'} at new sectors</span>}
+      {r.chances > 0 && <span className="rf-tag chance" title={rfChancesText(r.route, ctx)}>{r.chances} chance{r.chances === 1 ? '' : 's'} at new sectors</span>}
       {r === ctx.top && <span className="rf-tag best">best</span>}
     </td>
   ), sort: (r) => r.route.length },
@@ -264,7 +277,9 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
                 const isMust = must.includes(s.id);
                 const out = leaveOut.includes(s.id);
                 const status = isMust ? 'must be in the route' : out ? 'left out' : !t.rankOk ? `needs rank ${s.rankReq}`
-                  : t.state ? RF_STATE_TEXT[t.state] : `rank ${s.rankReq}`;
+                  : t.state === 'chance' ? `opens from ${(sectorOf.get(s.from) || {}).letter || '?'}`
+                    : t.state === 'locked' ? (sectorOf.get(s.from) ? `after ${sectorOf.get(s.from).letter}` : 'not yet')
+                      : t.state ? RF_STATE_TEXT[t.state] : `rank ${s.rankReq}`;
                 return (
                   <button key={s.id} className={`rf-tile ${t.state || ''}${usable ? '' : ' off'}${isMust ? ' must' : ''}${out ? ' out' : ''}`}
                     onClick={() => cycle(s.id)} title={`${s.letter}: ${s.name}, rank ${s.rankReq}${s.from ? `; opens from ${(sectorOf.get(s.from) || {}).letter || '?'}` : ''}`}>
@@ -277,7 +292,6 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
             {(discoveredHere.length > 0 || chanceHere.length > 0) && (
               <div className="rf-strip">
                 {discoveredHere.length > 0 && <span><b>{discoveredHere.map((s) => s.letter).join(', ')}</b> can be explored next.</span>}
-                {chanceHere.length > 0 && <span>{chanceHere.map((s) => `${s.letter} opens from ${(sectorOf.get(s.from) || {}).letter}`).join(', ')}, by chance.</span>}
                 <label className="finder-check"><input type="checkbox" checked={exploreFirst} onChange={(e) => setExploreFirst(e.target.checked)} /> Put routes that explore something new first</label>
               </div>
             )}

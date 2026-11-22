@@ -67,13 +67,14 @@ module.exports = async (t) => {
   await waitFor(`/read at the workshop/.test(document.querySelector('.rf-note').innerText)
     && [...document.querySelectorAll('.rf-tile')].some((b) => b.classList.contains('discovered'))`, 'the read sectors', 20000);
   const tiles = await ev(`Object.fromEntries([...document.querySelectorAll('.rf-tile')].map((b) => [b.querySelector('.rf-letter').innerText, b.querySelector('.st').innerText]))`);
-  check(tiles.O === 'explored' && tiles.J === 'explore next' && /could open by chance|needs rank/.test(tiles.Z), `the tiles say what the FC has done (${JSON.stringify(tiles)})`);
+  check(tiles.O === 'explored' && tiles.J === 'explore next' && /^opens from O$|needs rank/.test(tiles.Z), `the tiles say what the FC has done (${JSON.stringify(tiles)})`);
   const strip = await ev(`document.querySelector('.rf-strip') ? document.querySelector('.rf-strip').innerText.replace(/\\s+/g, ' ') : ''`);
-  check(/J can be explored next/.test(strip) && /Z opens from O, by chance/.test(strip), `the strip says what's next (${strip})`);
+  check(/J can be explored next/.test(strip) && !/opens from/.test(strip), `the strip says only what's sure next; the tiles say what opens from where (${strip})`);
   await waitFor(`${rowsSel}.length > 0 && [...${rowsSel}].some((tr) => /explores J/.test(tr.innerText))`, 'a route exploring J', 20000);
   const routeLetters = await ev(`[...${rowsSel}].map((tr) => [...tr.querySelectorAll('.rf-route .rf-letter')].map((l) => l.innerText).join(''))`);
   check(routeLetters.every((r) => !r.includes('Z')), `only through sectors the FC has discovered (${routeLetters.join(', ')})`);
-  check(await ev(`[...${rowsSel}].some((tr) => /1 chance at new sectors/.test(tr.innerText))`), 'a route through O has a chance at Z');
+  const chanceTip = await ev(`(() => { const tag = [...document.querySelectorAll('.rf .finder-table .rf-tag.chance')].find((x) => /1 chance at new sectors/.test(x.innerText)); return tag ? tag.title : ''; })()`);
+  check(/^Z opens from O: each voyage there is about a 20–30% chance/.test(chanceTip), `a route through O has a chance at Z, and says so on hover (${chanceTip})`);
   await t.shot('route-finder-fc');
 
   // The Unlocks tab.
