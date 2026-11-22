@@ -37,7 +37,9 @@ function finderStatCell(key) {
   return (r, ctx) => {
     const asked = ctx && ctx.need && ctx.need[key];
     if (!asked) return <td className="num dim">{plannerN(r.stats[key])}</td>;
-    return <td className="num">{plannerN(r.stats[key])}<span className={`finder-spare${r.spare[key] === 0 ? ' zero' : ''}`}>+{plannerN(r.spare[key])}</span></td>;
+    const spare = r.spare[key];
+    const tip = `${spare === 0 ? 'Exactly' : `${plannerN(spare)} more ${key} than`} what ${(ctx.why && ctx.why[key] || []).join(', ') || 'the goals'} needs (${plannerN(asked.low)})`;
+    return <td className="num" title={tip}>{plannerN(r.stats[key])}<span className={`finder-spare${spare === 0 ? ' zero' : ''}`}>+{plannerN(spare)}</span></td>;
   };
 }
 
@@ -52,7 +54,8 @@ const FINDER_COLUMN_DEFS = [
   { key: 'range', label: 'Range', td: (r) => (r.rangeShort > 0
     ? <td className="finder-range-out"><span className="finder-out-tag">needs {plannerN(r.rangeShort)} more range</span>
       <span className="dim"> {r.inRangeFrom ? `in range from rank ${r.inRangeFrom}` : 'not in range at any rank'}</span></td>
-    : <td className="num">{plannerN(r.stats.range)}{r.rangeNeeded !== null && <span className="finder-spare">+{plannerN(r.stats.range - r.rangeNeeded)}</span>}</td>),
+    : <td className="num" title={r.rangeNeeded !== null ? `${plannerN(r.stats.range - r.rangeNeeded)} more range than the route uses (${plannerN(r.rangeNeeded)})` : undefined}>
+      {plannerN(r.stats.range)}{r.rangeNeeded !== null && <span className="finder-spare">+{plannerN(r.stats.range - r.rangeNeeded)}</span>}</td>),
   sort: (r) => r.stats.range - (r.rangeNeeded || 0) },
   { key: 'voyage', label: 'Voyage', td: (r) => <td className="num">{r.hours ? plannerHours(r.hours) : '—'}</td>, sort: (r) => r.hours },
   { key: 'parts', label: 'To get', td: (r) => (!r.missingParts ? <td className="dim">—</td> : r.missingParts.length === 0
@@ -249,7 +252,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
     setGoals([...goals, { sectorId: sector.id, tier: 0, optimal: false, doubleDip: false, items: [itemId] }]);
   };
   const filtered = slots.some(Boolean);
-  const ctx = { onOpen: (r) => onOpenPlanner({ rank: r.rank, parts: r.parts, route: found.route }), need: found && found.need };
+  const ctx = { onOpen: (r) => onOpenPlanner({ rank: r.rank, parts: r.parts, route: found.route }), need: found && found.need, why: found && found.why };
   const rows = found && found.rows ? (finderSort.sortColumn ? applyColumnSort(cols.rows, finderSort.sortColumn, finderSort.sortDirection, cols.accessors) : cols.rows) : [];
   const groupOf = (r) => (r.rangeShort > 0 ? 'out' : r.rank);
 
@@ -373,6 +376,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
             <span className="finder-parts"><span className="finder-part own">C</span></span> you own it
             <span className="finder-parts"><span className="finder-part get">C+</span></span> still to get
             <span className="finder-maybe">might not</span> only the lower of the two sources' figures is met
+            <span className="finder-spare">+5</span> how much a stat or the range has beyond what's needed
           </div>
 
           {rows.length > 0 && (

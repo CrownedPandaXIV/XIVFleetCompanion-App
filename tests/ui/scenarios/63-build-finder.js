@@ -78,6 +78,11 @@ module.exports = async (t) => {
   const inRange = await ev(`[...document.querySelectorAll('.finder-group')].map((tr) => tr.innerText.replace(/\\s+/g, ' '))`);
   const spare = await ev(`[...document.querySelectorAll('.finder-table tbody tr:not(.finder-group)')].every((tr) => /\\+\\d/.test(tr.innerText) && !tr.classList.contains('finder-out'))`);
   check(inRange.length > 0 && inRange.every((g) => /^Rank \d+ [\d,]+ builds?$/.test(g)) && spare, `in range: grouped under Rank N with how many builds, each with its range to spare (${inRange.slice(0, 2).join(' | ')})`);
+  const tips = await ev(`[...document.querySelector('.finder-table tbody tr:not(.finder-group)').querySelectorAll('td[title]')].map((td) => td.title)`);
+  check(tips.some((x) => /^\d[\d,]* more range than the route uses \(\d+\)$/.test(x))
+    && tips.some((x) => /^(Exactly|[\d,]+ more surveillance than) what T2 on \w.* needs \([\d,]+\)$/.test(x)), `the range's + says what it is on hover (${tips.join(' | ')})`);
+  const legend = await ev(`document.querySelector('.finder-legend').innerText`);
+  check(/beyond what's needed/.test(legend), 'the legend says what the + numbers are');
   await ev(`document.querySelector('.finder-legend').scrollIntoView()`);
   await t.shot('build-finder-in-range');
   for (const r of was) await t.query(`UPDATE ffxiv_submarinerank SET range_bonus = ${r.range_bonus === null ? 'NULL' : `'${String(r.range_bonus).replace(/'/g, "''")}'`} WHERE id = '${String(r.id).replace(/'/g, "''")}'`);
