@@ -176,6 +176,9 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
   return {
     success: true, need, why, missing, minRank, route: route.map((s) => s.id), rangeNeeded: calc.rangeUsed(route, start),
     total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length,
+    // How many builds work from each rank (in range), for the page's group headings.
+    byRank: rows.reduce((counts, r) => { if (!(r.rangeShort > 0)) counts[r.rank] = (counts[r.rank] || 0) + 1; return counts; }, {}),
+    sectorLetters: sectors.map((s) => s.letter),
     rows: rows.slice(0, Math.max(1, Number(limit) || 200)),
   };
 }

@@ -499,17 +499,50 @@
     .planner-picker-list button.planner-picker-sub { display: grid; grid-template-columns: 1.3fr 0.6fr 0.6fr 1fr 1.4fr; gap: 8px; padding-left: 22px; font-size: 12px; font-variant-numeric: tabular-nums; }
     .planner-picker-list button.planner-picker-sub.chosen { outline: 1px solid var(--link); }
     .planner-picker-sub-name { font-weight: 500; }
-    .finder-goals { margin: 0 24px 12px; padding: 12px 16px; }
-    .finder-empty { margin-top: 8px; }
-    .finder-goal { border-top: 1px solid var(--border); padding: 8px 0; }
-    .finder-goal-name { font-weight: 600; margin-bottom: 6px; }
-    .finder-goal-name .link-button { margin-left: 10px; font-weight: normal; }
-    .finder-goal-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12px; }
-    .finder-goal-fields label { display: inline-flex; align-items: center; gap: 6px; }
-    .finder-options { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
-    .finder-summary { padding: 0 24px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-    .finder-need { display: inline-block; margin: 0 6px; padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 10px; }
-    tr.finder-out td { opacity: 0.75; }
+    /* Build Finder: what you want, the options, the builds (soft colour behind tags, from the look's own colours). */
+    .finder { display: flex; flex-direction: column; gap: 14px; padding: 0 24px 12px; }
+    .finder-band { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .finder-heading { margin: 0; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-soft); }
+    .finder-heading .count { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--dim); margin-left: 8px; }
+    .finder-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+    .finder-field { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; }
+    .finder-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .finder-goal { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; display: flex; flex-direction: column; gap: 9px; }
+    .finder-goal-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .finder-goal-head .link-button { margin-left: 4px; }
+    .finder-letter { font-weight: 600; background: var(--hover); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 6px; }
+    .finder-goal-name { font-weight: 600; }
+    .finder-tier { font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 3px; background: var(--hover); color: var(--text-soft); }
+    .finder-options { padding: 0 2px; }
+    .finder-needs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .finder-need { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 11px; border-radius: 6px; background: var(--hover); border: 1px solid var(--border-strong); }
+    .finder-need .k { font-size: 11px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+    .finder-need .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .finder-need .why { font-size: 11px; color: var(--dim); }
+    .finder-need.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: transparent; }
+    .finder-need.warn .v { color: var(--warn); }
+    .finder-tally { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--dim); }
+    .finder-tally b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .finder-tally .good b { color: var(--good); }
+    .finder-tally .warn b { color: var(--warn); }
+    .finder-tally .bad b { color: var(--danger); }
+    .finder-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--dim); align-items: center; }
+    .finder-parts { display: inline-flex; gap: 4px; }
+    .finder-part { font-size: 12px; font-weight: 600; min-width: 28px; text-align: center; padding: 1px 5px; border-radius: 4px; background: var(--hover); }
+    .finder-part.own { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+    .finder-part.get { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+    .finder-maybe { display: inline-block; font-size: 11px; font-weight: 600; color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); border-radius: 3px; padding: 0 5px; margin-left: 8px; cursor: help; }
+    .finder-spare { color: var(--good); font-size: 12px; margin-left: 4px; }
+    .finder-spare.zero { color: var(--warn); }
+    .finder-out-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-radius: 3px; padding: 0 5px; }
+    .finder-columns { padding: 0; }
+    .finder-table { overflow-x: auto; min-width: 0; }
+    .finder-table table { font-variant-numeric: tabular-nums; }
+    tr.finder-group td { color: var(--text-soft); font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--border-strong); background: transparent; }
+    tr.finder-group td .sub { font-weight: 400; color: var(--dim); margin-left: 8px; }
+    tr.finder-out td { color: var(--dim); }
+    .finder-open { padding: 2px 9px; font-size: 12px; }
+    .finder-more { text-align: center; font-size: 12px; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }
