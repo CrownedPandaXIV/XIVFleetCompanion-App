@@ -25,8 +25,9 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   used instead. Universalis is now asked for the last week's sales with the listings. A price changed this way is
   amber, with a hover saying what was ignored and what was used; Income lists the items whose prices were changed.
 - **The Planner priced on the market.** With Live Market Prices on, the loot, gil per voyage and gil per day use market
-  prices: on the chosen sub's world, or a world you pick (the one most of your subs are on first), with a World / Data
-  center / Region switch (Data center to start).
+  prices, with a World / Data center / Region switch (Data center to start) and a list of every world, data center or
+  region to price on, since loot can be moved to a character elsewhere and sold there. It starts on the chosen sub's own
+  (else that of the world most of your subs are on).
 - **Sector names without the doubled letter:** "A: South Isle of Zozonan" rather than "A: South Isle of Zozonan (A)".
 - **Sub Calculator → Build Finder (new page).** Pick up to five sectors and what you want from each: a loot tier (T2
   or T3), optimal retrieval, a double dip, or particular items (an item asks for the lowest tier that drops it there).
