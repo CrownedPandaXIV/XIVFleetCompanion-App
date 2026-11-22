@@ -66,6 +66,8 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   and range, for the Sub Calculator.
 - **Sub part condition (database update 17).** A new table for the plugin's readings of each sub part's condition,
   taken in the Free Company's workshop, so the Sub Calculator can later work out how much each voyage wears your parts.
+- **Explored sub sectors (database update 18).** A new table for which sectors each Free Company has unlocked and
+  explored, as the plugin last read them in its workshop, for the Sub Calculator's coming Route Finder.
 
 ## 1.11.0 - 2026-11-21
 
