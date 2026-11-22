@@ -7,7 +7,7 @@ const PLAY_STYLE_KEY = 'play_style';
 const PLAY_STYLES = ['auto', 'both', 'subs', 'retainers'];
 
 // Tabs only for subs, and only for retainers (the keys of renderer/app.jsx's VIEWS).
-const SUB_VIEWS = ['salvage', 'subs', 'supplies', 'parts', 'routeOpt', 'planner'];
+const SUB_VIEWS = ['salvage', 'subs', 'supplies', 'parts', 'routeOpt', 'planner', 'buildFinder'];
 const RETAINER_VIEWS = ['retainers'];
 
 // counts: { subs: built subs, retainers: retainers with a class }. Nothing yet counts as both.

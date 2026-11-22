@@ -43,7 +43,7 @@ db.withClient = async (work, onError) => { try { return await work(current); } c
 db.openClient = async () => new Proxy(current, { get: (t, k) => (k === 'end' ? async () => {} : typeof t[k] === 'function' ? t[k].bind(t) : t[k]) });
 db.fleetLocation = () => (current && current.dialect === 'sqlite' ? 'file' : 'database');
 for (const file of ['parts', 'subs', 'retainers', 'roster', 'details', 'income', 'shopping', 'settings', 'universalis', 'supplies',
-  'inventory', 'trends', 'play-style', 'fight-club']) require(`../../ipc/${file}`);
+  'inventory', 'trends', 'play-style', 'fight-club', 'calculator']) require(`../../ipc/${file}`);
 Module._load = original;
 // No live prices or anything else from the internet: both sides the same.
 global.fetch = async () => { throw new Error('no internet in this test'); };
@@ -187,6 +187,10 @@ async function moreReads(pg) {
   return [
     ['get-character-inventory', cids], ['get-character-inventory', []], ['get-fc-inventory', fcs],
     ['get-parts-needed', { aheadDays: 14 }],
+    // The Sub Calculator: its starting data, and the Build Finder with the parts the whole fleet and one character own.
+    ['get-sub-calculator'],
+    ['find-sub-builds', { goals: [{ sectorId: 1, tier: 2, optimal: true, doubleDip: false, items: [] }, { sectorId: 2, tier: 0, optimal: false, doubleDip: true, items: [] }], sortBy: 'parts', limit: 50 }],
+    ['find-sub-builds', { goals: [{ sectorId: 1, tier: 3, optimal: false, doubleDip: false, items: [] }], forCid: cids[0], sortBy: 'parts', limit: 50 }],
     ['get-shopping-list', { buyFromVendors: true, aheadDays: 7, priceScope: 'fleet' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'level', targetValue: 90, onlyCrafted: false, slotLabel: 'Main Hand' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'ilvl', targetValue: 600, onlyCrafted: true, slotLabel: 'Main Hand' }],

@@ -13,6 +13,7 @@ const VIEWS = [
   { key: 'supplies', label: 'Supplies', group: 'Submarines' },
   { key: 'salvage', label: 'Salvage', group: 'Submarines' },
   { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
+  { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
   { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
@@ -431,6 +432,8 @@ function App() {
   // "Open in Planner" on the Subs and Route Optimization pages: the sub to load, then the Planner page.
   const [plannerSub, setPlannerSub] = useState(null);
   const openInPlanner = (cid, subName) => { setPlannerSub({ cid, subName, at: Date.now() }); setCurrentView('planner'); };
+  // From the Build Finder: a build and route (not one of your subs).
+  const openBuildInPlanner = (build) => { setPlannerSub({ build, at: Date.now() }); setCurrentView('planner'); };
   const [trendDetail, setTrendDetail] = useState(null);
 
   // Chart icons and cards elsewhere ask for a detail panel or the Trends page by event.
@@ -708,6 +711,7 @@ function App() {
         {currentView === 'parts' && <PartsView refreshKey={refreshKey} />}
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
+        {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
         {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} />}
 
         {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}

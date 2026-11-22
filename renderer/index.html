@@ -499,6 +499,17 @@
     .planner-picker-list button.planner-picker-sub { display: grid; grid-template-columns: 1.3fr 0.6fr 0.6fr 1fr 1.4fr; gap: 8px; padding-left: 22px; font-size: 12px; font-variant-numeric: tabular-nums; }
     .planner-picker-list button.planner-picker-sub.chosen { outline: 1px solid var(--link); }
     .planner-picker-sub-name { font-weight: 500; }
+    .finder-goals { margin: 0 24px 12px; padding: 12px 16px; }
+    .finder-empty { margin-top: 8px; }
+    .finder-goal { border-top: 1px solid var(--border); padding: 8px 0; }
+    .finder-goal-name { font-weight: 600; margin-bottom: 6px; }
+    .finder-goal-name .link-button { margin-left: 10px; font-weight: normal; }
+    .finder-goal-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12px; }
+    .finder-goal-fields label { display: inline-flex; align-items: center; gap: 6px; }
+    .finder-options { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+    .finder-summary { padding: 0 24px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+    .finder-need { display: inline-block; margin: 0 6px; padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 10px; }
+    tr.finder-out td { opacity: 0.75; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }
@@ -738,6 +749,7 @@
   <script src="fc-directory.js"></script>
   <script src="routes.js"></script>
   <script src="planner.js"></script>
+  <script src="build-finder.js"></script>
   <script src="summary.js"></script>
   <script src="inventory.js"></script>
   <script src="trends.js"></script>

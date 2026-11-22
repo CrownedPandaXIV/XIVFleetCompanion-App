@@ -188,6 +188,18 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   // "Open in Planner": load that sub once the page has its subs.
   useEffect(() => {
     if (!openSub || !base || !base.subs) return;
+    if (openSub.build) {
+      // A build and route from the Build Finder.
+      const { rank: r, parts: p, route: rt } = openSub.build;
+      setChosen(null);
+      setRank(r);
+      setParts(p);
+      setRoute((rt || []).slice(0, 5));
+      const first = base.sectors.find((x) => x.id === (rt || [])[0]);
+      if (first) setMapId(first.map);
+      if (onOpenSubUsed) onOpenSubUsed();
+      return;
+    }
     const s = base.subs.find((x) => x.cid === String(openSub.cid) && x.subName === openSub.subName);
     if (s) {
       setChosen(s);

@@ -6,7 +6,9 @@ const { withClient } = require('../db');
 const { columnsByKey } = require('./shopping');
 const { loadSubmarines, loadStatTables, loadRankUpGameData } = require('./subs');
 const { itemNames, itemPrices } = require('./details');
-const { repairKitCostFrom } = require('./parts');
+const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
+const { snapshotFragments } = require('../db');
+const finder = require('../subs/build-finder');
 const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
@@ -81,8 +83,14 @@ async function loadCalculator(client) {
   return {
     success: true,
     maps: game.maps,
-    sectors: [...game.sectors.values()].map((s) => ({ id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq,
-      hasData: data.sectors.some((d) => d.id === s.id) })),
+    sectors: [...game.sectors.values()].map((s) => {
+      const d = data.sectors.find((x) => x.id === s.id);
+      // The items it can drop, for the Build Finder's goals: each once, at the lowest tier dropping it.
+      const items = d ? [...new Set(Object.values(d.pools).flatMap((p) => p.loot.map((l) => l[0])))]
+        .map((id) => ({ itemId: id, name: names.get(id) || `Item ${id}`, tier: finder.itemTier(d, id) }))
+        .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)) : [];
+      return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items };
+    }),
     partLetters: PART_LETTERS.map((letter) => ({ letter, name: partName(letter) })),
     maxRank: game.maxRank,
     subs,
@@ -116,7 +124,61 @@ function planFor({ rank, parts, route, bestOrder } = {}) {
   };
 }
 
+// The parts the player has, as "letter|slot": fitted on their subs or spare in a bag, a retainer or an FC chest.
+// cid: only that character's (its subs, its bags and retainers, its Free Company's chest); null for the whole fleet.
+async function ownedParts(client, cid = null) {
+  const owned = new Set();
+  const one = cid !== null && cid !== undefined && cid !== '';
+  const subs = await client.query(`SELECT cid, part1, part2, part3, part4 FROM companion_submarine_snapshot WHERE level > 0${one ? ' AND cid = $1' : ''}`, one ? [String(cid)] : []);
+  for (const r of subs.rows) [r.part1, r.part2, r.part3, r.part4].forEach((id, slot) => { const l = partLetter(Number(id)); if (CLASS_OF[l]) owned.add(`${l}|${slot}`); });
+  const addSpare = (itemId) => {
+    const p = sparePartLookup.get(Number(itemId));
+    if (!p) return;
+    const letter = `${p.class[0]}${p.modified ? '+' : ''}`;
+    owned.add(`${letter}|${SLOT_KEYS.indexOf(p.slot)}`);
+  };
+  const bags = await client.query(`SELECT item_id FROM companion_inventory_snapshot
+    WHERE quantity > 0 AND (sorted_container BETWEEN 0 AND 3 OR sorted_container BETWEEN 10000 AND 10004)${one ? ' AND owner_cid = $1' : ''}`, one ? [String(cid)] : []);
+  for (const r of bags.rows) addSpare(r.item_id);
+  let fcFilter = '';
+  const fcArgs = [];
+  if (one) {
+    const { latestCharacter } = await snapshotFragments(client);
+    const fc = (await client.query(`SELECT fc_id FROM ${latestCharacter} c WHERE c.cid = $1`, [String(cid)])).rows[0];
+    if (!fc || !fc.fc_id) return owned;
+    fcFilter = ' AND fc_id = $1';
+    fcArgs.push(String(fc.fc_id));
+  }
+  const chests = await client.query(`SELECT item_id FROM companion_fc_inventory_snapshot WHERE quantity > 0${fcFilter}`, fcArgs);
+  for (const r of chests.rows) addSpare(r.item_id);
+  return owned;
+}
+
+// The Build Finder: { goals: [{ sectorId, tier, optimal, doubleDip, items }], sureOnly, sortBy, forCid, limit }.
+// The builds that reach the goals, sorted, the first `limit` of them, and what the goals need.
+async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', forCid = null, limit = 200 } = {}) {
+  if (!cache) await loadCalculator(client);
+  if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
+  const { game, data } = cache;
+  const sectors = goals.map((g) => game.sectors.get(Number(g.sectorId))).filter(Boolean).slice(0, 5);
+  if (!sectors.length) return { success: true, rows: [], total: 0 };
+  const dataOf = new Map(data.sectors.map((d) => [d.id, d]));
+  const { need, why, missing } = finder.needsFor(goals, dataOf, (id) => (game.sectors.get(Number(id)) || {}).letter || String(id));
+  const start = calc.startFor(sectors[0].id, game.startingPoints);
+  const route = sectors.length > 1 ? calc.bestOrder(sectors, start, 100) : sectors;
+  const minRank = Math.max(1, ...sectors.map((s) => s.rankReq));
+  const owned = await ownedParts(client, forCid);
+  const rows = finder.sortBuilds(finder.findBuilds({ need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
+    minRank, maxRank: game.maxRank, route, start, owned, sureOnly }), sortBy);
+  return {
+    success: true, need, why, missing, minRank, route: route.map((s) => s.id), rangeNeeded: calc.rangeUsed(route, start),
+    total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length,
+    rows: rows.slice(0, Math.max(1, Number(limit) || 200)),
+  };
+}
+
 ipcMain.handle('get-sub-calculator', () => withClient((client) => loadCalculator(client), (err) => ({ success: false, error: err.message })));
+ipcMain.handle('find-sub-builds', (event, request) => withClient((client) => findFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('plan-sub-voyage', (event, request) => {
   try {
     return planFor(request);
@@ -125,4 +187,4 @@ ipcMain.handle('plan-sub-voyage', (event, request) => {
   }
 });
 
-module.exports = { loadCalculator, planFor, partLetter };
+module.exports = { loadCalculator, planFor, partLetter, findFor, ownedParts };

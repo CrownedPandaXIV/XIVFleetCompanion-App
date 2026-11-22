@@ -20,7 +20,7 @@ test('a saved choice wins; anything else works it out', () => {
 test('tabs left out for what is not run', () => {
   assert.deepStrictEqual(hiddenViews('both'), []);
   assert.deepStrictEqual(hiddenViews('subs'), ['retainers']);
-  assert.deepStrictEqual(hiddenViews('retainers'), ['salvage', 'subs', 'supplies', 'parts', 'routeOpt', 'planner']);
+  assert.deepStrictEqual(hiddenViews('retainers'), ['salvage', 'subs', 'supplies', 'parts', 'routeOpt', 'planner', 'buildFinder']);
   assert.deepStrictEqual(playStyleUses('retainers'), { subs: false, retainers: true });
 });
 
