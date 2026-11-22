@@ -68,6 +68,25 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   taken in the Free Company's workshop, so the Sub Calculator can later work out how much each voyage wears your parts.
 - **Explored sub sectors (database update 18).** A new table for which sectors each Free Company has unlocked and
   explored, as the plugin last read them in its workshop, for the Sub Calculator's coming Route Finder.
+- **Sub Calculator → Route Finder (new page, two tabs).** **Best routes:** choose one of your subs (or set the parts
+  and rank), a map, and what to go for: experience, gil or a chosen item. It checks every route of up to five sectors,
+  each in the fastest order the sub's range allows, and lists the ones that fit the sub's range and the longest voyage
+  you pick (12h to any), best first, with bars for voyage time, experience an hour and gil a day, the loot tier at each
+  stop and the range to spare. The map's sectors are tiles coloured by what your Free Company has done (explored,
+  explore next, could open by chance, not yet): click one to make it a must, again to leave it out. Only sectors the FC
+  has discovered and the sub's rank allows are used. A route that explores something new, or has chances at sectors not
+  discovered yet, says so, and "Put routes that explore something new first" puts those first. Open in Planner on each. With Live Market Prices on, gil is at market prices on your data center.
+  **Unlocks:** for a Free Company, what's sure to explore next, what could open by chance and from where (about 20–30%
+  a voyage, Pepper's guess), and the way to the next map, step by step; then each map's sectors and how far along it is.
+  Until the plugin has read an FC's sectors in its workshop, every sector is allowed and it says "not read yet".
+- **Fight Club routes your FC can't run yet are marked (Subs and Route Optimization).** When a sub's Fight Club target
+  uses a sector its Free Company hasn't discovered, it says "needs R" (hover: it opens from L, by chance) and, below it,
+  the best Fight Club route the FC can run now ("now: O-J · 250k/day").
+- **Build Finder: an item's amounts by retrieval.** The item search shows how many each time at poor, normal and
+  optimal retrieval ("1–5 · 5–10 · 10–15 each"), each with the retrieval it needs on hover, instead of one span from
+  the lowest to the highest.
+- **Planner: the notes under a tier, retrieval or double dip wrap** inside their column instead of being cut off.
+- **Column widths are saved once, when you let go** of a column's edge, not at every move of the mouse.
 
 ## 1.11.0 - 2026-11-21
 

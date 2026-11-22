@@ -13,6 +13,7 @@ const VIEWS = [
   { key: 'supplies', label: 'Supplies', group: 'Submarines' },
   { key: 'salvage', label: 'Salvage', group: 'Submarines' },
   { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
+  { key: 'routeFinder', label: 'Route Finder', group: 'Sub Calculator' },
   { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
@@ -711,6 +712,7 @@ function App() {
         {currentView === 'parts' && <PartsView refreshKey={refreshKey} />}
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
+        {currentView === 'routeFinder' && <RouteFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
         {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
         {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} />}
 

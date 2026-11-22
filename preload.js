@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('api', {
   getSubCalculator: () => invoke('get-sub-calculator'),
   planSubVoyage: (request) => invoke('plan-sub-voyage', request),
   findSubBuilds: (request) => invoke('find-sub-builds', request),
+  findSubRoutes: (request) => invoke('find-sub-routes', request),
+  getFcUnlocks: (fcId) => invoke('get-fc-unlocks', fcId),
   getDataFreshness: () => invoke('get-data-freshness'),
   updateSortOrder: (orderedCids) => invoke('update-sort-order', orderedCids),
   removeCharacter: (cid) => invoke('remove-character', cid),

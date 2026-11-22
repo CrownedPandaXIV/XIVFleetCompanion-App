@@ -91,10 +91,13 @@ function useColumnWidths(tableKey, columnKeys, defaultWidth = 150) {
   const widthsRef = useRef(widths);
   widthsRef.current = widths;
 
-  function persist(newWidths) {
+  // Shown at once; saved (save: false while dragging) only when the change is done, so a drag writes once.
+  function persist(newWidths, save = true) {
     widthsRef.current = newWidths;
     setWidths(newWidths);
-    localStorage.setItem(storageKey, JSON.stringify(newWidths));
+    if (save) {
+      try { localStorage.setItem(storageKey, JSON.stringify(newWidths)); } catch { /* not remembered */ }
+    }
   }
 
   // From a mouse drag, or from the keyboard on the resize handle (Left / Right arrows: 10 px at a time).
@@ -113,11 +116,12 @@ function useColumnWidths(tableKey, columnKeys, defaultWidth = 150) {
     function onMove(moveEvent) {
       const delta = moveEvent.clientX - startX;
       const newWidth = Math.max(10, startWidth + delta);
-      persist({ ...widthsRef.current, [columnKey]: newWidth });
+      persist({ ...widthsRef.current, [columnKey]: newWidth }, false);
     }
     function onUp() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      persist(widthsRef.current);
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);

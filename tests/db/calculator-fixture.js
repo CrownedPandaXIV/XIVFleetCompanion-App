@@ -126,13 +126,64 @@ for (const goals of finderGoals) {
   }
 }
 
-console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds`);
+// The Route Finder's answers (subs/route-finder.js): routes for builds on each map, with an FC's reading, musts, a
+// voyage limit, ranked each way; the unlocks of that reading; and Fight Club routes checked against it.
+const rf = require('../../subs/route-finder');
+const openerOf = new Map([...game.sectors.keys()].map((id) => [id, dataOf.has(id) ? Number(dataOf.get(id).unlockedFrom) || 0 : 0]));
+// Explored 1-12 and 32-34, discovered 13, 14 and 35; the rest not.
+const read = new Map([...game.sectors.keys()].map((id) => [id, { unlocked: id <= 14 || (id >= 32 && id <= 35), explored: id <= 12 || (id >= 32 && id <= 34) }]));
+const states = rf.sectorStates([...game.sectors.keys()], read, openerOf);
+const routeCases = [
+  { rank: 125, parts: ['W+', 'C+', 'W+', 'C+'], mapId: 1, maxStops: 5, maxHours: null, must: [], leaveOut: [], rankBy: 'exp', itemId: null, read: false, exploreFirst: false },
+  { rank: 125, parts: ['W+', 'C+', 'W+', 'C+'], mapId: 1, maxStops: 4, maxHours: 72, must: [], leaveOut: [3], rankBy: 'gil', itemId: null, read: true, exploreFirst: false },
+  { rank: 90, parts: ['S+', 'U+', 'W+', 'C+'], mapId: 1, maxStops: 5, maxHours: 60, must: [8], leaveOut: [], rankBy: 'exp', itemId: null, read: true, exploreFirst: true },
+  { rank: 110, parts: ['Y+', 'Y+', 'Y+', 'Y+'], mapId: 2, maxStops: 5, maxHours: null, must: [], leaveOut: [], rankBy: 'item', itemId: someItem(32, 1) || someItem(33, 1), read: false, exploreFirst: false },
+  { rank: 60, parts: ['S', 'U', 'W', 'C'], mapId: 2, maxStops: 3, maxHours: 48, must: [], leaveOut: [], rankBy: 'gil', itemId: null, read: true, exploreFirst: true },
+];
+const routeAnswers = routeCases.map((c) => {
+  const stats = buildStats(c.rank, c.parts, rankStatsById, partStatsByClassSlot);
+  const onMap = [...game.sectors.values()].filter((x) => x.map === c.mapId).sort((a, b) => a.id - b.id);
+  const st = c.read ? states : rf.sectorStates([...game.sectors.keys()], null, openerOf);
+  const allowed = rf.usableSectors({ onMap, rank: c.rank, states: st, leaveOut: c.leaveOut });
+  const values = new Map(onMap.map((x) => [x.id, rf.sectorValue(x, dataOf.get(x.id), stats, prices)]));
+  const routes = rf.findRoutes({ sectors: allowed, start: calc.startFor(onMap[0].id, game.startingPoints), stats, maxStops: c.maxStops, maxHours: c.maxHours,
+    must: c.must, values, rankBy: c.rankBy, itemId: c.itemId, opens: rf.opensOf(openerOf), states: st, exploreFirst: c.exploreFirst });
+  return { ...c, allowed: allowed.map((x) => x.id), total: routes.length,
+    first: routes.slice(0, 30).map((r) => ({ route: r.route, hours: r6(r.hours), range: r.range, exp: r6(r.exp), expPerHour: r6(r.expPerHour),
+      gilPerVoyage: r6(r.gilPerVoyage), gilPerDay: r6(r.gilPerDay), itemPerDay: r6(r.itemPerDay), explores: r.explores, chances: r.chances })) };
+});
+const maps = [1, 2].map((id) => ({ id, name: `Map ${id}` }));
+const unlocksAnswer = rf.unlocks({ sectors: [...game.sectors.values()].sort((a, b) => a.id - b.id), maps, states, openerOf });
+// The same FC before the second map opened: the way there, from the first map.
+const readEarly = new Map([...read.entries()].map(([id, r]) => [id, id >= 32 ? { unlocked: false, explored: false } : r]));
+const unlocksEarly = rf.unlocks({ sectors: [...game.sectors.values()].sort((a, b) => a.id - b.id), maps,
+  states: rf.sectorStates([...game.sectors.keys()], readEarly, openerOf), openerOf });
+const { fightClubOptions, bestOf } = require('../../subs/submarine-builds');
+// Fight Club writes routes as the game's letters (A-Z, then AA...): the made-up maps get them in id order.
+const gameLetter = (i) => (i < 26 ? String.fromCharCode(65 + i) : `A${String.fromCharCode(65 + i - 26)}`);
+const letterMaps = [1, 2].map((id) => ({ id, byLetter: new Map([...game.sectors.values()].filter((x) => x.map === id).sort((a, b) => a.id - b.id).map((x, i) => [gameLetter(i), x.id])) }));
+// M (13) discovered; R, O and Z (18, 15, 26) not: MROJZ can't be run yet.
+const fightClubRows = [
+  { route: 'MROJZ', hours: 24, repair_times: '10', gil_sub_day: 320000, rec_build_notes: '90: WWWW' },
+  { route: 'BCMN', hours: 24, repair_times: '', gil_sub_day: 260000, rec_build_notes: '86: W+C+W+C+' },
+  { route: 'JEB', hours: 12, repair_times: '8', gil_sub_day: 200000, rec_build_notes: '85: SSSS' },
+  { route: 'ZAAAB', hours: 24, repair_times: '', gil_sub_day: 400000, rec_build_notes: '95: UUUU' },
+];
+const fightClubAnswers = [85, 88, 90, 99].map((rank) => {
+  const check = rf.fightClubCheck({ options: fightClubOptions(fightClubRows, repairKitCost), rank, maps: letterMaps, read, bestOf });
+  return { rank, best: check.best ? check.best.row.route : null, missing: check.missing, alt: check.alt ? check.alt.row.route : null };
+});
+
+console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}`);
 const file = process.argv[2];
 if (file) {
   fs.writeFileSync(file, JSON.stringify({
     about: 'Written by XIVFleetCompanion-App tests/db/calculator-fixture.js: made-up game data and the app\'s Sub Calculator answers (subs/calculator.js).',
     game: { sectors, ranks, parts }, repairKitCost, priceRule: '(itemId % 97) * 10', cases: answers,
     finder: { owned: [...owned], partFilter, cases: finderAnswers },
+    routeFinder: { read: [...read.entries()].map(([id, r]) => ({ id, unlocked: r.unlocked, explored: r.explored })), openerOf: [...openerOf.entries()],
+      cases: routeAnswers, unlocks: [{ read: 'all', maps, ...unlocksAnswer }, { read: 'early', maps, ...unlocksEarly }],
+      fightClub: { rows: fightClubRows, maps: letterMaps.map((m) => ({ id: m.id, letters: [...m.byLetter.entries()] })), cases: fightClubAnswers } },
   }));
   console.log(`wrote ${file}`);
 }

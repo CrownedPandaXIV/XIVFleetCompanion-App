@@ -191,6 +191,10 @@ async function moreReads(pg) {
     ['get-sub-calculator'],
     ['find-sub-builds', { goals: [{ sectorId: 1, tier: 2, optimal: true, doubleDip: false, items: [] }, { sectorId: 2, tier: 0, optimal: false, doubleDip: true, items: [] }], sortBy: 'parts', limit: 50 }],
     ['find-sub-builds', { goals: [{ sectorId: 1, tier: 3, optimal: false, doubleDip: false, items: [] }], forCid: cids[0], sortBy: 'parts', limit: 50 }],
+    // The Route Finder: one map's routes for a build, through one FC's explored sectors, and its Unlocks tab.
+    ['find-sub-routes', { rank: 60, parts: ['W+', 'C+', 'W+', 'C+'], mapId: 1, maxStops: 5, maxHours: null, must: [], leaveOut: [], rankBy: 'exp', fcId: fcs[0], limit: 50 }],
+    ['find-sub-routes', { rank: 60, parts: ['S', 'U', 'W', 'C'], mapId: 1, maxStops: 3, maxHours: 48, must: [1], leaveOut: [], rankBy: 'gil', exploreFirst: true, limit: 50 }],
+    ['get-fc-unlocks', fcs[0]],
     ['get-shopping-list', { buyFromVendors: true, aheadDays: 7, priceScope: 'fleet' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'level', targetValue: 90, onlyCrafted: false, slotLabel: 'Main Hand' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'ilvl', targetValue: 600, onlyCrafted: true, slotLabel: 'Main Hand' }],
@@ -341,6 +345,10 @@ async function round(name, pg, file) {
     psql(['-v', 'days=30', '-f', 'tests/db/generate-metric-history.sql']);
     psql(['-f', 'tests/ui/fixtures.sql']);
     await pg.query('DROP TABLE companion_character_snapshot');
+    // One Free Company's sectors as the plugin read them in its workshop (the Route Finder): O explored, J discovered.
+    await pg.query(`INSERT INTO companion_fc_sub_sector (fc_id, sector_id, unlocked, explored, read_at, cid)
+      SELECT fc_id, s, s <= 2, s = 1, now() - interval '1 hour', 18014498578000001
+      FROM (SELECT DISTINCT fc_id FROM companion_fc_inventory_snapshot ORDER BY 1 LIMIT 1) f, generate_series(1, 3) s`);
 
     const fleetFile = path.join(folder, 'fleet.db');
     const gameFile = path.join(folder, 'game-data.db');

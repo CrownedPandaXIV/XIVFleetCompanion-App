@@ -29,20 +29,20 @@ const PLANNER_REACH_DEFS = [
   { key: 'tier', label: 'Loot tier', cell: (s) => (plannerNoData(s) ? <span className="dim">No XIVStats data for this sector yet.</span> : (
     <React.Fragment>
       <PlannerPill sure={s.result.tierSure}>Tier {s.result.tier}</PlannerPill>
-      {s.result.tier < 3 ? <div className="dim">{plannerN(s.result.need.t3)} more surveillance for T3</div>
-        : s.result.tierSure === 'maybe' ? <div className="tone-warn">{plannerN(s.result.need.t3)} more to be sure</div> : null}
+      {s.result.tier < 3 ? <div className="dim planner-cell-note">{plannerN(s.result.need.t3)} more surveillance for T3</div>
+        : s.result.tierSure === 'maybe' ? <div className="tone-warn planner-cell-note">{plannerN(s.result.need.t3)} more to be sure</div> : null}
     </React.Fragment>)), sort: (s) => (s.result ? s.result.tier : null) },
   { key: 'retrieval', label: 'Retrieval', cell: (s) => (plannerNoData(s) ? plannerDash : (
     <React.Fragment>
       <PlannerPill sure={s.result.retrieval === 'optimal' ? s.result.retrievalSure : s.result.retrieval === 'normal' ? 'maybe' : 'no'}>
         {s.result.retrieval[0].toUpperCase() + s.result.retrieval.slice(1)}</PlannerPill>
       {s.result.retrieval !== 'optimal' || s.result.retrievalSure === 'maybe'
-        ? <div className="dim">{plannerN(s.result.need.optimal)} more retrieval for optimal</div> : null}
+        ? <div className="dim planner-cell-note">{plannerN(s.result.need.optimal)} more retrieval for optimal</div> : null}
     </React.Fragment>)), sort: (s) => (s.result ? ['poor', 'normal', 'optimal'].indexOf(s.result.retrieval) : null) },
   { key: 'doubleDip', label: 'Double dip', cell: (s) => (plannerNoData(s) ? plannerDash : (
     <React.Fragment>
       <PlannerPill sure={s.result.doubleDip}>{s.result.doubleDip === 'yes' ? 'Yes' : s.result.doubleDip === 'maybe' ? 'Maybe' : 'No'}</PlannerPill>
-      {s.result.doubleDip !== 'yes' && <div className="dim">{plannerN(s.result.need.favor)} more favor</div>}
+      {s.result.doubleDip !== 'yes' && <div className="dim planner-cell-note">{plannerN(s.result.need.favor)} more favor</div>}
     </React.Fragment>)), sort: (s) => (s.result ? ['no', 'maybe', 'yes'].indexOf(s.result.doubleDip) : null) },
   { key: 'tiers', label: 'T2 / T3 at', td: (s) => <td className="num">{plannerNoData(s) ? plannerDash : `${plannerRange(s.breakpoints[0])} / ${plannerRange(s.breakpoints[1])}`}</td>,
     sort: (s) => (s.breakpoints ? s.breakpoints[1].high : null) },

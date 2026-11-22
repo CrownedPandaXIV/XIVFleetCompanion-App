@@ -85,6 +85,25 @@ const finderChance = (c) => (c === null || c === undefined ? '' : c < 0.01 ? 'un
 
 // Find an item: every sector that drops it, on every map, with the rank it needs, the lowest tier it drops at, how
 // often and how many, and the surveillance that tier takes. Add puts the sector in with the item as its goal.
+// How many each time, at poor, normal and optimal retrieval ("1–5 · 5–10 · 10–15"), each saying on hover the retrieval it
+// needs there. The Planner shows the one a build reaches.
+function FinderAmounts({ it }) {
+  if (!it.amounts) return <span className="dim">{it.low === it.high ? it.low : `${it.low}–${it.high}`} each</span>;
+  const span = ([a, b]) => (a === b ? `${a}` : `${a}–${b}`);
+  const levels = [['poor', 'Poor retrieval', null], ['normal', 'Normal retrieval', it.retrievalAt && it.retrievalAt.normal], ['optimal', 'Optimal retrieval', it.retrievalAt && it.retrievalAt.optimal]];
+  return (
+    <span className="finder-amounts">
+      {levels.map(([k, label, at], i) => (
+        <React.Fragment key={k}>
+          {i > 0 && <span className="dim"> · </span>}
+          <span className={`finder-amount ${k}`} title={`${label}${at ? `, ${finderNeedText(at)} retrieval` : ''}: ${span(it.amounts[k])} each time`}>{span(it.amounts[k])}</span>
+        </React.Fragment>
+      ))}
+      <span className="dim"> each</span>
+    </span>
+  );
+}
+
 function FinderItemSearch({ base, onAdd }) {
   const [text, setText] = useState('');
   const { open, setOpen, box } = useFinderPopover();
@@ -111,7 +130,7 @@ function FinderItemSearch({ base, onAdd }) {
           {!found.length && <div className="dim">No sector drops anything called “{text}”.</div>}
           {found.slice(0, 8).map(([id, { name, at }]) => (
             <div key={id} className="finder-search-item">
-              <div className="finder-search-name">{name} <span className="dim">{at.length} sector{at.length === 1 ? '' : 's'}</span></div>
+              <div className="finder-search-name">{name} <span className="dim">{at.length} sector{at.length === 1 ? '' : 's'} · each time at poor · normal · optimal retrieval</span></div>
               {at.sort((a, b) => a.s.map - b.s.map || a.s.id - b.s.id).map(({ s, it }) => (
                 <div key={s.id} className="finder-search-row">
                   <span className="dim">{mapName.get(s.map) || ''}</span>
@@ -119,7 +138,7 @@ function FinderItemSearch({ base, onAdd }) {
                   <span className="dim">rank {s.rankReq}</span>
                   <span className="finder-tier">T{it.tier}</span>
                   <span title={`In ${finderChance(it.chance)} of XIVStats' T${it.tier} voyages there`}>{finderChance(it.chance)}</span>
-                  <span className="dim">{it.low === it.high ? it.low : `${it.low}–${it.high}`} each</span>
+                  <FinderAmounts it={it} />
                   <span className="dim">{it.at ? `T${it.tier} at ${finderNeedText(it.at)}` : 'any surveillance'}</span>
                   <button onClick={() => { onAdd(s, id); setOpen(false); }}>Add</button>
                 </div>

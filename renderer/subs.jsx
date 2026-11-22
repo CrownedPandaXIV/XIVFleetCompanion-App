@@ -95,6 +95,22 @@ function formatGilDay(value) {
 }
 
 // Gil a day in gold (large amounts as "5.86M"), a softer dash when unknown: as the plugin.
+// A Fight Club target the sub's Free Company can't run yet (a sector on it not discovered): "needs R", and the best
+// Fight Club route it can run now. Sectors open by chance from the one before (Route Finder → Unlocks).
+function FightClubBlocked({ blocked }) {
+  if (!blocked) return null;
+  const needs = blocked.needs.map((n) => n.letter).join(', ');
+  const why = blocked.needs.map((n) => `${n.letter} isn't discovered yet${n.from ? ` (it opens from ${n.from}, by chance)` : ''}`).join('; ');
+  const alt = blocked.alt ? ` Best your FC can run now: ${blocked.alt.route}, ${Number(blocked.alt.gilPerDay).toLocaleString()} gil a day.` : '';
+  const short = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(Math.round(n)));
+  return (
+    <React.Fragment>
+      <span className="fc-blocked-tag" title={`${why}.${alt}`}>needs {needs}</span>
+      {blocked.alt && <span className="fc-blocked-alt" title={alt.trim()}>now: {blocked.alt.route} · {short(Number(blocked.alt.gilPerDay))}/day</span>}
+    </React.Fragment>
+  );
+}
+
 function GilDay({ value }) {
   return value === '' || value === null || value === undefined ? <span className="dim">—</span> : <GilText gil={Number(value)} />;
 }
@@ -200,7 +216,7 @@ const SUB_COLUMN_DEFS = [
   { key: 'currentGilDay', label: 'Current gil/day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
   // Green when it's on it, amber when it isn't (Route Optimization lists those).
   { key: 'targetRoute', label: 'Target route', cell: (s) => (s.target_route
-    ? <span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span>
+    ? <React.Fragment><span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span><FightClubBlocked blocked={s.target_blocked} /></React.Fragment>
     : <span className="dim">—</span>), sort: (r) => r.target_route || null },
   { key: 'targetGilDay', label: 'Target gil/day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   { key: 'planner', label: 'Planner', cell: (s, ctx) => (ctx && ctx.onOpenPlanner

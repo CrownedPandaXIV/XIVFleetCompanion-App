@@ -49,7 +49,7 @@ module.exports = async (t) => {
   const hit = await ev(`(() => { const item = [...document.querySelectorAll('.finder-search-item')].find((x) => x.querySelector('.finder-search-name').innerText.startsWith(${JSON.stringify(itemName)}));
     const rows = item ? [...item.querySelectorAll('.finder-search-row')] : [];
     return { rows: rows.length, text: rows.map((r) => r.innerText.replace(/\\s+/g, ' ')).join(' | ') }; })()`);
-  check(hit.rows > 0 && /rank \d+/.test(hit.text) && /T[123]/.test(hit.text) && /each/.test(hit.text), `searching "${itemName}" lists the sectors dropping it (${hit.text.slice(0, 120)})`);
+  check(hit.rows > 0 && /rank \d+/.test(hit.text) && /T[123]/.test(hit.text) && /\d+(–\d+)? · \d+(–\d+)? · \d+(–\d+)? each/.test(hit.text), `searching "${itemName}" lists the sectors dropping it (${hit.text.slice(0, 120)})`);
   await ev(`[...[...document.querySelectorAll('.finder-search-item')].find((x) => x.querySelector('.finder-search-name').innerText.startsWith(${JSON.stringify(itemName)})).querySelectorAll('.finder-search-row button')][0].click()`);
   await waitFor(`[...document.querySelectorAll('.finder-goal .planner-chip')].some((c) => c.innerText.includes(${JSON.stringify(itemName)}))`, 'the item added', 5000);
   check(true, 'Add puts the item on its sector as a goal');

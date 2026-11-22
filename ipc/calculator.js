@@ -9,6 +9,7 @@ const { itemNames, itemPrices } = require('./details');
 const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
 const { snapshotFragments } = require('../db');
 const finder = require('../subs/build-finder');
+const routeFinder = require('../subs/route-finder');
 const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
@@ -65,7 +66,8 @@ async function loadCalculator(client) {
   const data = calculatorData.load();
   const itemIds = [...new Set(data.sectors.flatMap((s) => Object.values(s.pools).flatMap((p) => p.loot.map((l) => l[0]))))];
   const [names, prices, repairKitCost] = await Promise.all([itemNames(client, itemIds), itemPrices(client, itemIds), repairKitCostFrom(client)]);
-  cache = { game, data, names, prices, repairKitCost, live: await universalisEnabled(client).catch(() => false), market: new Map() };
+  cache = { game, data, names, prices, repairKitCost, live: await universalisEnabled(client).catch(() => false), market: new Map(),
+    fcs: await fcSectors(client).catch(() => []) };
 
   // The player's subs for the sub picker: who has them (account, character, world, Free Company), their build,
   // route and whether they are out (return_time), in the roster's order.
@@ -75,9 +77,10 @@ async function loadCalculator(client) {
     try {
       for (const r of (await client.query('SELECT cid, fc_name FROM companion_character_housing')).rows) if (r.fc_name) fcNames.set(String(r.cid), r.fc_name);
     } catch { /* no Free Company names: the picker searches without them */ }
+    const fcIds = await fcIdsOf(client);
     subs = (await loadSubmarines(client)).map((s) => ({
       cid: String(s.cid), subName: s.sub_name, character: s.character_name || 'Unknown character', world: s.world || '',
-      account: s.account_label || '', fc: fcNames.get(String(s.cid)) || '', sortIndex: s.sort_index ?? null,
+      account: s.account_label || '', fc: fcNames.get(String(s.cid)) || '', fcId: fcIds.get(String(s.cid)) || null, sortIndex: s.sort_index ?? null,
       rank: s.rank, parts: s.part_letters, routeText: s.current_route || '', returnTime: Number(s.return_time) || 0,
       route: Array.from(s.points || []).filter((b) => b > 0),
     })).filter((s) => s.parts.every((p) => CLASS_OF[p]));
@@ -96,15 +99,21 @@ async function loadCalculator(client) {
           const tier = finder.itemTier(d, id);
           const pool = d.pools[tier];
           const entry = pool.loot.find((l) => l[0] === id);
+          // amounts: how many each time at poor, normal and optimal retrieval, and the retrieval normal and optimal need.
           return { itemId: id, name: names.get(id) || `Item ${id}`, tier, chance: pool.records > 0 ? entry[1] / pool.records : null,
-            low: entry[4], high: entry[9], at: tier >= 2 ? calc.breakpoint(d, tier === 3 ? 1 : 0) : null };
+            low: entry[4], high: entry[9], at: tier >= 2 ? calc.breakpoint(d, tier === 3 ? 1 : 0) : null,
+            amounts: { poor: [entry[4], entry[5]], normal: [entry[6], entry[7]], optimal: [entry[8], entry[9]] },
+            retrievalAt: { normal: calc.breakpoint(d, 2), optimal: calc.breakpoint(d, 3) } };
         })
         .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)) : [];
-      return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items };
+      // from: the sector it opens from (XIVStats; 0: open from the start), for the Route Finder's unlocks.
+      return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items, from: d ? Number(d.unlockedFrom) || 0 : null };
     }),
     partLetters: PART_LETTERS.map((letter) => ({ letter, name: partName(letter) })),
     maxRank: game.maxRank,
     subs,
+    // The Free Companies, with the sectors each has unlocked and explored as the plugin last read them (Route Finder).
+    fcs: cache.fcs,
     repairKitCost,
     about: data.about,
     // Live Market Prices (Settings): whether the loot is priced from Universalis, and the worlds to price it on, the
@@ -114,6 +123,115 @@ async function loadCalculator(client) {
     worlds: [...subs.reduce((m, s) => (s.world ? m.set(s.world, (m.get(s.world) || 0) + 1) : m), new Map()).entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w]) => w),
   };
+}
+
+// Each character's Free Company (as text), from its latest snapshot.
+async function fcIdsOf(client) {
+  const out = new Map();
+  try {
+    const { latestCharacter } = await snapshotFragments(client);
+    for (const r of (await client.query(`SELECT c.cid, c.fc_id FROM ${latestCharacter} c`)).rows) {
+      if (r.fc_id && String(r.fc_id) !== '0') out.set(String(r.cid), String(r.fc_id));
+    }
+  } catch { /* no snapshots yet */ }
+  return out;
+}
+
+// Every Free Company with subs or a reading, by name, each with the sectors the plugin last read in its workshop
+// (database update 18): [{ fcId, name, readAt (ms, or null: not read yet), sectors: { id: [unlocked, explored] } }].
+async function fcSectors(client) {
+  const fcIds = await fcIdsOf(client);
+  const names = new Map();
+  try {
+    for (const r of (await client.query('SELECT cid, fc_name FROM companion_character_housing')).rows) {
+      const fc = fcIds.get(String(r.cid));
+      if (fc && r.fc_name && !names.has(fc)) names.set(fc, r.fc_name);
+    }
+  } catch { /* no FC names: shown by number */ }
+  const byFc = new Map();
+  for (const fc of new Set(fcIds.values())) byFc.set(fc, { fcId: fc, name: names.get(fc) || `Free Company ${fc}`, readAt: null, sectors: {} });
+  let rows = [];
+  try {
+    rows = (await client.query('SELECT fc_id, sector_id, unlocked, explored, read_at FROM companion_fc_sub_sector')).rows;
+  } catch { /* a database without update 18 yet: nothing read */ }
+  for (const r of rows) {
+    const fc = String(r.fc_id);
+    if (!byFc.has(fc)) byFc.set(fc, { fcId: fc, name: names.get(fc) || `Free Company ${fc}`, readAt: null, sectors: {} });
+    const one = byFc.get(fc);
+    const at = r.read_at instanceof Date ? r.read_at.getTime() : typeof r.read_at === 'number' ? r.read_at * 1000 : new Date(r.read_at).getTime();
+    one.readAt = Math.max(one.readAt || 0, at || 0) || null;
+    one.sectors[Number(r.sector_id)] = [r.unlocked === true || Number(r.unlocked) === 1, r.explored === true || Number(r.explored) === 1];
+  }
+  return [...byFc.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// One FC's reading as subs/route-finder.js reads it (Map id -> { unlocked, explored }), or null when not read.
+function readOf(fcId) {
+  const fc = fcId ? (cache.fcs || []).find((f) => f.fcId === String(fcId)) : null;
+  if (!fc || !fc.readAt) return null;
+  return new Map(Object.entries(fc.sectors).map(([id, [unlocked, explored]]) => [Number(id), { unlocked, explored }]));
+}
+
+// The Route Finder: { rank, parts, mapId, maxStops, maxHours, must, leaveOut, rankBy, itemId, exploreFirst, fcId, place,
+// scope, limit }. The best routes for the build on the map, only through sectors the FC has discovered (every sector
+// when it hasn't been read) and the sub's rank allows; each sector's state for the page's tiles.
+async function routesFor(client, request = {}) {
+  if (!cache) await loadCalculator(client);
+  if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
+  const { game, data } = cache;
+  const rank = Number(request.rank);
+  const parts = request.parts || [];
+  const stats = buildStats(rank, parts, game.stats.rankStatsById, game.stats.partStatsByClassSlot);
+  if (!stats) return { success: true, stats: null, routes: [], tiles: [] };
+  const onMap = [...game.sectors.values()].filter((x) => x.map === Number(request.mapId)).sort((a, b) => a.id - b.id);
+  if (!onMap.length) return { success: true, stats, routes: [], tiles: [] };
+  const dataOf = new Map(data.sectors.map((d) => [d.id, d]));
+  const openerOf = new Map([...game.sectors.keys()].map((id) => [id, dataOf.has(id) ? Number(dataOf.get(id).unlockedFrom) || 0 : 0]));
+  const read = readOf(request.fcId);
+  const states = routeFinder.sectorStates([...game.sectors.keys()], read, openerOf);
+  const leaveOut = new Set((request.leaveOut || []).map(Number));
+  const must = (request.must || []).map(Number).filter((id) => onMap.some((x) => x.id === id));
+  const allowed = routeFinder.usableSectors({ onMap, rank, states, leaveOut: [...leaveOut] });
+
+  // Prices: the market's when Live Market Prices is on and a place is given, else vendor prices.
+  let prices = cache.prices;
+  let pricing = { source: 'vendor' };
+  if (request.place && cache.live) {
+    const scope = ['world', 'dc', 'region'].includes(request.scope) ? request.scope : 'dc';
+    const ids = [...new Set(onMap.flatMap((x) => (dataOf.get(x.id) ? Object.values(dataOf.get(x.id).pools).flatMap((p) => p.loot.map((l) => l[0])) : [])))];
+    try {
+      const market = await plannerMarket(client, request.place, scope, ids);
+      if (market) { prices = market.prices; pricing = { source: 'market', scope, place: market.place, stale: market.stale }; }
+    } catch (err) { pricing = { source: 'vendor', error: err.message }; }
+  }
+  const values = new Map(onMap.map((x) => [x.id, routeFinder.sectorValue(x, dataOf.get(x.id), stats, prices)]));
+  const start = calc.startFor(onMap[0].id, game.startingPoints);
+  const mustOk = must.every((id) => allowed.some((x) => x.id === id));
+  const itemId = request.rankBy === 'item' && request.itemId ? Number(request.itemId) : null;
+  const routes = mustOk ? routeFinder.findRoutes({ sectors: allowed, start, stats, maxStops: request.maxStops, maxHours: Number(request.maxHours) || null,
+    must, values, rankBy: itemId ? 'item' : request.rankBy === 'gil' ? 'gil' : 'exp', itemId, opens: routeFinder.opensOf(openerOf), states,
+    exploreFirst: !!request.exploreFirst }) : [];
+  const limit = Math.max(1, Number(request.limit) || 100);
+  return {
+    success: true, stats, read: !!read, pricing,
+    tiles: onMap.map((x) => ({ id: x.id, state: states.get(x.id), rankOk: x.rankReq <= rank, allowed: allowed.some((a) => a.id === x.id) })),
+    total: routes.length, newOnes: routes.filter((r) => r.explores + r.chances > 0).length,
+    routes: routes.slice(0, limit).map((r) => ({ ...r, stops: r.route.map((id) => ({ id, tier: values.get(id).tier, tierSure: values.get(id).tierSure })) })),
+  };
+}
+
+// The Route Finder's Unlocks tab for one FC: each map's progress, what to explore next for sure, what could open by
+// chance, and the way to the next map (subs/route-finder.js unlocks).
+function unlocksFor(fcId) {
+  if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
+  const { game, data } = cache;
+  const dataOf = new Map(data.sectors.map((d) => [d.id, d]));
+  const openerOf = new Map([...game.sectors.keys()].map((id) => [id, dataOf.has(id) ? Number(dataOf.get(id).unlockedFrom) || 0 : 0]));
+  const read = readOf(fcId);
+  if (!read) return { success: true, read: false };
+  const states = routeFinder.sectorStates([...game.sectors.keys()], read, openerOf);
+  const u = routeFinder.unlocks({ sectors: [...game.sectors.values()].sort((a, b) => a.id - b.id), maps: game.maps.slice().sort((a, b) => a.id - b.id), states, openerOf });
+  return { success: true, read: true, ...u, states: Object.fromEntries(states) };
 }
 
 // Every world, data center and region Universalis knows, for the Planner's "Market prices on" (loot from a voyage can
@@ -265,6 +383,8 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
 
 ipcMain.handle('get-sub-calculator', () => withClient((client) => loadCalculator(client), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('find-sub-builds', (event, request) => withClient((client) => findFor(client, request), (err) => ({ success: false, error: err.message })));
+ipcMain.handle('find-sub-routes', (event, request) => withClient((client) => routesFor(client, request), (err) => ({ success: false, error: err.message })));
+ipcMain.handle('get-fc-unlocks', (event, fcId) => withClient(async (client) => { if (!cache) await loadCalculator(client); return unlocksFor(fcId); }, (err) => ({ success: false, error: err.message })));
 ipcMain.handle('plan-sub-voyage', (event, request) => withClient((client) => planPriced(client, request), (err) => ({ success: false, error: err.message })));
 
-module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts };
+module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts, routesFor, unlocksFor, fcSectors };

@@ -42,7 +42,7 @@ const ROUTE_OPT_COLUMN_DEFS = [
   { key: 'sub', label: 'Sub', cell: (r) => r.sub_name, sort: (r) => r.sub_name },
   { key: 'currentRoute', label: 'Current route', cell: (r) => r.current_route || '—', sort: (r) => r.current_route || null },
   { key: 'currentGilDay', label: 'Current gil/day', cell: (r) => <GilDay value={r.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
-  { key: 'targetRoute', label: 'Target route', cell: (r) => r.target_route, sort: (r) => r.target_route || null },
+  { key: 'targetRoute', label: 'Target route', cell: (r) => <React.Fragment>{r.target_route}<FightClubBlocked blocked={r.target_blocked} /></React.Fragment>, sort: (r) => r.target_route || null },
   { key: 'targetGilDay', label: 'Target gil/day', cell: (r) => <GilDay value={r.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
   // Green for more gil a day, red for less (as the plugin).
   { key: 'gain', label: 'Gil/day gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
