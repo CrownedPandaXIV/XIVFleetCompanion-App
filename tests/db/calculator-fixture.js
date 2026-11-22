@@ -86,7 +86,7 @@ const answers = cases.map((c) => {
     wear: p.wear.map((w) => (w ? { slot: w.slot, lost: w.lost, voyagesLasting: w.voyagesLasting, kitsPerVoyage: r6(w.kitsPerVoyage) } : null)),
     sectors: p.sectors.map((s) => ({ id: s.sector.id, result: s.result || null, bonus: s.bonus || null })),
     missingData: p.missingData.map((s) => s.id),
-    loot: p.loot.map((l) => ({ itemId: l.itemId, tier: l.tier, sectors: l.sectors, perVoyage: r6(l.perVoyage), low: l.low, high: l.high, gil: r6(l.gil) })),
+    loot: p.loot.map((l) => ({ itemId: l.itemId, tier: l.tier, sectors: l.sectors, perVoyage: r6(l.perVoyage), chance: r6(l.chance), low: l.low, high: l.high, gil: r6(l.gil) })),
   };
 });
 

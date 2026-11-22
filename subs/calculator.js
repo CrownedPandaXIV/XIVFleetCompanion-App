@@ -147,11 +147,13 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
     return { sector: s, data: d, result, loot: sectorLoot(d, result), bonus: bonusExp(result) };
   });
 
-  // Loot added up over the route, item by item.
+  // Loot added up over the route, item by item. chance: of getting it at all on a voyage (any of its sectors; each
+  // sector's chance taken as at most 1).
   const byItem = new Map();
   for (const p of perSector) {
     for (const l of p.loot || []) {
-      const was = byItem.get(l.itemId) || { itemId: l.itemId, tier: l.tier, sectors: [], perVoyage: 0, low: l.low, high: l.high };
+      const was = byItem.get(l.itemId) || { itemId: l.itemId, tier: l.tier, sectors: [], perVoyage: 0, low: l.low, high: l.high, miss: 1 };
+      was.miss *= 1 - Math.min(1, l.chance);
       if (l.perVoyage > 0 && !was.sectors.includes(p.sector.letter)) was.sectors.push(p.sector.letter);
       was.perVoyage += l.perVoyage;
       was.low = Math.min(was.low, l.low);
@@ -160,7 +162,7 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
       byItem.set(l.itemId, was);
     }
   }
-  const loot = [...byItem.values()].map((l) => ({ ...l, gil: l.perVoyage * (prices.get(l.itemId) || 0) }))
+  const loot = [...byItem.values()].map(({ miss, ...l }) => ({ ...l, chance: 1 - miss, gil: l.perVoyage * (prices.get(l.itemId) || 0) }))
     .sort((a, b) => b.gil - a.gil || b.perVoyage - a.perVoyage);
   const gilPerVoyage = loot.reduce((sum, l) => sum + l.gil, 0);
 

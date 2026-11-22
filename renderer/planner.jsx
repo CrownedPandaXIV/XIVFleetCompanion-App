@@ -2,6 +2,13 @@
 // it can bring back, and its gil, experience and repair cost a day (ipc/calculator.js, subs/calculator.js).
 
 const PLANNER_SLOTS = ['Hull', 'Stern', 'Bow', 'Bridge'];
+// How often an item comes, as a chance per voyage in words.
+function plannerOften(chance) {
+  if (!(chance > 0)) return '—';
+  if (chance >= 0.95) return 'nearly every voyage';
+  if (chance >= 0.45) return `about ${Math.round(chance * 10)} in 10 voyages`;
+  return `about 1 in ${Math.round(1 / chance).toLocaleString()} voyages`;
+}
 const PLANNER_SCOPES = { world: 'World', dc: 'Data center', region: 'Region' };
 const PLANNER_STATS = [['surveillance', 'Surveillance'], ['retrieval', 'Retrieval'], ['speed', 'Speed'], ['range', 'Range'], ['favor', 'Favor']];
 const plannerN = (v, digits = 0) => (v === null || v === undefined ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits }));
@@ -53,10 +60,16 @@ const PLANNER_LOOT_DEFS = [
   { key: 'tier', label: 'Tier', cell: (l) => `T${l.tier}`, sort: (l) => l.tier },
   { key: 'sectors', label: 'Sectors', cell: (l) => l.sectors.join(', ') || '—', sort: (l) => l.sectors.join(',') || null },
   { key: 'amount', label: 'Amount each time', td: (l) => <td className="num">{l.low === l.high ? l.low : `${l.low}–${l.high}`}</td>, sort: (l) => l.high },
+  // How often it comes at all, in words ("about 1 in 15 voyages"): a rare item's gil per voyage is an average.
+  { key: 'often', label: 'How often', td: (l) => <td className={l.perVoyage > 0 ? '' : 'dim'} title={l.perVoyage > 0 ? `${plannerN(l.chance * 100, 1)}% of voyages` : ''}>
+    {l.perVoyage > 0 ? plannerOften(l.chance) : '—'}</td>, sort: (l) => l.chance },
   { key: 'perVoyage', label: 'Per voyage', td: (l) => <td className="num">{l.perVoyage > 0 ? plannerN(l.perVoyage, 2) : '—'}</td>, sort: (l) => l.perVoyage },
-  // Amber where the market price was adjusted (a lone low listing skipped, or recent sales used): the hover says why.
-  { key: 'gil', label: 'Gil per voyage', td: (l) => <td className={`num gil${l.note ? ' tone-warn' : ''}`} title={l.note || (l.price ? `${plannerN(l.price)} gil each` : '')}>
-    {l.gil > 0 ? plannerN(l.gil) : '—'}</td>, sort: (l) => l.gil },
+  // One of it at the price used (market or vendor): something to aim for. Amber where the market price was adjusted
+  // (a lone low listing skipped, or recent sales used): the hover says why.
+  { key: 'price', label: 'Price each', td: (l) => <td className={`num gil${l.note ? ' tone-warn' : ''}`} title={l.note || ''}>{l.price > 0 ? plannerN(l.price) : '—'}</td>,
+    sort: (l) => l.price },
+  { key: 'gil', label: 'Gil per voyage', td: (l) => <td className="num gil" title="On average: how many a voyage × the price each">{l.gil > 0 ? plannerN(l.gil) : '—'}</td>,
+    sort: (l) => l.gil },
 ];
 
 // Where a sub is: out until a time (the day too when it isn't today), back waiting to be collected, or in port.

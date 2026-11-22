@@ -43,6 +43,13 @@ module.exports = async (t) => {
   const loot = await ev(`[...document.querySelectorAll('.planner table')][1].querySelectorAll('tbody tr').length`);
   check(loot > 0 && /Gil per voyage/.test(text) && /kits a day/.test(text), `the loot it can bring back, gil and repairs are shown (${loot} items)`);
   check(/Loot and breakpoints: XIVStats/.test(text), 'where the data comes from is said');
+  // (The made-up items have no vendor price, so Price each shows "—" here.)
+  const loot2 = await ev(`(() => { const t = [...document.querySelectorAll('.planner table')][1];
+    const heads = [...t.querySelectorAll('thead th')].map((th) => th.textContent.replace(/[▲▼]/g, '').trim().toLowerCase());
+    const col = (name) => [...t.querySelectorAll('tbody tr')].map((tr) => tr.children[heads.indexOf(name)].innerText.trim());
+    return { heads, often: col('how often'), price: col('price each') }; })()`);
+  check(loot2.often.some((x) => /^(about \d[\d,]* in [\d,]+ voyages|nearly every voyage)$/.test(x)) && loot2.heads.includes('price each') && loot2.price.every((x) => /^(\d[\d,]*|—)$/.test(x)),
+    `the loot says how often each item comes and its price each (${loot2.often.slice(0, 3).join(' | ')}; ${loot2.price.slice(0, 3).join(' | ')})`);
 
   // Removing a sector updates everything.
   await ev(`document.querySelector('.planner-chip button').click()`);

@@ -73,6 +73,8 @@ test('a whole plan: range, ceruleum, gil, wear and repair cost', () => {
   assert.strictEqual(p.exp, 3000);
   assert.deepStrictEqual(p.missingData.map((s) => s.letter), ['B']);
   assert.ok(Math.abs(p.gilPerVoyage - (0.375 * 4 * 100 + 0.125 * 20 * 10)) < 1e-9);
+  // Item 1 comes on 37.5% of voyages (only sector A has data): about 1 in 3.
+  assert.ok(Math.abs(p.loot.find((l) => l.itemId === 1).chance - 0.375) < 1e-9);
   // Each part: (335 + 90 - 80) × 7 + (335 + 100 - 80) × 7 = 2415 + 2485 = 4900 a voyage; lasts 6 voyages.
   assert.deepStrictEqual(p.wear.map((w) => [w.lost, w.voyagesLasting]), [[4900, 6], [4900, 6], [4900, 6], [4900, 6]]);
   assert.ok(Math.abs(p.kitsPerVoyage - 4 * 3 * 4900 / 30000) < 1e-9);
