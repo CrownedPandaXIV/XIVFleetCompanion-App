@@ -83,11 +83,23 @@ module.exports = async (t) => {
   await ev(`document.querySelector('.planner-picker-sub').click()`);
   await waitFor(`!!document.querySelector('.planner-prices') && /market prices/.test(document.body.innerText)`, 'market prices on the Planner', 20000);
   const prices = await ev(`document.querySelector('.planner-prices').innerText.replace(/\\s+/g, ' ')`);
-  check(/Market prices on the World Data center Region of/.test(prices) && /world\)/.test(prices), `the Planner prices on the chosen sub's world (${prices})`);
+  const options = () => ev(`[...document.querySelector('.planner-place').options].map((o) => o.text)`);
+  check(/Market prices on the World Data center Region/.test(prices), `the Planner's price switch (${prices})`);
   check(await ev(`document.querySelector('.planner-scope button.active').innerText`) === 'Data center', 'data center by default');
+  const dcs = await options();
+  check(dcs[0] === "Dynamis (Sub1's data center)" && dcs.includes('Primal'), `every data center to choose from, the sub's own first: ${JSON.stringify(dcs)}`);
+  await ev(`[...document.querySelectorAll('.planner-scope button')].find((b) => b.innerText === 'World').click()`);
+  await waitFor(`document.querySelector('.planner-place').options[0].text.includes("world")`, 'the worlds', 10000);
+  const worlds = await options();
+  check(worlds[0] === "Maduin (Sub1's world)" && worlds.includes('Behemoth (Primal)'), `every world to choose from, the sub's own first: ${JSON.stringify(worlds)}`);
+  // Loot moved to a character on another world can be sold there: pick it.
+  await ev(`(() => { const s = document.querySelector('.planner-place'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'Behemoth');
+    s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  await waitFor(`/market prices \\(World: Behemoth\\)/.test(document.body.innerText)`, 'priced on Behemoth', 20000);
+  check(asked.some((u) => u.startsWith('/api/v2/Behemoth/')), 'another world picked: priced on that world');
   await ev(`[...document.querySelectorAll('.planner-scope button')].find((b) => b.innerText === 'Region').click()`);
-  await waitFor(`/market prices \\(Region/.test(document.body.innerText)`, 'priced on the region', 20000);
-  check(true, 'the Region switch prices the loot on the region');
+  await waitFor(`/market prices \\(Region: NA\\)/.test(document.body.innerText)`, 'priced on the region', 20000);
+  check((await options())[0] === "NA (Sub1's region)", 'the Region switch lists the regions, the sub\'s own first');
   await shot('planner-live');
 
   // Turned off again: nothing more is asked.
@@ -108,8 +120,8 @@ module.exports.setup = () => new Promise((resolve) => {
   server = http.createServer((req, res) => {
     asked.push(req.url);
     const send = (body) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
-    if (req.url.startsWith('/api/v2/data-centers')) return send([{ name: 'Dynamis', region: 'North-America', worlds: [1] }]);
-    if (req.url.startsWith('/api/v2/worlds')) return send([{ id: 1, name: 'Maduin' }]);
+    if (req.url.startsWith('/api/v2/data-centers')) return send([{ name: 'Dynamis', region: 'North-America', worlds: [1] }, { name: 'Primal', region: 'North-America', worlds: [2] }]);
+    if (req.url.startsWith('/api/v2/worlds')) return send([{ id: 1, name: 'Maduin' }, { id: 2, name: 'Behemoth' }]);
     const m = /^\/api\/v2\/([^/]+)\/([\d,]+)/.exec(req.url);
     if (!m) { res.writeHead(404); return res.end(); }
     const scope = scopeOf[decodeURIComponent(m[1]).toLowerCase()];

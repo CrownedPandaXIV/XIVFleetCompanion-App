@@ -13,7 +13,7 @@ const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
 const { liveUniversalis, universalisEnabled } = require('./universalis');
-const { scopePrices, ownRetainerKeys } = require('../characters/universalis');
+const { scopePrices, ownRetainerKeys, REGION_LABELS } = require('../characters/universalis');
 
 const quote = (name) => `"${name.replace(/"/g, '""')}"`;
 // Part letters in the order the page offers them, and their class numbers (as submarine-builds.js).
@@ -110,17 +110,31 @@ async function loadCalculator(client) {
     // Live Market Prices (Settings): whether the loot is priced from Universalis, and the worlds to price it on, the
     // one most of the player's subs are on first.
     live: cache.live,
+    markets: cache.live ? await marketPlaces(client).catch(() => null) : null,
     worlds: [...subs.reduce((m, s) => (s.world ? m.set(s.world, (m.get(s.world) || 0) + 1) : m), new Map()).entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w]) => w),
   };
 }
 
-// Market prices for the Planner's loot on one world's world, data center or region (characters/universalis.js:
-// the market price, a lone low listing skipped and checked against the last week's sales), kept a few minutes.
-// { prices: Map itemId -> gil (vendor for the rest), notes: Map itemId -> note, place, stale } or { error }.
+// Every world, data center and region Universalis knows, for the Planner's "Market prices on" (loot from a voyage can
+// be moved to a character elsewhere and sold there): { world: [{ name, dc, region }], dc: [{ name, region }],
+// region: [{ name, label }] }, each in name order.
+async function marketPlaces(client) {
+  const universalis = await liveUniversalis(client);
+  if (!universalis) return null;
+  const places = [...(await universalis.placesOf()).values()];
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const dcs = new Map(places.map((p) => [p.dc, { name: p.dc, region: p.region }]));
+  const regions = new Map(places.map((p) => [p.region, { name: p.region, label: REGION_LABELS[p.region] || p.region }]));
+  return { world: places.map((p) => ({ name: p.name, dc: p.dc, region: p.region })).sort(byName), dc: [...dcs.values()].sort(byName), region: [...regions.values()].sort(byName) };
+}
+
+// Market prices for the Planner's loot on one world, data center or region (place: its name; characters/universalis.js
+// marketPrice: a lone low listing skipped and checked against the last week's sales), kept a few minutes.
+// { prices: Map itemId -> gil (vendor for the rest), notes: Map itemId -> note, place, stale }.
 const MARKET_KEEP_MS = 5 * 60 * 1000;
-async function plannerMarket(client, world, scope, ids) {
-  const key = `${world}|${scope}`;
+async function plannerMarket(client, place, scope, ids) {
+  const key = `${scope}|${place}`;
   const was = cache.market && cache.market.get(key);
   if (was && Date.now() - was.at < MARKET_KEEP_MS && ids.every((id) => was.asked.has(id))) return was;
   const universalis = await liveUniversalis(client);
@@ -129,12 +143,12 @@ async function plannerMarket(client, world, scope, ids) {
   const own = ownRetainerKeys((await client.query(
     `SELECT r.name, c.world FROM companion_retainer_lookup r JOIN ${latestCharacter} c ON c.cid = r.owner_cid`)).rows);
   const asked = new Set([...(was ? was.asked : []), ...ids]);
-  const live = await universalis.marketFor([world], [...asked]);
-  const m = live.get(world);
+  const { listings, history, stale } = await universalis.listingsIn(place, [...asked]);
+  // One place's listings and sales in the shape scopePrices reads (a world's listings don't name the world).
+  const m = { names: { world: scope === 'world' ? place : undefined }, listings: { [scope]: listings }, history: { [scope]: history } };
   const notes = new Map();
   const prices = scopePrices(m, scope, cache.prices, own, { notes });
-  const place = m && m.names ? m.names[scope] : null;
-  const answer = { at: Date.now(), asked, prices, notes, place, stale: m ? m.stale : null };
+  const answer = { at: Date.now(), asked, prices, notes, place: scope === 'region' ? (REGION_LABELS[place] || place) : place, stale };
   if (!cache.market) cache.market = new Map();
   cache.market.set(key, answer);
   return answer;
@@ -168,17 +182,18 @@ function planFor({ rank, parts, route, bestOrder } = {}, market = null) {
   };
 }
 
-// A plan, priced on the market when Live Market Prices is on and a world is given ({ world, scope }), else at
+// A plan, priced on the market when Live Market Prices is on and a place is given ({ place, scope }: a world, data
+// center or region by name), else at
 // vendor prices. The answer's `pricing` says which, and why not when Universalis couldn't be asked.
 async function planPriced(client, request = {}) {
   const vendorPlan = planFor(request);
-  if (!vendorPlan.success || !vendorPlan.loot || !request.world || !cache.live) return { ...vendorPlan, pricing: { source: 'vendor' } };
+  if (!vendorPlan.success || !vendorPlan.loot || !request.place || !cache.live) return { ...vendorPlan, pricing: { source: 'vendor' } };
   const scope = ['world', 'dc', 'region'].includes(request.scope) ? request.scope : 'dc';
   try {
-    const market = await plannerMarket(client, request.world, scope, vendorPlan.loot.map((l) => l.itemId));
+    const market = await plannerMarket(client, request.place, scope, vendorPlan.loot.map((l) => l.itemId));
     if (!market) return { ...vendorPlan, pricing: { source: 'vendor' } };
     const plan = planFor(request, market);
-    return { ...plan, pricing: { source: 'market', world: request.world, scope, place: market.place, stale: market.stale,
+    return { ...plan, pricing: { source: 'market', scope, place: market.place, stale: market.stale,
       adjusted: plan.loot ? plan.loot.filter((l) => l.note).length : 0 } };
   } catch (err) {
     return { ...vendorPlan, pricing: { source: 'vendor', error: err.message } };

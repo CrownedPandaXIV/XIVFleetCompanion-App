@@ -311,13 +311,15 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     return result;
   }
 
-  // One world, data center or region (the Shopping List's "Prices from"): { listings: Map itemId -> listings,
-  // stale: { problem, since } | null }.
+  // One world, data center or region (the Shopping List's and the Planner's "Prices from"): { listings: Map itemId ->
+  // listings, history, stale: { problem, since } | null }.
+  // With history: Map itemId -> the last week's sales (for marketPrice).
   async function listingsIn(scope, ids) {
     const stale = {};
+    const history = new Map();
     const itemIds = [...new Set(ids.map(Number).filter((id) => id > 0))];
-    const listings = scope && itemIds.length ? await listingsFor(scope, itemIds, stale) : new Map();
-    return { listings, stale: stale.problem ? { problem: stale.problem, since: stale.since } : null };
+    const listings = scope && itemIds.length ? await listingsFor(scope, itemIds, stale, history) : new Map();
+    return { listings, history, stale: stale.problem ? { problem: stale.problem, since: stale.since } : null };
   }
 
   return { marketFor, placesOf, listingsIn };

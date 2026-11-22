@@ -155,6 +155,22 @@ function PlannerSubPicker({ subs, chosen, onChoose }) {
 
 // openSub: { cid, subName, at } from "Open in Planner" on the Subs or Route Optimization page; loaded once, then
 // onOpenSubUsed clears it.
+// The chosen sub's world, data center and region (else those of the world most of the player's subs are on):
+// { world, dc, region } names, from Universalis's list (base.markets); null when the world isn't known.
+function plannerHome(base, chosen) {
+  const world = (chosen && chosen.world) || (base.worlds || [])[0];
+  if (!world) return null;
+  const known = ((base.markets && base.markets.world) || []).find((w) => w.name.toLowerCase() === String(world).toLowerCase());
+  return known ? { world: known.name, dc: known.dc, region: known.region } : { world, dc: null, region: null };
+}
+
+// The world, data center or region the loot is priced on: the one picked for this scope, else the sub's own.
+function pricePlaceOf(base, chosen, scope, picked) {
+  if (picked[scope]) return picked[scope];
+  const home = plannerHome(base, chosen);
+  return home ? home[scope] : null;
+}
+
 function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   const [base, setBase] = useState(null);
   const [error, setError] = useState(null);
@@ -166,8 +182,10 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   const [plan, setPlan] = useState(null);
   const [chosen, setChosen] = useState(null);
   // Live Market Prices: the world to price on (the chosen sub's, else this one, else the most common) and the scope.
-  const [priceWorld, setPriceWorld] = useState(null);
+  // Where to price the loot: a scope, and a world, data center or region picked from all of them (loot can be moved
+  // to a character elsewhere and sold there). Not picked: the chosen sub's own (else the most common world's).
   const [priceScope, setPriceScope] = useState('dc');
+  const [pricePicked, setPricePicked] = useState({ world: null, dc: null, region: null });
 
   useEffect(() => {
     window.api.getSubCalculator().then((r) => {
@@ -181,10 +199,12 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   useEffect(() => {
     if (!base || base.missingGameData) return;
     let current = true;
-    const world = base.live ? ((chosen && chosen.world) || priceWorld || (base.worlds || [])[0] || null) : null;
-    window.api.planSubVoyage({ rank, parts, route, world, scope: priceScope }).then((r) => { if (current) setPlan(r.success ? r : { error: r.error }); });
+    const place = base.live ? pricePlaceOf(base, chosen, priceScope, pricePicked) : null;
+    window.api.planSubVoyage({ rank, parts, route, place, scope: priceScope }).then((r) => { if (current) setPlan(r.success ? r : { error: r.error }); });
     return () => { current = false; };
-  }, [base, rank, parts, route, chosen, priceWorld, priceScope]);
+  }, [base, rank, parts, route, chosen, pricePicked, priceScope]);
+  // Choosing another sub starts from its own world, data center and region again.
+  useEffect(() => { setPricePicked({ world: null, dc: null, region: null }); }, [chosen]);
 
   // The two tables, as every page's: resizable columns you can drag to move, click to sort, and the Columns menu.
   const reachSort = useColumnSort();
@@ -331,14 +351,21 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
                   <button key={k} className={priceScope === k ? 'active' : ''} onClick={() => setPriceScope(k)}>{label}</button>
                 ))}
               </span>
-              <span className="dim">of</span>
-              {chosen && chosen.world
-                ? <span>{chosen.world} <span className="dim">({chosen.subName}'s world)</span></span>
-                : (
-                  <select value={priceWorld || (base.worlds || [])[0] || ''} onChange={(e) => setPriceWorld(e.target.value)}>
-                    {(base.worlds || []).map((w) => <option key={w} value={w}>{w}</option>)}
+              {(() => {
+                const home = plannerHome(base, chosen);
+                const own = home ? home[priceScope] : null;
+                const options = (base.markets && base.markets[priceScope]) || [];
+                const value = pricePlaceOf(base, chosen, priceScope, pricePicked) || '';
+                const whose = chosen ? `${chosen.subName}'s` : 'your most common';
+                const label = (o) => (priceScope === 'region' ? o.label : o.name);
+                return (
+                  <select className="planner-place" value={value} onChange={(e) => setPricePicked({ ...pricePicked, [priceScope]: e.target.value })}>
+                    {own && <option value={own}>{priceScope === 'region' ? ((options.find((o) => o.name === own) || {}).label || own) : own} ({whose} {PLANNER_SCOPES[priceScope].toLowerCase()})</option>}
+                    {options.filter((o) => o.name !== own).map((o) => <option key={o.name} value={o.name}>{label(o)}{priceScope === 'world' ? ` (${o.dc})` : ''}</option>)}
+                    {!options.length && !own && <option value="">Universalis's list couldn't be read</option>}
                   </select>
-                )}
+                );
+              })()}
               {plan.pricing && plan.pricing.adjusted > 0 && (
                 <span className="tone-warn" title="A lone listing far below the others was skipped, or the last week's sales were used: hover a price for why.">
                   {plan.pricing.adjusted} price{plan.pricing.adjusted === 1 ? '' : 's'} adjusted for odd listings</span>
