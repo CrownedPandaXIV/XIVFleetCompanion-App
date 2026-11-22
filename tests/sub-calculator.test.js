@@ -19,6 +19,18 @@ test('best order: the one using the least range', () => {
   assert.deepStrictEqual(calc.bestOrder([b, a], start, 100).map((s) => s.letter), ['A', 'B']);
 });
 
+test("best order with the sub's range: the fastest order it can fly", () => {
+  // Each leg is rounded down on its own for range and for time, so the least range isn't always the fastest:
+  // C-B-A uses 71 range and takes 60,861 seconds at speed 210; B-C-A uses 72 and takes 60,821.
+  const sector = (letter, x, y) => ({ id: letter.charCodeAt(0), letter, x, y, z: 0, expReward: 1, surveyMinutes: 60, surveyDistance: 10 });
+  const three = [sector('A', 728, 706), sector('B', 419, 469), sector('C', 310, 599)];
+  const order = (range) => calc.bestOrder(three, start, 210, range).map((s) => s.letter).join('');
+  assert.strictEqual(order(undefined), 'CBA'); // no range given: the least range
+  assert.strictEqual(order(72), 'BCA'); // both fit: the faster
+  assert.strictEqual(order(71), 'CBA'); // only the shorter fits
+  assert.strictEqual(order(50), 'CBA'); // none fits: the least range
+});
+
 test('damage per sector, as SubmarineTracker predicts it', () => {
   assert.strictEqual(calc.sectorDamage(100, 50), (335 + 100 - 50) * 7);
   assert.strictEqual(calc.sectorDamage(1, 1000), 0);

@@ -337,7 +337,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
                 </span>
               );
             })}
-            {route.length > 1 && <button onClick={bestOrder} title="Put the sectors in the order that uses the least range">Best order</button>}
+            {route.length > 1 && <button onClick={bestOrder} title="Put the sectors in the fastest order this sub's range allows">Best order</button>}
           </div>
           {plan && plan.route && plan.route.length > 0 && stats && (
             <div className="planner-facts">

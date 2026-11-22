@@ -29,13 +29,18 @@ function permutations(list) {
 }
 
 // The order of these sectors that uses the least range (then the shortest voyage), as SubmarineTracker picks it.
-function bestOrder(sectors, start, speed) {
+function bestOrder(sectors, start, speed, range = null) {
   if (sectors.length <= 1) return sectors;
   let best = null;
   for (const order of permutations(sectors)) {
-    const range = rangeUsed(order, start);
+    const used = rangeUsed(order, start);
     const hours = (voyage(order, start, speed) || {}).hours || 0;
-    if (!best || range < best.range || (range === best.range && hours < best.hours)) best = { order, range, hours };
+    const fits = range !== null && range !== undefined && used <= range;
+    // With the sub's range: the fastest order it can fly (least range on a tie); none fits, or no range given: least range.
+    const better = !best || (fits !== best.fits ? fits
+      : fits ? hours < best.hours || (hours === best.hours && used < best.used)
+        : used < best.used || (used === best.used && hours < best.hours));
+    if (better) best = { order, used, hours, fits };
   }
   return best.order;
 }

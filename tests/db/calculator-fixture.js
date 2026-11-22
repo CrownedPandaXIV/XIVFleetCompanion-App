@@ -75,7 +75,7 @@ const r6 = (v) => (v === null || v === undefined ? null : Math.round(v * 1e6) / 
 const answers = cases.map((c) => {
   const stats = buildStats(c.rank, c.parts, rankStatsById, partStatsByClassSlot);
   let route = c.route.map((id) => game.sectors.get(id));
-  if (c.bestOrder && route.length > 1) route = calc.bestOrder(route, calc.startFor(route[0].id, game.startingPoints), stats.speed);
+  if (c.bestOrder && route.length > 1) route = calc.bestOrder(route, calc.startFor(route[0].id, game.startingPoints), stats.speed, stats.range);
   const p = calc.plan({ route: route.map((s) => s.id), stats, partClasses: c.parts.map((l) => CLASS_OF[l]), game, data, prices, repairKitCost });
   if (!p) throw new Error(`no plan for ${JSON.stringify(c)}`);
   return {

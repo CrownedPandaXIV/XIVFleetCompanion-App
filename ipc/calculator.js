@@ -163,7 +163,7 @@ function planFor({ rank, parts, route, bestOrder } = {}, market = null) {
   const stats = buildStats(Number(rank), parts, game.stats.rankStatsById, game.stats.partStatsByClassSlot);
   if (!stats) return { success: true, stats: null };
   let sectors = (route || []).map((id) => game.sectors.get(Number(id))).filter(Boolean).slice(0, 5);
-  if (bestOrder && sectors.length > 1) sectors = calc.bestOrder(sectors, calc.startFor(sectors[0].id, game.startingPoints), stats.speed);
+  if (bestOrder && sectors.length > 1) sectors = calc.bestOrder(sectors, calc.startFor(sectors[0].id, game.startingPoints), stats.speed, stats.range);
   const p = calc.plan({ route: sectors.map((s) => s.id), stats, partClasses: parts.map((l) => CLASS_OF[l]), game, data, prices, repairKitCost });
   if (!p) return { success: true, stats, route: [] };
   return {
