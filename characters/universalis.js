@@ -1,7 +1,7 @@
 // Live market prices from Universalis (universalis.app, the crowd-sourced market board site), when turned on
 // in Settings → General → Live Market Prices (tier3_settings 'universalis_enabled'; off by default). For each
-// item: the cheapest listing on a character's home world, on its data center and on its region (NA, EU, JP,
-// OCE). Used for the market value of loot and venture rewards (Income, Summary) and to spot listings that
+// item: its market price (marketPrice: the cheapest listing, skipping lone low listings and checked against the last
+// week's sales) on a character's home world, on its data center and on its region (NA, EU, JP, OCE). Used for the market value of loot and venture rewards (Income, Summary) and to spot listings that
 // someone else sells cheaper (Gil & Market). Only item numbers and world, data center and region names are
 // sent. Answers are kept for 30 minutes. No Electron or pg here, so it can be tested on its own
 // (tests/universalis.test.js); `fetchImpl` and the address can be swapped for tests.
@@ -15,6 +15,13 @@ const PARALLEL = 4; // requests at once
 // (with 20, a material needed in the thousands looked short when plenty more was for sale).
 const LISTINGS = 100;
 const KEEP_MS = 30 * 60 * 1000;
+// Recent sales asked for with the listings: up to this many, from the last week (the check on a low listing).
+const SALES = 100;
+const SALES_WITHIN_S = 7 * 24 * 60 * 60;
+const WEEK_MS = SALES_WITHIN_S * 1000;
+// A listing under this share of the typical price is an outlier: of the five cheapest listings' middle price
+// (step 2), then of the last week's middle sale price (step 3). A starting guess, easy to change.
+const OUTLIER_SHARE = 0.5;
 // How long one request may take, answer included, before it counts as no answer (the plugin's too).
 const TIMEOUT_MS = 20 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
@@ -44,6 +51,17 @@ function worldPlaces(dataCenters) {
     for (const world of dc.worlds) places.set(String(world).toLowerCase(), { name: String(world), dc: dc.name, region: dc.region });
   }
   return places;
+}
+
+// One answer's recent sales: Map itemId -> sales ([{ pricePerUnit, quantity, hq, timestamp (seconds), worldName }]).
+function parseHistory(json) {
+  const items = new Map();
+  if (!json || typeof json !== 'object') return items;
+  const list = json.items ? Object.values(json.items) : json.itemID !== undefined ? [json] : [];
+  for (const item of list) {
+    if (item && item.itemID !== undefined) items.set(Number(item.itemID), Array.isArray(item.recentHistory) ? item.recentHistory : []);
+  }
+  return items;
 }
 
 // One answer from /api/v2/{scope}/{ids}: Map itemId -> listings. Several ids answer { items: { id: {...} } };
@@ -91,8 +109,69 @@ function sellingListings(listings, { exclude, world } = {}) {
     .sort((a, b) => a.price - b.price);
 }
 
+const middle = (values) => {
+  if (!values.length) return null;
+  const v = [...values].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+};
+
+// The market price of an item, the same on every page (Planner, Income, Gil & Market):
+//   1. the cheapest listing someone else sells (not the player's own retainers; `hq` true or false for that
+//      quality only);
+//   2. skipping lone low listings: with three or more listings, any under half the middle price of the five
+//      cheapest is left out, and the cheapest of the rest is used;
+//   3. checked against recent sales: if that is still under half the middle price of the last week's sales (three
+//      or more of them), the sales' middle price is used instead. No listings at all: the sales' middle price.
+// { price, world, adjusted, skipped: [{ price, world }], salesMiddle, sales, note } or null when there is neither.
+// `note` says, in plain words, what was changed and why (for a hover).
+function marketPrice(listings, history, { hq, exclude, world, now = Date.now() } = {}) {
+  const selling = (listings || [])
+    .filter((l) => Number(l.pricePerUnit) > 0)
+    .filter((l) => hq === undefined || !!l.hq === !!hq)
+    .filter((l) => !(exclude && l.retainerName && exclude.has(retainerKey(l.retainerName, l.worldName || world))))
+    .map((l) => ({ price: Number(l.pricePerUnit), world: l.worldName || null }))
+    .sort((a, b) => a.price - b.price);
+  const sales = (history || [])
+    .filter((h) => Number(h.pricePerUnit) > 0 && (!h.timestamp || Number(h.timestamp) * 1000 >= now - WEEK_MS))
+    .filter((h) => hq === undefined || !!h.hq === !!hq)
+    .map((h) => Number(h.pricePerUnit));
+  const salesMiddle = sales.length >= 3 ? middle(sales) : null;
+  const gil = (n) => Math.round(n).toLocaleString('en-US');
+  if (!selling.length) {
+    if (salesMiddle === null) return null;
+    return { price: salesMiddle, world: null, adjusted: true, skipped: [], salesMiddle, sales: sales.length,
+      note: `No listings: using the middle price of the last week's ${sales.length} sales (${gil(salesMiddle)} gil).` };
+  }
+  let skipped = [];
+  let pick = selling[0];
+  if (selling.length >= 3) {
+    const typical = middle(selling.slice(0, 5).map((l) => l.price));
+    const at = selling.findIndex((l) => l.price >= typical * OUTLIER_SHARE);
+    if (at > 0) { skipped = selling.slice(0, at); pick = selling[at]; }
+  }
+  const notes = [];
+  if (skipped.length) {
+    notes.push(`Ignored ${skipped.length} listing${skipped.length === 1 ? '' : 's'} at ${skipped.map((l) => `${gil(l.price)} gil`).join(', ')} `
+      + `(well below the others, around ${gil(middle(selling.slice(0, 5).map((l) => l.price)))}).`);
+  }
+  let price = pick.price;
+  let usedWorld = pick.world;
+  if (salesMiddle !== null && price < salesMiddle * OUTLIER_SHARE) {
+    notes.push(`The cheapest listing (${gil(price)} gil) is well below the last week's ${sales.length} sales, around ${gil(salesMiddle)}.`);
+    price = salesMiddle;
+    usedWorld = null;
+  }
+  const adjusted = notes.length > 0;
+  return { price, world: usedWorld, adjusted, skipped, salesMiddle, sales: sales.length,
+    note: adjusted ? `${notes.join(' ')} Using ${gil(price)} gil.` : null };
+}
+
+// marketPrice for compareListings' `cheapest` (its options carry the sales as `history`).
+const rivalPrice = (listings, options = {}) => marketPrice(listings, options.history, options);
+
 function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now(), timeoutMs = TIMEOUT_MS } = {}) {
-  const cache = new Map(); // `${scope}|${id}` -> { at, listings }
+  const cache = new Map(); // `${scope}|${id}` -> { at, listings, history }
   let places = null;
 
   // `missingOk`: a 404 answers null. Universalis answers 404 when no item asked for is on the market board
@@ -153,32 +232,38 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
   // a time. When Universalis does not answer (busy, unreachable, a server error), items already asked for before
   // keep their last listings and `stale` (an object) gets the time they are from and why; an item never asked for
   // before makes it fail.
-  async function listingsFor(scope, ids, stale) {
+  // historyOut (a Map, optional) gets each item's recent sales.
+  async function listingsFor(scope, ids, stale, historyOut = new Map()) {
     const out = new Map();
     const missing = [];
     for (const id of ids) {
       const hit = cache.get(`${scope}|${id}`);
-      if (hit && now() - hit.at < KEEP_MS) out.set(id, hit.listings);
+      if (hit && now() - hit.at < KEEP_MS) { out.set(id, hit.listings); historyOut.set(id, hit.history || []); }
       else missing.push(id);
     }
     const batches = [];
     for (let i = 0; i < missing.length; i += BATCH) batches.push(missing.slice(i, i + BATCH));
     await Promise.all(batches.map(async (batch) => {
       let items;
+      let sold;
       try {
-        items = parseItems(await limited(() => getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=0`, { missingOk: true })));
+        const json = await limited(() => getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=${SALES}&entriesWithin=${SALES_WITHIN_S}`, { missingOk: true }));
+        items = parseItems(json);
+        sold = parseHistory(json);
       } catch (err) {
         const old = batch.map((id) => cache.get(`${scope}|${id}`));
         if (old.some((o) => !o)) throw err;
-        batch.forEach((id, k) => out.set(id, old[k].listings));
+        batch.forEach((id, k) => { out.set(id, old[k].listings); historyOut.set(id, old[k].history || []); });
         stale.problem = err.message;
         stale.since = Math.min(stale.since || Infinity, ...old.map((o) => o.at));
         return;
       }
       for (const id of batch) {
         const listings = items.get(id) || [];
-        cache.set(`${scope}|${id}`, { at: now(), listings });
+        const history = sold.get(id) || [];
+        cache.set(`${scope}|${id}`, { at: now(), listings, history });
         out.set(id, listings);
+        historyOut.set(id, history);
       }
     }));
     // In the order asked, whichever batch answered first.
@@ -198,16 +283,19 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     const names = [...new Set([...scopesOf.values()].flatMap((scopes) => SCOPES.map((s) => scopes[s]).filter(Boolean)))];
     const answers = new Map(await Promise.all(names.map(async (name) => {
       const stale = {};
-      const listings = itemIds.length ? await listingsFor(name, itemIds, stale) : new Map();
-      return [name, { listings, stale }];
+      const history = new Map();
+      const listings = itemIds.length ? await listingsFor(name, itemIds, stale, history) : new Map();
+      return [name, { listings, history, stale }];
     })));
     const result = new Map();
     for (const [world, scopes] of scopesOf) {
       const byScope = {};
+      const historyByScope = {};
       const stale = {};
       for (const s of SCOPES) {
         const answer = scopes[s] ? answers.get(scopes[s]) : null;
         byScope[s] = answer ? answer.listings : new Map();
+        historyByScope[s] = answer ? answer.history : new Map();
         if (answer && answer.stale.problem) {
           stale.problem = answer.stale.problem;
           stale.since = Math.min(stale.since || Infinity, answer.stale.since);
@@ -216,6 +304,7 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
       result.set(world, {
         names: { world, dc: scopes.dc, region: scopes.region ? (REGION_LABELS[scopes.region] || scopes.region) : null },
         listings: byScope,
+        history: historyByScope,
         stale: stale.problem ? { problem: stale.problem, since: stale.since } : null,
       });
     }
@@ -234,18 +323,24 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
   return { marketFor, placesOf, listingsIn };
 }
 
-// Gil for each item at the cheapest listing in one scope, falling back to `vendor` (Map) for items not on the
-// market board (salvage, for one). `exclude`: the player's own retainers (ownRetainerKeys), whose listings are
-// not the market. `hq`: prices for HQ items: the cheapest HQ listing, else the cheapest of either quality.
-function scopePrices(market, scope, vendor, exclude, { hq = false } = {}) {
+// Gil for each item at its market price in one scope (marketPrice), falling back to `vendor` (Map) for items
+// neither listed nor sold (salvage, for one). `exclude`: the player's own retainers (ownRetainerKeys), whose
+// listings are not the market. `hq`: prices for HQ items: the HQ market price, else that of either quality.
+// `notes` (a Map, optional) gets itemId -> note for each price the outlier checks changed.
+function scopePrices(market, scope, vendor, exclude, { hq = false, notes = null, now = Date.now() } = {}) {
   const prices = new Map(vendor);
   if (!market) return prices;
   for (const [id, listings] of market.listings[scope]) {
     const world = scope === 'world' && market.names ? market.names.world : undefined;
-    const best = (hq && cheapestListing(listings, { exclude, world, hq: true })) || cheapestListing(listings, { exclude, world });
-    if (best) prices.set(id, best.price);
+    const history = market.history && market.history[scope] ? market.history[scope].get(id) || [] : [];
+    const best = (hq && marketPrice(listings, history, { exclude, world, hq: true, now })) || marketPrice(listings, history, { exclude, world, now });
+    if (best) {
+      prices.set(id, best.price);
+      if (notes && best.adjusted) notes.set(id, best.note);
+    }
   }
   return prices;
 }
 
-module.exports = { SETTING_KEY, SCOPES, REGION_LABELS, KNOWN_DATA_CENTERS, worldPlaces, parseItems, ownRetainerKeys, cheapestListing, sellingListings, createUniversalis, scopePrices };
+module.exports = { SETTING_KEY, SCOPES, REGION_LABELS, KNOWN_DATA_CENTERS, OUTLIER_SHARE, worldPlaces, parseItems, parseHistory, ownRetainerKeys, cheapestListing,
+  sellingListings, marketPrice, rivalPrice, createUniversalis, scopePrices };

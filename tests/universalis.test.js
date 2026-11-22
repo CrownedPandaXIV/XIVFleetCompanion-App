@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { parseItems, ownRetainerKeys, cheapestListing, createUniversalis, scopePrices, KNOWN_DATA_CENTERS, worldPlaces } = require('../characters/universalis');
+const { parseItems, parseHistory, ownRetainerKeys, cheapestListing, marketPrice, createUniversalis, scopePrices, KNOWN_DATA_CENTERS, worldPlaces } = require('../characters/universalis');
 const { compareListings } = require('../characters/market');
 const { marketLoot, voyagesFrom } = require('../subs/loot');
 
@@ -67,7 +67,7 @@ test('prices for a world, its data center and its region, asked once and kept fo
   assert.strictEqual(cheapestListing(maduin.listings.world.get(5111)).price, 30);
   assert.deepStrictEqual(cheapestListing(maduin.listings.dc.get(5111)), { price: 20, world: 'Golem' });
   assert.deepStrictEqual(cheapestListing(maduin.listings.region.get(5111)), { price: 10, world: 'Siren' });
-  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=100&entries=0')), calls.join(' '));
+  assert.ok(calls.some((c) => c.includes('/api/v2/Maduin/5111,4?listings=100&entries=100&entriesWithin=604800')), calls.join(' '));
   const asked = calls.length;
   await u.marketFor(['Maduin'], [5111]);
   assert.strictEqual(calls.length, asked, 'kept: not asked again');
@@ -232,4 +232,48 @@ test('each world, data center and region asked once, a few requests at a time (n
   assert.ok(most > 1 && most <= 4, `${most} at once`);
   assert.strictEqual(m.get('Halicarnassus').names.dc, 'Dynamis');
   assert.deepStrictEqual([...m.keys()], ['Maduin', 'Halicarnassus', 'Zalera']);
+});
+
+// The market price (marketPrice): lone low listings skipped, then checked against the last week's sales.
+test('market price: the cheapest listing when nothing is odd', () => {
+  const p = marketPrice([listing(1000), listing(1100), listing(1050)], []);
+  assert.deepStrictEqual([p.price, p.adjusted, p.note], [1000, false, null]);
+});
+
+test('market price: a lone low listing is skipped (under half the middle of the five cheapest)', () => {
+  // Five cheapest: 120, 1400, 1450, 1500, 1600: middle 1450, half 725. 120 is skipped; 1400 is used.
+  const p = marketPrice([listing(1500), listing(120, { worldName: 'Golem' }), listing(1400, { worldName: 'Siren' }), listing(1600), listing(1450), listing(9000)], []);
+  assert.deepStrictEqual([p.price, p.world, p.adjusted, p.skipped.map((l) => l.price)], [1400, 'Siren', true, [120]]);
+  assert.match(p.note, /Ignored 1 listing at 120 gil \(well below the others, around 1,450\)\. Using 1,400 gil\./);
+  // Two low ones: 100 and 200 of 100, 200, 1000, 1100, 1200 (middle 1000, half 500): both skipped.
+  assert.deepStrictEqual(marketPrice([listing(100), listing(200), listing(1000), listing(1100), listing(1200)], []).skipped.map((l) => l.price), [100, 200]);
+  // Fewer than three listings: nothing to compare with, the cheapest stands.
+  assert.strictEqual(marketPrice([listing(100), listing(1000)], []).price, 100);
+});
+
+test("market price: checked against the last week's sales", () => {
+  const now = 1_800_000_000_000;
+  const sale = (price, daysAgo = 1) => ({ pricePerUnit: price, quantity: 1, hq: false, timestamp: Math.floor((now - daysAgo * 86_400_000) / 1000) });
+  // Every listing low (no lone outlier), but sales around 1,000: the sales' middle price is used.
+  const low = marketPrice([listing(300), listing(320), listing(350)], [sale(900), sale(1000), sale(1100), sale(50, 10)], { now });
+  assert.deepStrictEqual([low.price, low.adjusted, low.sales], [1000, true, 3]);
+  assert.match(low.note, /well below the last week's 3 sales, around 1,000\. Using 1,000 gil\./);
+  // Listings in line with sales: unchanged; fewer than three sales: no check.
+  assert.strictEqual(marketPrice([listing(800)], [sale(900), sale(1000), sale(1100)], { now }).price, 800);
+  assert.strictEqual(marketPrice([listing(300)], [sale(1000), sale(1100)], { now }).price, 300);
+  // No listings: the sales' middle price; neither: nothing.
+  assert.strictEqual(marketPrice([], [sale(900), sale(1000), sale(1100)], { now }).price, 1000);
+  assert.strictEqual(marketPrice([], [], { now }), null);
+  // The player's own retainers are left out, as before.
+  assert.strictEqual(marketPrice([listing(10, { retainerName: 'Mine', worldName: 'Maduin' }), listing(500)], [], { exclude: ownRetainerKeys([{ name: 'Mine', world: 'Maduin' }]) }).price, 500);
+});
+
+test('recent sales come with the listings, and scopePrices notes a price it changed', () => {
+  const json = { items: { 5: { itemID: 5, listings: [listing(10), listing(1000), listing(1100)], recentHistory: [{ pricePerUnit: 1000 }] } } };
+  assert.strictEqual(parseHistory(json).get(5).length, 1);
+  const market = { names: { world: 'Maduin' }, listings: { dc: parseItems(json) }, history: { dc: parseHistory(json) } };
+  const notes = new Map();
+  const prices = scopePrices(market, 'dc', new Map(), null, { notes });
+  assert.strictEqual(prices.get(5), 1000);
+  assert.match(notes.get(5), /Ignored 1 listing at 10 gil/);
 });

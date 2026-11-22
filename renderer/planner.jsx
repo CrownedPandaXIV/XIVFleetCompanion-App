@@ -2,6 +2,7 @@
 // it can bring back, and its gil, experience and repair cost a day (ipc/calculator.js, subs/calculator.js).
 
 const PLANNER_SLOTS = ['Hull', 'Stern', 'Bow', 'Bridge'];
+const PLANNER_SCOPES = { world: 'World', dc: 'Data center', region: 'Region' };
 const PLANNER_STATS = [['surveillance', 'Surveillance'], ['retrieval', 'Retrieval'], ['speed', 'Speed'], ['range', 'Range'], ['favor', 'Favor']];
 const plannerN = (v, digits = 0) => (v === null || v === undefined ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits }));
 const plannerHours = (h) => `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m`;
@@ -53,7 +54,9 @@ const PLANNER_LOOT_DEFS = [
   { key: 'sectors', label: 'Sectors', cell: (l) => l.sectors.join(', ') || '—', sort: (l) => l.sectors.join(',') || null },
   { key: 'amount', label: 'Amount each time', td: (l) => <td className="num">{l.low === l.high ? l.low : `${l.low}–${l.high}`}</td>, sort: (l) => l.high },
   { key: 'perVoyage', label: 'Per voyage', td: (l) => <td className="num">{l.perVoyage > 0 ? plannerN(l.perVoyage, 2) : '—'}</td>, sort: (l) => l.perVoyage },
-  { key: 'gil', label: 'Gil per voyage', td: (l) => <td className="num gil">{l.gil > 0 ? plannerN(l.gil) : '—'}</td>, sort: (l) => l.gil },
+  // Amber where the market price was adjusted (a lone low listing skipped, or recent sales used): the hover says why.
+  { key: 'gil', label: 'Gil per voyage', td: (l) => <td className={`num gil${l.note ? ' tone-warn' : ''}`} title={l.note || (l.price ? `${plannerN(l.price)} gil each` : '')}>
+    {l.gil > 0 ? plannerN(l.gil) : '—'}</td>, sort: (l) => l.gil },
 ];
 
 // Where a sub is: out until a time (the day too when it isn't today), back waiting to be collected, or in port.
@@ -162,6 +165,9 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   const [adding, setAdding] = useState('');
   const [plan, setPlan] = useState(null);
   const [chosen, setChosen] = useState(null);
+  // Live Market Prices: the world to price on (the chosen sub's, else this one, else the most common) and the scope.
+  const [priceWorld, setPriceWorld] = useState(null);
+  const [priceScope, setPriceScope] = useState('dc');
 
   useEffect(() => {
     window.api.getSubCalculator().then((r) => {
@@ -175,9 +181,10 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
   useEffect(() => {
     if (!base || base.missingGameData) return;
     let current = true;
-    window.api.planSubVoyage({ rank, parts, route }).then((r) => { if (current) setPlan(r.success ? r : { error: r.error }); });
+    const world = base.live ? ((chosen && chosen.world) || priceWorld || (base.worlds || [])[0] || null) : null;
+    window.api.planSubVoyage({ rank, parts, route, world, scope: priceScope }).then((r) => { if (current) setPlan(r.success ? r : { error: r.error }); });
     return () => { current = false; };
-  }, [base, rank, parts, route]);
+  }, [base, rank, parts, route, chosen, priceWorld, priceScope]);
 
   // The two tables, as every page's: resizable columns you can drag to move, click to sort, and the Columns menu.
   const reachSort = useColumnSort();
@@ -316,11 +323,37 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
 
       {plan && plan.sectors && plan.sectors.length > 0 && (
         <React.Fragment>
+          {base.live && (
+            <div className="controls planner-prices">
+              <span className="dim">Market prices on the</span>
+              <span className="planner-scope">
+                {Object.entries(PLANNER_SCOPES).map(([k, label]) => (
+                  <button key={k} className={priceScope === k ? 'active' : ''} onClick={() => setPriceScope(k)}>{label}</button>
+                ))}
+              </span>
+              <span className="dim">of</span>
+              {chosen && chosen.world
+                ? <span>{chosen.world} <span className="dim">({chosen.subName}'s world)</span></span>
+                : (
+                  <select value={priceWorld || (base.worlds || [])[0] || ''} onChange={(e) => setPriceWorld(e.target.value)}>
+                    {(base.worlds || []).map((w) => <option key={w} value={w}>{w}</option>)}
+                  </select>
+                )}
+              {plan.pricing && plan.pricing.adjusted > 0 && (
+                <span className="tone-warn" title="A lone listing far below the others was skipped, or the last week's sales were used: hover a price for why.">
+                  {plan.pricing.adjusted} price{plan.pricing.adjusted === 1 ? '' : 's'} adjusted for odd listings</span>
+              )}
+              {plan.pricing && plan.pricing.error && <span className="tone-warn">Universalis: {plan.pricing.error} Vendor prices are shown.</span>}
+              {plan.pricing && plan.pricing.stale && <span className="tone-warn">Some prices are from earlier: {plan.pricing.stale.problem}</span>}
+            </div>
+          )}
           <div className="supplies-summary planner-summary">
             <div className="account-group supply-card">
               <div className="supply-card-label">Gil per voyage</div>
               <div className="supply-card-value gil">{plannerN(plan.gilPerVoyage)}</div>
-              <div className="supply-card-note">expected, at vendor prices (salvage at the Salvage page's)</div>
+              <div className="supply-card-note">{plan.pricing && plan.pricing.source === 'market'
+                ? `expected, at market prices (${PLANNER_SCOPES[plan.pricing.scope]}${plan.pricing.place ? `: ${plan.pricing.place}` : ''})`
+                : 'expected, at vendor prices (salvage at the Salvage page\'s)'}</div>
             </div>
             <div className="account-group supply-card">
               <div className="supply-card-label">Gil per day</div>

@@ -64,14 +64,16 @@ function listingAges(listings, minDays, now = Date.now()) {
 // With live prices (universalis.js): for each listing, the cheapest someone else sells the same item and
 // quality for on the listing's world, its data center and its region, and whether it is undercut (someone
 // sells it cheaper on its own world, where it sells). listings: [{ item_id, hq, unit_price, world, ... }];
-// market: Map world -> marketFor()'s answer; cheapest(listings, { hq, exclude, world }) from universalis.js;
+// market: Map world -> marketFor()'s answer; cheapest(listings, { hq, exclude, world, history }): the market price
+// (universalis.js marketPrice, so a lone low listing doesn't count as undercutting; its note says what was skipped);
 // exclude: the player's own retainers (universalis.js ownRetainerKeys: their own listings are not competition).
 function compareListings(listings, { market, cheapest, exclude }) {
   return listings.map((l) => {
     const m = market.get(l.world);
     const others = {};
     for (const scope of ['world', 'dc', 'region']) {
-      const found = m ? cheapest(m.listings[scope].get(Number(l.item_id)) || [], { hq: !!l.hq, exclude, world: scope === 'world' ? l.world : undefined }) : null;
+      const history = m && m.history && m.history[scope] ? m.history[scope].get(Number(l.item_id)) || [] : [];
+      const found = m ? cheapest(m.listings[scope].get(Number(l.item_id)) || [], { hq: !!l.hq, exclude, world: scope === 'world' ? l.world : undefined, history }) : null;
       others[scope] = found;
     }
     const price = Number(l.unit_price);

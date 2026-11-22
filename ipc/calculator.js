@@ -12,6 +12,8 @@ const finder = require('../subs/build-finder');
 const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
+const { liveUniversalis, universalisEnabled } = require('./universalis');
+const { scopePrices, ownRetainerKeys } = require('../characters/universalis');
 
 const quote = (name) => `"${name.replace(/"/g, '""')}"`;
 // Part letters in the order the page offers them, and their class numbers (as submarine-builds.js).
@@ -35,7 +37,8 @@ async function loadGame(client) {
   const sectors = new Map();
   const startingPoints = [];
   for (const r of rows) {
-    const s = { id: Number(r.id), letter: r.letter || '', name: r.name || '', map: Number(r.map) || 0, rankReq: Number(r.rankReq) || 0,
+    // The game's names end in the sector's letter ("South Isle of Zozonan (A)"): left off, as the letter is shown beside it.
+    const s = { id: Number(r.id), letter: r.letter || '', name: String(r.name || '').replace(new RegExp(`\\s*\\(${String(r.letter || '').replace(/[^A-Za-z]/g, '')}\\)$`), '').trim(), map: Number(r.map) || 0, rankReq: Number(r.rankReq) || 0,
       x: Number(r.x) || 0, y: Number(r.y) || 0, z: Number(r.z) || 0, expReward: Number(r.expReward) || 0,
       surveyMinutes: Number(r.surveyMinutes) || 0, surveyDistance: Number(r.surveyDistance) || 0, tanks: Number(r.tanks) || 0 };
     if (String(r.starting).toLowerCase() === 'true') startingPoints.push(s);
@@ -62,7 +65,7 @@ async function loadCalculator(client) {
   const data = calculatorData.load();
   const itemIds = [...new Set(data.sectors.flatMap((s) => Object.values(s.pools).flatMap((p) => p.loot.map((l) => l[0]))))];
   const [names, prices, repairKitCost] = await Promise.all([itemNames(client, itemIds), itemPrices(client, itemIds), repairKitCostFrom(client)]);
-  cache = { game, data, names, prices, repairKitCost };
+  cache = { game, data, names, prices, repairKitCost, live: await universalisEnabled(client).catch(() => false), market: new Map() };
 
   // The player's subs for the sub picker: who has them (account, character, world, Free Company), their build,
   // route and whether they are out (return_time), in the roster's order.
@@ -104,13 +107,45 @@ async function loadCalculator(client) {
     subs,
     repairKitCost,
     about: data.about,
+    // Live Market Prices (Settings): whether the loot is priced from Universalis, and the worlds to price it on, the
+    // one most of the player's subs are on first.
+    live: cache.live,
+    worlds: [...subs.reduce((m, s) => (s.world ? m.set(s.world, (m.get(s.world) || 0) + 1) : m), new Map()).entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w]) => w),
   };
 }
 
-// One plan: { rank, parts: [hull, stern, bow, bridge letters], route: [sector ids], bestOrder }.
-function planFor({ rank, parts, route, bestOrder } = {}) {
+// Market prices for the Planner's loot on one world's world, data center or region (characters/universalis.js:
+// the market price, a lone low listing skipped and checked against the last week's sales), kept a few minutes.
+// { prices: Map itemId -> gil (vendor for the rest), notes: Map itemId -> note, place, stale } or { error }.
+const MARKET_KEEP_MS = 5 * 60 * 1000;
+async function plannerMarket(client, world, scope, ids) {
+  const key = `${world}|${scope}`;
+  const was = cache.market && cache.market.get(key);
+  if (was && Date.now() - was.at < MARKET_KEEP_MS && ids.every((id) => was.asked.has(id))) return was;
+  const universalis = await liveUniversalis(client);
+  if (!universalis) return null;
+  const { latestCharacter } = await snapshotFragments(client);
+  const own = ownRetainerKeys((await client.query(
+    `SELECT r.name, c.world FROM companion_retainer_lookup r JOIN ${latestCharacter} c ON c.cid = r.owner_cid`)).rows);
+  const asked = new Set([...(was ? was.asked : []), ...ids]);
+  const live = await universalis.marketFor([world], [...asked]);
+  const m = live.get(world);
+  const notes = new Map();
+  const prices = scopePrices(m, scope, cache.prices, own, { notes });
+  const place = m && m.names ? m.names[scope] : null;
+  const answer = { at: Date.now(), asked, prices, notes, place, stale: m ? m.stale : null };
+  if (!cache.market) cache.market = new Map();
+  cache.market.set(key, answer);
+  return answer;
+}
+
+// One plan: { rank, parts: [hull, stern, bow, bridge letters], route: [sector ids], bestOrder }. market: from
+// plannerMarket (its prices and notes), or null for vendor prices.
+function planFor({ rank, parts, route, bestOrder } = {}, market = null) {
   if (!cache) return { success: false, error: 'The calculator is still loading.' };
-  const { game, data, names, prices, repairKitCost } = cache;
+  const { game, data, names, repairKitCost } = cache;
+  const prices = market && market.prices ? market.prices : cache.prices;
   const stats = buildStats(Number(rank), parts, game.stats.rankStatsById, game.stats.partStatsByClassSlot);
   if (!stats) return { success: true, stats: null };
   let sectors = (route || []).map((id) => game.sectors.get(Number(id))).filter(Boolean).slice(0, 5);
@@ -128,8 +163,26 @@ function planFor({ rank, parts, route, bestOrder } = {}) {
       result: x.result || null, bonus: x.bonus || null, exp: x.sector.expReward,
       breakpoints: x.data ? [0, 1, 2, 3, 4].map((i) => calc.breakpoint(x.data, i)) : null,
     })),
-    loot: p.loot.map((l) => ({ ...l, name: names.get(l.itemId) || `Item ${l.itemId}`, price: prices.get(l.itemId) || 0 })),
+    loot: p.loot.map((l) => ({ ...l, name: names.get(l.itemId) || `Item ${l.itemId}`, price: prices.get(l.itemId) || 0,
+      note: market && market.notes ? market.notes.get(l.itemId) || null : null })),
   };
+}
+
+// A plan, priced on the market when Live Market Prices is on and a world is given ({ world, scope }), else at
+// vendor prices. The answer's `pricing` says which, and why not when Universalis couldn't be asked.
+async function planPriced(client, request = {}) {
+  const vendorPlan = planFor(request);
+  if (!vendorPlan.success || !vendorPlan.loot || !request.world || !cache.live) return { ...vendorPlan, pricing: { source: 'vendor' } };
+  const scope = ['world', 'dc', 'region'].includes(request.scope) ? request.scope : 'dc';
+  try {
+    const market = await plannerMarket(client, request.world, scope, vendorPlan.loot.map((l) => l.itemId));
+    if (!market) return { ...vendorPlan, pricing: { source: 'vendor' } };
+    const plan = planFor(request, market);
+    return { ...plan, pricing: { source: 'market', world: request.world, scope, place: market.place, stale: market.stale,
+      adjusted: plan.loot ? plan.loot.filter((l) => l.note).length : 0 } };
+  } catch (err) {
+    return { ...vendorPlan, pricing: { source: 'vendor', error: err.message } };
+  }
 }
 
 // A part class's letter (Syldra is Y, not S).
@@ -197,12 +250,6 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
 
 ipcMain.handle('get-sub-calculator', () => withClient((client) => loadCalculator(client), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('find-sub-builds', (event, request) => withClient((client) => findFor(client, request), (err) => ({ success: false, error: err.message })));
-ipcMain.handle('plan-sub-voyage', (event, request) => {
-  try {
-    return planFor(request);
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
+ipcMain.handle('plan-sub-voyage', (event, request) => withClient((client) => planPriced(client, request), (err) => ({ success: false, error: err.message })));
 
-module.exports = { loadCalculator, planFor, partLetter, findFor, ownedParts };
+module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts };
