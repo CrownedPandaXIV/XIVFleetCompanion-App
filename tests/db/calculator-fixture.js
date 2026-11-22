@@ -103,6 +103,7 @@ const finderGoals = [
   [{ sectorId: 1, tier: 0, optimal: false, doubleDip: false, items: [] }],
 ];
 const owned = new Set(['W+|0', 'C+|1', 'W+|2', 'C+|3', 'S|0', 'Y|1', 'U+|2']);
+const partFilter = [{ letters: ['S', 'S+', 'W+'] }, null, { own: true }, null];
 const finderAnswers = [];
 for (const goals of finderGoals) {
   for (const sureOnly of [false, true]) {
@@ -117,8 +118,11 @@ for (const goals of finderGoals) {
       sorted[by] = finder.sortBuilds(rows, by).slice(0, 25).map((r) => ({ parts: r.parts, rank: r.rank, sure: r.sure, sureRank: r.sureRank, stats: r.stats, spare: r.spare,
         rangeShort: r.rangeShort, inRangeFrom: r.inRangeFrom, hours: r6(r.hours), missing: r.missingParts.map((m) => `${m.letter}|${m.slot}`) }));
     }
+    // The part filter: hull Shark, Modified Shark or Modified Whale, and a bow the player owns.
+    const kept = finder.sortBuilds(finder.filterByParts(rows, partFilter, owned), 'rank');
     finderAnswers.push({ goals, sureOnly, route: route.map((s) => s.id), need, why, missing, minRank, rangeNeeded: calc.rangeUsed(route, start),
-      total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length, sorted });
+      total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length, sorted,
+      filtered: { total: kept.length, first: kept.slice(0, 25).map((r) => r.parts.join('|')) } });
   }
 }
 
@@ -128,7 +132,7 @@ if (file) {
   fs.writeFileSync(file, JSON.stringify({
     about: 'Written by XIVFleetCompanion-App tests/db/calculator-fixture.js: made-up game data and the app\'s Sub Calculator answers (subs/calculator.js).',
     game: { sectors, ranks, parts }, repairKitCost, priceRule: '(itemId % 97) * 10', cases: answers,
-    finder: { owned: [...owned], cases: finderAnswers },
+    finder: { owned: [...owned], partFilter, cases: finderAnswers },
   }));
   console.log(`wrote ${file}`);
 }

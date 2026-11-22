@@ -63,6 +63,116 @@ const FINDER_COLUMN_DEFS = [
     ? <button type="button" className="finder-open" onClick={() => ctx.onOpen(r)} title="Open this build and the route in Sub Calculator → Planner.">Open in Planner</button> : null) },
 ];
 
+// A popover that closes on a click elsewhere or Escape.
+function useFinderPopover() {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return { open, setOpen, box };
+}
+
+const finderChance = (c) => (c === null || c === undefined ? '' : c < 0.01 ? 'under 1%' : `${Math.round(c * 100)}%`);
+
+// Find an item: every sector that drops it, on every map, with the rank it needs, the lowest tier it drops at, how
+// often and how many, and the surveillance that tier takes. Add puts the sector in with the item as its goal.
+function FinderItemSearch({ base, onAdd }) {
+  const [text, setText] = useState('');
+  const { open, setOpen, box } = useFinderPopover();
+  const mapName = new Map(base.maps.map((m) => [m.id, m.name]));
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  const byItem = new Map();
+  if (words.length && text.trim().length >= 2) {
+    for (const s of base.sectors) {
+      for (const it of s.items || []) {
+        const name = it.name.toLowerCase();
+        if (!words.every((w) => name.includes(w))) continue;
+        if (!byItem.has(it.itemId)) byItem.set(it.itemId, { name: it.name, at: [] });
+        byItem.get(it.itemId).at.push({ s, it });
+      }
+    }
+  }
+  const found = [...byItem.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
+  return (
+    <div className="finder-search" ref={box}>
+      <input type="search" placeholder="Find an item, e.g. Cocobolo Lumber" value={text}
+        onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
+      {open && text.trim().length >= 2 && (
+        <div className="finder-search-panel">
+          {!found.length && <div className="dim">No sector drops anything called “{text}”.</div>}
+          {found.slice(0, 8).map(([id, { name, at }]) => (
+            <div key={id} className="finder-search-item">
+              <div className="finder-search-name">{name} <span className="dim">{at.length} sector{at.length === 1 ? '' : 's'}</span></div>
+              {at.sort((a, b) => a.s.map - b.s.map || a.s.id - b.s.id).map(({ s, it }) => (
+                <div key={s.id} className="finder-search-row">
+                  <span className="dim">{mapName.get(s.map) || ''}</span>
+                  <span><span className="finder-letter">{s.letter}</span> {s.name}</span>
+                  <span className="dim">rank {s.rankReq}</span>
+                  <span className="finder-tier">T{it.tier}</span>
+                  <span title={`In ${finderChance(it.chance)} of XIVStats' T${it.tier} voyages there`}>{finderChance(it.chance)}</span>
+                  <span className="dim">{it.low === it.high ? it.low : `${it.low}–${it.high}`} each</span>
+                  <span className="dim">{it.at ? `T${it.tier} at ${finderNeedText(it.at)}` : 'any surveillance'}</span>
+                  <button onClick={() => { onAdd(s, id); setOpen(false); }}>Add</button>
+                </div>
+              ))}
+            </div>
+          ))}
+          {found.length > 8 && <div className="dim">{found.length - 8} more items match: type more of the name.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One slot's part filter: Any, Plain only, Modified only, Ones I own, or ticked parts.
+const FINDER_PLAIN = ['S', 'U', 'W', 'C', 'Y'];
+const FINDER_MODIFIED = ['S+', 'U+', 'W+', 'C+', 'Y+'];
+const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+function finderSlotText(value) {
+  if (!value) return 'Any';
+  if (value.own) return 'Ones I own';
+  const l = value.letters;
+  if (sameSet(l, FINDER_PLAIN)) return 'Plain only';
+  if (sameSet(l, FINDER_MODIFIED)) return 'Modified only';
+  if (l.length > 3) return `${l.length} parts`;
+  return l.map((x) => partNameOf(x).replace('Modified ', '') + (x.endsWith('+') ? '+' : '')).join(', ');
+}
+function FinderSlotFilter({ slot, value, onChange }) {
+  const { open, setOpen, box } = useFinderPopover();
+  const letters = value && value.letters ? value.letters : [];
+  const toggle = (l) => {
+    const next = letters.includes(l) ? letters.filter((x) => x !== l) : [...letters, l];
+    onChange(next.length ? { letters: next } : null);
+  };
+  return (
+    <div className="finder-slot" ref={box}>
+      <span className="dim">{slot}</span>
+      <button className={`finder-slot-button${value ? ' set' : ''}`} onClick={() => setOpen(!open)}>{finderSlotText(value)} ▾</button>
+      {open && (
+        <div className="finder-slot-panel">
+          <div className="finder-slot-quick">
+            <button className="link-button" onClick={() => onChange(null)}>Any</button>
+            <button className="link-button" onClick={() => onChange({ letters: FINDER_PLAIN })}>Plain only</button>
+            <button className="link-button" onClick={() => onChange({ letters: FINDER_MODIFIED })}>Modified only</button>
+            <button className="link-button" onClick={() => onChange({ own: true })}>Ones I own</button>
+          </div>
+          {[...FINDER_PLAIN, ...FINDER_MODIFIED].map((l) => (
+            <label key={l} className="finder-check">
+              <input type="checkbox" checked={letters.includes(l)} onChange={() => toggle(l)} /> {partNameOf(l)}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BuildFinderView({ refreshKey, onOpenPlanner }) {
   const [base, setBase] = useState(null);
   const [error, setError] = useState(null);
@@ -74,6 +184,9 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
   const [forSub, setForSub] = useState(null);
   const [found, setFound] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [slots, setSlots] = useState([null, null, null, null]); // the part filter, per slot
+  const [switchTo, setSwitchTo] = useState(null); // a sector from the item search on another map, waiting for a yes
+  const [note, setNote] = useState(null);
 
   useEffect(() => {
     window.api.getSubCalculator().then((r) => {
@@ -92,14 +205,14 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
     const call = ++latest.current;
     setBusy(true);
     const timer = setTimeout(() => {
-      window.api.findSubBuilds({ goals, sortBy, sureOnly, forCid: forSub ? forSub.cid : null, limit: 200 }).then((r) => {
+      window.api.findSubBuilds({ goals, sortBy, sureOnly, forCid: forSub ? forSub.cid : null, slots, limit: 200 }).then((r) => {
         if (call !== latest.current) return;
         setBusy(false);
         setFound(r.success ? r : { error: r.error });
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [base, goals, sortBy, sureOnly, forSub, refreshKey]);
+  }, [base, goals, sortBy, sureOnly, forSub, slots, refreshKey]);
 
   // Grouped by rank while sorted by lowest rank and no column is clicked; otherwise one list with a Rank column.
   const finderSort = useColumnSort();
@@ -121,6 +234,21 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
     const id = Number(adding || (onMap[0] && onMap[0].id));
     if (id && goals.length < 5) { setGoals([...goals, { sectorId: id, tier: 0, optimal: false, doubleDip: false, items: [] }]); setAdding(''); }
   };
+  // A sector from the item search, with the item as its goal: added to it when already chosen; another map starts fresh.
+  const addFromSearch = (sector, itemId) => {
+    setNote(null);
+    if (sector.map !== mapId) {
+      if (goals.length) { setSwitchTo({ sector, itemId }); return; }
+      setMapId(sector.map);
+      setGoals([{ sectorId: sector.id, tier: 0, optimal: false, doubleDip: false, items: [itemId] }]);
+      return;
+    }
+    const at = goals.findIndex((g) => g.sectorId === sector.id);
+    if (at >= 0) { if (!goals[at].items.includes(itemId)) change(at, { items: [...goals[at].items, itemId] }); return; }
+    if (goals.length >= 5) { setNote('A voyage has at most 5 sectors: remove one to add this.'); return; }
+    setGoals([...goals, { sectorId: sector.id, tier: 0, optimal: false, doubleDip: false, items: [itemId] }]);
+  };
+  const filtered = slots.some(Boolean);
   const ctx = { onOpen: (r) => onOpenPlanner({ rank: r.rank, parts: r.parts, route: found.route }), need: found && found.need };
   const rows = found && found.rows ? (finderSort.sortColumn ? applyColumnSort(cols.rows, finderSort.sortColumn, finderSort.sortDirection, cols.accessors) : cols.rows) : [];
   const groupOf = (r) => (r.rangeShort > 0 ? 'out' : r.rank);
@@ -129,6 +257,16 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
     <div className="finder">
       <section className="finder-band">
         <h2 className="finder-heading">What you want <span className="count">{goals.length} of 5 sectors</span></h2>
+        <FinderItemSearch base={base} onAdd={addFromSearch} />
+        {switchTo && (
+          <div className="finder-switch tone-warn">
+            {switchTo.sector.letter}: {switchTo.sector.name} is on {(base.maps.find((m) => m.id === switchTo.sector.map) || {}).name}. A voyage stays on one
+            map, so switching clears your {goals.length} sector{goals.length === 1 ? '' : 's'} here.
+            <button onClick={() => { setMapId(switchTo.sector.map); setGoals([{ sectorId: switchTo.sector.id, tier: 0, optimal: false, doubleDip: false, items: [switchTo.itemId] }]); setSwitchTo(null); }}>Switch map</button>
+            <button className="link-button" onClick={() => setSwitchTo(null)}>Cancel</button>
+          </div>
+        )}
+        {note && <div className="tone-warn">{note}</div>}
         <div className="finder-row">
           <label className="finder-field">Map
             <select value={mapId ?? ''} onChange={(e) => { setMapId(Number(e.target.value)); setGoals([]); }}>
@@ -217,8 +355,16 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
               <span className="why">route {found.route.map((id) => (sectorOf.get(id) || {}).letter).join('-')}</span></span>
           </div>
           {found.missing.length > 0 && <div className="tone-warn">No loot data yet for {found.missing.join(', ')}: its goals are left out.</div>}
+          <div className="finder-filter">
+            <span className="finder-field">Only these parts</span>
+            {['Hull', 'Stern', 'Bow', 'Bridge'].map((label, i) => (
+              <FinderSlotFilter key={label} slot={label} value={slots[i]} onChange={(v) => setSlots(slots.map((x, j) => (j === i ? v : x)))} />
+            ))}
+            {filtered && <button className="link-button" onClick={() => setSlots([null, null, null, null])}>Clear filters</button>}
+          </div>
           <div className="finder-tally">
-            <span><b>{plannerN(found.total)}</b> build{found.total === 1 ? '' : 's'}</span>
+            {filtered && <span><b>{plannerN(found.unfiltered)}</b> builds ·</span>}
+            <span><b>{plannerN(found.total)}</b> {filtered ? 'with these parts' : `build${found.total === 1 ? '' : 's'}`}</span>
             <span className="good"><b>{plannerN(found.sure)}</b> sure</span>
             {found.total - found.sure > 0 && <span className="warn"><b>{plannerN(found.total - found.sure)}</b> might not</span>}
             <span className={found.outOfRange ? 'bad' : ''}><b>{plannerN(found.outOfRange)}</b> out of range</span>
@@ -258,7 +404,8 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
             </React.Fragment>
           )}
           {rows.length === 0 && !busy && (
-            <div className="status">No build reaches all of that at any rank{sureOnly ? ' for sure (untick "Only builds sure to reach it" to see the near ones)' : ''}.</div>
+            <div className="status">{filtered && found.unfiltered > 0 ? 'No build with these parts reaches it: loosen the part filter.'
+              : `No build reaches all of that at any rank${sureOnly ? ' for sure (untick "Only builds sure to reach it" to see the near ones)' : ''}.`}</div>
           )}
         </section>
       )}

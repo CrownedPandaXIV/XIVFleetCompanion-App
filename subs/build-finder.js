@@ -130,4 +130,16 @@ function sortBuilds(rows, by = 'rank') {
   return rows.map((r, i) => [r, i]).sort(([a, ai], [b, bi]) => (a.rangeShort > 0) - (b.rangeShort > 0) || order(a, b) || ai - bi).map(([r]) => r);
 }
 
-module.exports = { LETTERS, itemTier, needsFor, findBuilds, sortBuilds, SORTS };
+// Keeps the builds whose parts pass the part filter. slots: per slot (hull, stern, bow, bridge) null for any part,
+// { own: true } for a part the player has (owned: Set of "letter|slot"), or { letters: [...] } for those parts.
+function filterByParts(rows, slots, owned) {
+  if (!slots || !slots.some(Boolean)) return rows;
+  return rows.filter((r) => r.parts.every((letter, slot) => {
+    const f = slots[slot];
+    if (!f) return true;
+    if (f.own) return !!owned && owned.has(`${letter}|${slot}`);
+    return (f.letters || []).includes(letter);
+  }));
+}
+
+module.exports = { LETTERS, itemTier, needsFor, findBuilds, sortBuilds, filterByParts, SORTS };

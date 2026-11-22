@@ -87,7 +87,15 @@ async function loadCalculator(client) {
       const d = data.sectors.find((x) => x.id === s.id);
       // The items it can drop, for the Build Finder's goals: each once, at the lowest tier dropping it.
       const items = d ? [...new Set(Object.values(d.pools).flatMap((p) => p.loot.map((l) => l[0])))]
-        .map((id) => ({ itemId: id, name: names.get(id) || `Item ${id}`, tier: finder.itemTier(d, id) }))
+        .map((id) => {
+          // For the item search: at its lowest tier, how often it came in XIVStats' records (of that tier's voyages),
+          // how many each time (poor to optimal), and the surveillance that tier needs.
+          const tier = finder.itemTier(d, id);
+          const pool = d.pools[tier];
+          const entry = pool.loot.find((l) => l[0] === id);
+          return { itemId: id, name: names.get(id) || `Item ${id}`, tier, chance: pool.records > 0 ? entry[1] / pool.records : null,
+            low: entry[4], high: entry[9], at: tier >= 2 ? calc.breakpoint(d, tier === 3 ? 1 : 0) : null };
+        })
         .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)) : [];
       return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items };
     }),
@@ -159,7 +167,8 @@ async function ownedParts(client, cid = null) {
 
 // The Build Finder: { goals: [{ sectorId, tier, optimal, doubleDip, items }], sureOnly, sortBy, forCid, limit }.
 // The builds that reach the goals, sorted, the first `limit` of them, and what the goals need.
-async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', forCid = null, limit = 200 } = {}) {
+// slots: the part filter, per slot null (any), { own: true } or { letters: [...] } (subs/build-finder.js filterByParts).
+async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', forCid = null, slots = null, limit = 200 } = {}) {
   if (!cache) await loadCalculator(client);
   if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
   const { game, data } = cache;
@@ -171,9 +180,12 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
   const route = sectors.length > 1 ? calc.bestOrder(sectors, start, 100) : sectors;
   const minRank = Math.max(1, ...sectors.map((s) => s.rankReq));
   const owned = await ownedParts(client, forCid);
-  const rows = finder.sortBuilds(finder.findBuilds({ need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
-    minRank, maxRank: game.maxRank, route, start, owned, sureOnly }), sortBy);
+  const all = finder.findBuilds({ need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
+    minRank, maxRank: game.maxRank, route, start, owned, sureOnly });
+  // The part filter applies before the list is cut, so the counts and rank groups follow it.
+  const rows = finder.sortBuilds(finder.filterByParts(all, slots, owned), sortBy);
   return {
+    unfiltered: all.length,
     success: true, need, why, missing, minRank, route: route.map((s) => s.id), rangeNeeded: calc.rangeUsed(route, start),
     total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length,
     // How many builds work from each rank (in range), for the page's group headings.

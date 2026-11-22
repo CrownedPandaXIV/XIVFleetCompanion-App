@@ -543,6 +543,20 @@
     tr.finder-out td { color: var(--dim); }
     .finder-open { padding: 2px 9px; font-size: 12px; }
     .finder-more { text-align: center; font-size: 12px; }
+    .finder-search { position: relative; }
+    .finder-search input { width: min(420px, 100%); box-sizing: border-box; }
+    .finder-search-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; max-height: 60vh; overflow-y: auto; background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+    .finder-search-name { font-weight: 600; margin-bottom: 4px; }
+    .finder-search-row { display: grid; grid-template-columns: 1.1fr 2fr 0.7fr 0.4fr 0.6fr 0.7fr 1.2fr auto; gap: 8px; align-items: center; font-size: 12px; padding: 3px 0; border-top: 1px solid var(--border); }
+    .finder-search-row button { padding: 1px 10px; font-size: 12px; }
+    .finder-search-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .finder-switch { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+    .finder-filter { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    .finder-slot { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .finder-slot-button { padding: 2px 10px; font-size: 12px; }
+    .finder-slot-button.set { border-color: var(--accent); color: var(--text-bright); }
+    .finder-slot-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 210px; background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+    .finder-slot-quick { display: flex; flex-wrap: wrap; gap: 4px 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }

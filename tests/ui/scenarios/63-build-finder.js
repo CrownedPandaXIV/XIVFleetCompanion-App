@@ -39,6 +39,36 @@ module.exports = async (t) => {
   check(groups.length > 0 && groupRanks.every((r, i) => i === 0 || r > groupRanks[i - 1]) && /builds?/.test(groups[0]), `rows are grouped by rank, lowest first (${groups.slice(0, 3).join(' | ')})`);
   check(!(await ev(`[...document.querySelectorAll('.finder-table thead th')].some((th) => th.innerText.trim().toLowerCase() === 'rank')`)), 'no Rank column while grouped');
 
+  // Find an item: the name of one the first sector drops, every sector dropping it, and Add puts it on that sector.
+  const itemName = await ev(`[...document.querySelector('.finder-goal').querySelectorAll('select')][1].options[1].text.replace(/ \\(T\\d\\)$/, '')`);
+  await ev(`(() => { const i = document.querySelector('.finder-search input'); i.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(itemName)});
+    i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await waitFor(`document.querySelectorAll('.finder-search-row').length > 0`, 'the item search', 5000);
+  await t.shot('build-finder-search');
+  const hit = await ev(`(() => { const item = [...document.querySelectorAll('.finder-search-item')].find((x) => x.querySelector('.finder-search-name').innerText.startsWith(${JSON.stringify(itemName)}));
+    const rows = item ? [...item.querySelectorAll('.finder-search-row')] : [];
+    return { rows: rows.length, text: rows.map((r) => r.innerText.replace(/\\s+/g, ' ')).join(' | ') }; })()`);
+  check(hit.rows > 0 && /rank \d+/.test(hit.text) && /T[123]/.test(hit.text) && /each/.test(hit.text), `searching "${itemName}" lists the sectors dropping it (${hit.text.slice(0, 120)})`);
+  await ev(`[...[...document.querySelectorAll('.finder-search-item')].find((x) => x.querySelector('.finder-search-name').innerText.startsWith(${JSON.stringify(itemName)})).querySelectorAll('.finder-search-row button')][0].click()`);
+  await waitFor(`[...document.querySelectorAll('.finder-goal .planner-chip')].some((c) => c.innerText.includes(${JSON.stringify(itemName)}))`, 'the item added', 5000);
+  check(true, 'Add puts the item on its sector as a goal');
+  await waitFor(`document.querySelectorAll('.finder-table tbody tr:not(.finder-group)').length > 0 && !document.body.innerText.includes('working out')`, 'the builds again', 30000);
+
+  // Only these parts: Hull plain only.
+  await ev(`document.querySelector('.finder-slot-button').click()`);
+  await ev(`document.querySelector('.finder-filter').scrollIntoView()`);
+  await t.shot('build-finder-slot');
+  await ev(`[...document.querySelectorAll('.finder-slot-panel button')].find((b) => b.innerText === 'Plain only').click()`);
+  await waitFor(`/with these parts/.test(document.querySelector('.finder-tally').innerText) && !document.body.innerText.includes('working out')`, 'the part filter', 30000);
+  const hulls = await ev(`[...document.querySelectorAll('.finder-table tbody tr:not(.finder-group)')].map((tr) => tr.querySelector('.finder-part').innerText)`);
+  const slotText = await ev(`document.querySelector('.finder-slot-button').innerText`);
+  check(hulls.length > 0 && hulls.every((h) => !h.endsWith('+')) && /Plain only/.test(slotText), `Hull: plain only leaves plain hulls (${[...new Set(hulls)].join(', ')})`);
+  const tallyFiltered = await ev(`document.querySelector('.finder-tally').innerText.replace(/\\s+/g, ' ')`);
+  check(/[\d,]+ builds · [\d,]+ with these parts/.test(tallyFiltered), `the counts say how many have these parts (${tallyFiltered})`);
+  await ev(`[...document.querySelectorAll('.finder-filter button')].find((b) => b.innerText === 'Clear filters').click()`);
+  await waitFor(`!/with these parts/.test(document.querySelector('.finder-tally').innerText)`, 'the filter cleared', 30000);
+
   // With enough range (the made-up ranks' range raised for a moment, in this scratch database), the builds are in
   // range and grouped under "Rank N · how many builds".
   const was = await t.query('SELECT id, range_bonus FROM ffxiv_submarinerank ORDER BY id');

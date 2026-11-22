@@ -92,3 +92,14 @@ test('parts owned by the fleet: fitted, or spare in a bag, a retainer or an FC c
   const owned = await ownedParts(client, null);
   assert.deepStrictEqual([...owned].sort(), ['S|0', 'S|1', 'S|2', 'S|3', 'U|3', 'W+|0', 'W+|1', 'W+|2', 'W+|3', 'Y|1']);
 });
+
+test('the part filter: any part, chosen parts, or one you own, slot by slot', () => {
+  const row = (parts) => ({ parts });
+  const rows = [row(['S', 'S', 'S', 'S']), row(['S+', 'U', 'W', 'C']), row(['Y', 'Y+', 'S', 'U'])];
+  const owned = new Set(['S|0', 'Y|0', 'U|3', 'C|3']);
+  assert.strictEqual(finder.filterByParts(rows, null, owned).length, 3);
+  assert.strictEqual(finder.filterByParts(rows, [null, null, null, null], owned).length, 3);
+  assert.deepStrictEqual(finder.filterByParts(rows, [{ letters: ['S', 'S+'] }, null, null, null], owned).map((r) => r.parts[0]), ['S', 'S+']);
+  assert.deepStrictEqual(finder.filterByParts(rows, [{ own: true }, null, null, { own: true }], owned).map((r) => r.parts.join('')), ['YY+SU']);
+  assert.strictEqual(finder.filterByParts(rows, [{ letters: [] }, null, null, null], owned).length, 0);
+});
