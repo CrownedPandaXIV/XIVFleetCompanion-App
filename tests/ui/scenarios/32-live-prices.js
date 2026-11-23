@@ -76,7 +76,7 @@ module.exports = async (t) => {
   await shot('market-live');
 
   // The Planner: market prices on the data center of the chosen sub's world (or the most common world).
-  await nav('Planner');
+  await nav('Voyage Planner');
   await waitFor(`document.querySelectorAll('.planner-stat').length === 5`, 'the Planner', 20000);
   await ev(`document.querySelector('.planner-picker-button').click()`);
   await waitFor(`document.querySelectorAll('.planner-picker-sub').length > 0`, 'the sub picker', 10000);

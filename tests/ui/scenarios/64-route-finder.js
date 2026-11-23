@@ -61,9 +61,19 @@ module.exports = async (t) => {
   await t.query(`INSERT INTO companion_fc_sub_sector (fc_id, sector_id, unlocked, explored, read_at, cid) VALUES
     (${fc}, 1, true, true, now(), 1), (${fc}, 2, true, false, now(), 1), (${fc}, 3, false, false, now(), 1)`);
   await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
-  await waitFor(`[...document.querySelectorAll('.rf-note select option')].some((o) => o.value === '${fc}')`, 'the FC in the list', 20000);
-  await ev(`(() => { const s = document.querySelector('.rf-note select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '${fc}');
-    s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  // The Free Company picker: grouped by account label, each with its world.
+  await waitFor(`!!document.querySelector('.rf-note .fc-picker-button')`, 'the FC picker', 20000);
+  await ev(`document.querySelector('.rf-note .fc-picker-button').click()`);
+  await waitFor(`!!document.querySelector('.fc-picker-row[data-fc="${fc}"]')`, 'the FC in the list', 20000);
+  const groups = (await ev(`[...document.querySelectorAll('.fc-picker-panel .planner-picker-account')].map((b) => b.innerText)`))
+    .map((g) => g.replace(/^[▾▸\s]+/, '').replace(/\s*\(\d+\)\s*$/, ''));
+  const expected = (await t.query(`SELECT DISTINCT coalesce(nullif(account_label, ''), 'No account label') AS a FROM companion_character_current WHERE fc_id IS NOT NULL AND fc_id <> 0`)).map((r) => r.a)
+    .sort((a, b) => (a === 'No account label') - (b === 'No account label') || a.localeCompare(b));
+  check(JSON.stringify(groups) === JSON.stringify(expected), `the FC picker groups by account label, in name order (${groups.join(', ')})`);
+  const row = await ev(`document.querySelector('.fc-picker-row[data-fc="${fc}"]').innerText`);
+  const world = (await t.query(`SELECT world FROM companion_character_current WHERE fc_id = ${fc} AND world IS NOT NULL LIMIT 1`))[0].world;
+  check(row.includes(`(${world})`), `each Free Company shows its world (${row.replace(/\s+/g, ' ')})`);
+  await ev(`document.querySelector('.fc-picker-row[data-fc="${fc}"]').click()`);
   await waitFor(`/read at the workshop/.test(document.querySelector('.rf-note').innerText)
     && [...document.querySelectorAll('.rf-tile')].some((b) => b.classList.contains('discovered'))`, 'the read sectors', 20000);
   const tiles = await ev(`Object.fromEntries([...document.querySelectorAll('.rf-tile')].map((b) => [b.querySelector('.rf-letter').innerText, b.querySelector('.st').innerText]))`);
@@ -95,7 +105,7 @@ module.exports = async (t) => {
   // Open in Planner.
   await waitFor(`${rowsSel}.length > 0`, 'routes', 20000);
   const stops = await ev(`${rowsSel}[0].querySelectorAll('.rf-route .rf-letter').length`);
-  await ev(`[...document.querySelectorAll('.rf .finder-table tbody button')].find((b) => b.innerText === 'Open in Planner').click()`);
+  await ev(`[...document.querySelectorAll('.rf .finder-table tbody button')].find((b) => b.innerText === 'Open in Voyage Planner').click()`);
   await waitFor(`document.querySelectorAll('.planner-chip').length === ${stops} && document.querySelectorAll('.planner-stat').length === 5`, 'the Planner with that route', 15000);
   check(true, `Open in Planner loads the build and its ${stops} stop(s)`);
 

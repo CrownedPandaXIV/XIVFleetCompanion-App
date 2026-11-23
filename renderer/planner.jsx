@@ -1,4 +1,4 @@
-// Sub Calculator → Planner: pick a build and a route, see its stats, voyage, the tiers each sector reaches, the loot
+// Sub Calculator → Voyage Planner: pick a build and a route, see its stats, voyage, the tiers each sector reaches, the loot
 // it can bring back, and its gil, experience and repair cost a day (ipc/calculator.js, subs/calculator.js).
 
 const PLANNER_SLOTS = ['Hull', 'Stern', 'Bow', 'Bridge'];
@@ -166,7 +166,88 @@ function PlannerSubPicker({ subs, chosen, onChoose }) {
   );
 }
 
-// openSub: { cid, subName, at } from "Open in Planner" on the Subs or Route Optimization page; loaded once, then
+// Choosing a Free Company (Levelling Plan, Route Finder, Compare Builds): the Voyage Planner's way, a panel grouped by
+// account label (in name order, no label last), each account's Free Companies as the Character Roster orders their
+// characters, with their world and whether the workshop's sectors have been read; a search across name, world and
+// account. fcs: base.fcs ({ fcId, name, world, accounts: [{ account, sortIndex }], readAt }).
+function FcPicker({ fcs, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [folded, setFolded] = useState(() => new Set());
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const list = fcs || [];
+  const chosen = list.find((f) => f.fcId === value) || null;
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const groups = fcPickerGroups(list.filter((f) => {
+    const hay = `${f.name} ${f.world || ''} ${(f.accounts || []).map((a) => a.account).join(' ')}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  }));
+  const toggle = (key) => setFolded((f) => { const n = new Set(f); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const isFolded = (key) => !words.length && folded.has(key);
+  return (
+    <span className="planner-picker fc-picker" ref={box} data-fc={value ?? ''}>
+      <button type="button" className="planner-picker-button fc-picker-button" onClick={() => setOpen(!open)} disabled={!list.length}>
+        {!list.length ? 'No Free Company yet' : chosen ? <React.Fragment>{chosen.name}{chosen.world ? <span className="dim"> ({chosen.world})</span> : null}{chosen.readAt ? null : <span className="dim"> · not read yet</span>}</React.Fragment> : 'Choose a Free Company…'}
+        <span className="dim"> ▾</span>
+      </button>
+      {open && (
+        <div className="planner-picker-panel fc-picker-panel">
+          <input type="search" autoFocus placeholder="Search Free Company, world or account" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="planner-picker-list">
+            {!groups.length && <div className="dim planner-picker-empty">No Free Company matches “{search}”.</div>}
+            {groups.map((g) => (
+              <div key={g.name}>
+                <button type="button" className="planner-picker-account" onClick={() => toggle(g.name)}>
+                  {isFolded(g.name) ? '▸' : '▾'} {g.name} <span className="dim">({g.fcs.length})</span>
+                </button>
+                {!isFolded(g.name) && g.fcs.map((f) => (
+                  <button type="button" key={f.fcId} data-fc={f.fcId} className={`fc-picker-row${f.fcId === value ? ' chosen' : ''}`} onClick={() => { onChange(f.fcId); setOpen(false); }}>
+                    <span>{f.name}{f.world ? <span className="dim"> ({f.world})</span> : null}</span>
+                    <span className="dim">{f.readAt ? `sectors read ${rfWhen(f.readAt)}` : 'not read yet'}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
+// The picker's groups: [{ name: account label, fcs }], accounts in name order with "No account label" last, each
+// account's Free Companies by where their first character is in the Character Roster, then by name.
+function fcPickerGroups(fcs) {
+  const NONE = 'No account label';
+  const groups = new Map();
+  for (const f of fcs) {
+    const accounts = (f.accounts || []).length ? f.accounts : [{ account: '', sortIndex: null }];
+    for (const a of accounts) {
+      const name = a.account || NONE;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push({ f, at: a.sortIndex ?? 1e9 });
+    }
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => (a === NONE) - (b === NONE) || a.localeCompare(b))
+    .map(([name, rows]) => ({ name, fcs: rows.sort((x, y) => x.at - y.at || x.f.name.localeCompare(y.f.name)).map((r) => r.f) }));
+}
+
+// "Working out…" while a page works out its answer; the answer under it is dimmed until the new one is in.
+function Working({ busy, children }) {
+  if (!busy) return null;
+  return <div className="working" role="status"><span className="working-spin" />{children || 'Working out…'}</div>;
+}
+
+// openSub: { cid, subName, at } from "Open in Voyage Planner" on the Subs or Route Optimization page; loaded once, then
 // onOpenSubUsed clears it.
 // The chosen sub's world, data center and region (else those of the world most of the player's subs are on):
 // { world, dc, region } names, from Universalis's list (base.markets); null when the world isn't known.
@@ -225,7 +306,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
   const lootSort = useColumnSort();
   const lootCols = useTableColumns({ tableKey: 'plannerLoot', ownDefs: PLANNER_LOOT_DEFS, rows: plan && plan.loot ? plan.loot : null, idOf: () => null });
 
-  // "Open in Planner": load that sub once the page has its subs.
+  // "Open in Voyage Planner": load that sub once the page has its subs.
   useEffect(() => {
     if (!openSub || !base || !base.subs) return;
     if (openSub.build) {
@@ -255,7 +336,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
   if (!base) return <div className="status">Loading...</div>;
   if (base.missingGameData) {
-    return <div className="status">The Planner needs the game data's sub tables. Update them in Settings → Data → Game Data.</div>;
+    return <div className="status">The Voyage Planner needs the game data's sub tables. Update them in Settings → Data → Game Data.</div>;
   }
 
   const sectorOf = new Map(base.sectors.map((s) => [s.id, s]));
@@ -311,7 +392,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
             <div className="planner-compare">
               <CmpAddButton compare={compare} build={chosen && chosen.rank === rank && chosen.parts.join() === parts.join()
                 ? { label: chosen.subName, who: [chosen.character, chosen.world].filter(Boolean).join(' · '), world: chosen.world, fcId: chosen.fcId, rank, parts, route }
-                : { label: parts.join(''), who: 'from the Planner', world: chosen ? chosen.world : undefined, rank, parts, route }} />
+                : { label: parts.join(''), who: 'from the Voyage Planner', world: chosen ? chosen.world : undefined, rank, parts, route }} />
             </div>
           )}
         </div>

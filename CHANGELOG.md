@@ -7,7 +7,7 @@ All notable changes to the app are recorded here. Versions follow
 
 The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
 
-- **Sub Calculator → Planner (new page).** Pick a rank, four parts and up to five sectors, or load one of your
+- **Sub Calculator → Voyage Planner (new page).** Pick a rank, four parts and up to five sectors, or load one of your
   subs, and see:
   - the build's surveillance, retrieval, speed, range and favor;
   - the range the route uses against the sub's, the voyage length, experience and ceruleum, and a Best order
@@ -19,16 +19,16 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   Its two tables work like every other page's: columns to size, move, sort and choose.
   - bonus experience as Pepper's guide gives it: what the build is sure of (optimal retrieval's +25%) and the most
     luck can add (T2/T3 loot, HQ materials, a double dip; up to +100% a sector).
-- **Market prices skip odd listings (Income, Gil & Market and the Planner alike).** With Live Market Prices on, an
+- **Market prices skip odd listings (Income, Gil & Market and the Voyage Planner alike).** With Live Market Prices on, an
   item's price is the cheapest listing, but a lone listing far below the others (under half the middle price of the
   five cheapest) is skipped, and if the price is still under half the middle price of the last week's sales, that is
   used instead. Universalis is now asked for the last week's sales with the listings. A price changed this way is
   amber, with a hover saying what was ignored and what was used; Income lists the items whose prices were changed.
-- **The Planner priced on the market.** With Live Market Prices on, the loot, gil per voyage and gil per day use market
+- **The Voyage Planner priced on the market.** With Live Market Prices on, the loot, gil per voyage and gil per day use market
   prices, with a World / Data center / Region switch (Data center to start) and a list of every world, data center or
   region to price on, since loot can be moved to a character elsewhere and sold there. It starts on the chosen sub's own
   (else that of the world most of your subs are on).
-- **The Planner's loot says how often and what one is worth.** A "How often" column ("about 1 in 15 voyages") makes
+- **The Voyage Planner's loot says how often and what one is worth.** A "How often" column ("about 1 in 15 voyages") makes
   clear that a rare item's gil per voyage is an average, and "Price each" shows one of it at the price used (market or
   vendor; amber with the reason when the market price was adjusted): something to aim for.
 - **Sector names without the doubled letter:** "A: South Isle of Zozonan" rather than "A: South Isle of Zozonan (A)".
@@ -42,7 +42,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   - in amber where only the lower of XIVStats' and Pepper's figures is met, with the rank it's sure from, or tick
     "Only builds sure to reach it";
   - out of range builds listed last, saying how much more range they need and the rank they're in range from;
-  - Sort by lowest rank, fastest voyage, fewest parts still needed or most range to spare; Open in Planner on each.
+  - Sort by lowest rank, fastest voyage, fewest parts still needed or most range to spare; Open in Voyage Planner on each.
   Laid out in three parts: what you want (a card per sector), the options, and the builds: what they need as
   boxes (amber where the sources differ), the counts on one line, and the list grouped by rank while sorted by lowest
   rank. Each build's parts are tags, green for one you own and amber for one to get; the stats the goals ask for show
@@ -53,15 +53,15 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     the sector in with the item as its goal; a sector on another map switches the map after asking.
   - **Only these parts:** a dropdown per slot (hull, stern, bow, bridge) with Any, Standard only, Modified only, Ones I
     own, or parts to tick. It filters every build before the list is cut to 200, so the counts and rank groups follow it.
-- **Choosing one of your subs on the Planner.** The dropdown is replaced by a panel grouped by account, then
+- **Choosing one of your subs on the Voyage Planner.** The dropdown is replaced by a panel grouped by account, then
   character (with world and Free Company), each group folding away, with a search for character, world, account,
   Free Company or sub name. Each sub shows its rank, build, route and where it is: at sea until a time, back and
   waiting, or in port.
-- **Open in Planner** on each row of the Subs and Route Optimization pages loads that sub on the Planner.
+- **Open in Voyage Planner** on each row of the Subs and Route Optimization pages loads that sub on the Voyage Planner.
 - **The repair kit price is set on the Supplies page**, beside what to buy, instead of in Settings.
 - **Sub Calculator data.** The app now ships the loot each sector can give, by tier, and the surveillance,
   retrieval and favor breakpoints, from XIVStats, with Pepper's FFXIV Ship Guide's breakpoints beside them. Each
-  release reads them again, so new findings arrive with updates. The Planner uses it.
+  release reads them again, so new findings arrive with updates. The Voyage Planner uses it.
 - **All five sub stats.** Surveillance, retrieval and favor are now worked out from the game data alongside speed
   and range, for the Sub Calculator.
 - **Sub part condition (database update 17).** A new table for the plugin's readings of each sub part's condition,
@@ -75,7 +75,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   stop and the range to spare. The map's sectors are tiles coloured by what your Free Company has done (explored,
   explore next, could open by chance, not yet): click one to make it a must, again to leave it out. Only sectors the FC
   has discovered and the sub's rank allows are used. A route that explores something new, or has chances at sectors not
-  discovered yet, says so, and "Put routes that explore something new first" puts those first. Open in Planner on each. With Live Market Prices on, gil is at market prices on your data center.
+  discovered yet, says so, and "Put routes that explore something new first" puts those first. Open in Voyage Planner on each. With Live Market Prices on, gil is at market prices on your data center.
   **Unlocks:** for a Free Company, what's sure to explore next, what could open by chance and from where (about 20–30%
   a voyage, Pepper's guess), and the way to the next map, step by step; then each map's sectors and how far along it is.
   Until the plugin has read an FC's sectors in its workshop, every sector is allowed and it says "not read yet".
@@ -87,17 +87,17 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
 - **Build Finder: an item's amounts by retrieval.** The item search shows how many each time at poor, normal and
   optimal retrieval ("1–5 · 5–10 · 10–15 each"), each with the retrieval it needs on hover, instead of one span from
   the lowest to the highest.
-- **Planner: the notes under a tier, retrieval or double dip wrap** inside their column instead of being cut off.
+- **Voyage Planner: the notes under a tier, retrieval or double dip wrap** inside their column instead of being cut off.
 - **Column widths are saved once, when you let go** of a column's edge, not at every move of the mouse.
 - **Sub Calculator → Compare Builds (new page).** Up to three builds side by side. Add one of your subs, type one in, or use
-  **Add to compare** on the Build Finder and Planner (the builds stay while you move between pages). Two ways to compare:
+  **Add to compare** on the Build Finder and Voyage Planner (the builds stay while you move between pages). Two ways to compare:
   - **Same route:** every build flies the route you set, so the numbers compare the builds alone. A build that can't fly
     it says why ("Out of range: needs 20 more", "Rank too low for R") instead of numbers.
   - **Best route each:** each build gets its own best route on a map, for experience or gil, as the Route Finder ranks
     them (with a longest voyage, musts, and only sectors your Free Company has discovered), so the numbers compare build
     and route together. Each build's route is shown at the top of its column.
   Rows: the five stats, range used, voyage, experience and gil a voyage and a day, repair kits a day, gil a day after
-  repairs, and what each build reaches at each stop. The best figure in each row is green. Open in Planner on each.
+  repairs, and what each build reaches at each stop. The best figure in each row is green. Open in Voyage Planner on each.
 - **Sub Calculator → Levelling Plan (new page).** A sub's way from its rank to a target rank: by default the rank of its
   next build (as on the Subs page), else the top rank. Each voyage is on the route best for experience an hour at the
   rank it leaves at, as the Route Finder ranks them, on any map and only through sectors your Free Company has discovered.
@@ -106,12 +106,19 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     and repair kits, and a strip showing how long each stage takes.
   - **Stages:** a card per route, with its ranks, days and voyages, voyage length, experience a voyage and an hour, the
     sectors a new rank opens, and, when a sector your FC hasn't discovered yet would do better, by how much. Open in
-    Planner on each.
+    Voyage Planner on each.
   - **Plan for one sub, or every sub in a Free Company** (one line each, with when it gets there; Stages opens it).
   - **Keep this build, or suggest changes on the way:** at the start of each stage, the one-part swap that makes the
     route at least 3% faster for experience and the whole plan shorter, saying whether you have the part and how much
-    sooner it gets there. **Standard parts only** leaves Modified parts out, for their cost and repairs.
+    sooner it gets there. **Standard parts only** leaves Modified parts out, for their cost and repairs. With swaps,
+    each stage's parts sit apart from its route, after a "Parts" label.
+  - **Use every sector:** the plan as if every sector were discovered, to see how long it takes once your Free
+    Company has found them.
 - **Build Finder: a slot's Any is highlighted** while that slot has a filter, as the way to clear it.
+- **Working out… on the busy pages.** While the Levelling Plan, Compare Builds or Build Finder works out its answer, a
+  line says so and the old answer is dimmed until the new one is in.
+- **Choosing a Free Company** (Levelling Plan, Route Finder, Compare Builds) works like choosing a sub: a panel grouped
+  by account label, each Free Company with its world, in Character Roster order, with a search.
 
 ## 1.11.0 - 2026-11-21
 

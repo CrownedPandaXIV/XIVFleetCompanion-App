@@ -41,7 +41,7 @@ function LvStages({ plan, sectorOf, onOpenPlanner }) {
                 <span>
                   <span className="rf-route">{st.route.map((id) => <RfLetter key={id} sector={sectorOf.get(id)} />)}</span>
                   {opened.map((id) => <span key={id} className="rf-tag chance">{sectorOf.get(id).letter} from rank {sectorOf.get(id).rankReq}</span>)}
-                  {plan.swaps.length > 0 && <span className="finder-parts lv-parts">{st.parts.map((p, j) => <span key={j} className="finder-part">{p}</span>)}</span>}
+                  {plan.swaps.length > 0 && <span className="lv-parts"><span className="lv-parts-label">Parts</span>{st.parts.map((p, j) => <span key={j} className="finder-part lv-part" title={partNameOf(p)}>{p}</span>)}</span>}
                 </span>
                 <span className="lv-facts">
                   <span><b>{plannerHours(st.hours / st.voyages)}</b> a voyage</span>
@@ -53,7 +53,7 @@ function LvStages({ plan, sectorOf, onOpenPlanner }) {
                     with {st.better.missing.length === 1 ? 'it' : 'them'}, {st.better.route.map((id) => sectorOf.get(id).letter).join('-')} gives {plannerN((st.better.expPerHour / st.expPerHour - 1) * 100)}% more an hour.</span>
                 )}
               </div>
-              <button className="finder-open" onClick={() => onOpenPlanner({ rank: st.fromRank, parts: st.parts, route: st.route })}>Open in Planner</button>
+              <button className="finder-open" onClick={() => onOpenPlanner({ rank: st.fromRank, parts: st.parts, route: st.route })}>Open in Voyage Planner</button>
             </div>
           </React.Fragment>
         );
@@ -103,6 +103,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const [suggest, setSuggest] = useState(false);
   const [standardOnly, setStandardOnly] = useState(false);
   const [fcId, setFcId] = useState(null);
+  const [everySector, setEverySector] = useState(false);
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -134,14 +135,14 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
     const call = ++latest.current;
     setBusy(true);
     const timer = setTimeout(() => {
-      window.api.planSubLevelling({ subs, fcId, maxHours, suggest, standardOnly }).then((r) => {
+      window.api.planSubLevelling({ subs, fcId, everySector, maxHours, suggest, standardOnly }).then((r) => {
         if (call !== latest.current) return;
         setBusy(false);
         setAnswer(r.success ? { ...r, mode } : { error: r.error });
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [base, mode, rank, exp, goal, parts, chosen, fcId, maxHours, suggest, standardOnly, targets, nextBuilds, refreshKey]);
+  }, [base, mode, rank, exp, goal, parts, chosen, fcId, everySector, maxHours, suggest, standardOnly, targets, nextBuilds, refreshKey]);
 
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
   if (!base) return <div className="status">Loading...</div>;
@@ -161,13 +162,9 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const plans = answer && !answer.error && answer.mode === mode ? answer.plans : null;
   const one = plans && plans[0];
   const nextRank = chosen ? nextBuilds.get(keyOf(chosen)) : null;
-  const fcSelect = (
-    <select value={fcId ?? ''} onChange={(e) => setFcId(e.target.value || null)}>
-      {(base.fcs || []).length === 0 && <option value="">No Free Company yet</option>}
-      {(base.fcs || []).map((f) => <option key={f.fcId} value={f.fcId}>{f.name}{f.readAt ? '' : ' (not read yet)'}</option>)}
-    </select>
-  );
-  const fcNote = <span className="dim">{fc && fc.readAt ? `Only sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}).` : 'Not read yet: every sector is allowed.'}</span>;
+  const fcSelect = <FcPicker fcs={base.fcs} value={fcId} onChange={setFcId} />;
+  const everyBox = <label className="finder-check" title="Plan as if every sector were discovered: how long it takes once the Free Company has found them"><input type="checkbox" checked={everySector} onChange={(e) => setEverySector(e.target.checked)} /> Use every sector</label>;
+  const fcNote = <span className="dim">{everySector ? 'Every sector, as if all were discovered.' : fc && fc.readAt ? `Only sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}).` : 'Not read yet: every sector is allowed.'}</span>;
   const choices = (
     <div className="finder-row">
       <span className="finder-field">Longest voyage
@@ -222,23 +219,25 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
                 </select>
               </label>
               <span className="finder-field">Sectors explored by {fcSelect}</span>
+              {everyBox}
             </div>
             {fcNote}
           </section>
 
           <section className="finder-band">
-            <h2 className="finder-heading">The plan <span className="count">best experience at each rank, sent out again as soon as it's back{busy ? ' · working out…' : ''}</span></h2>
+            <h2 className="finder-heading">The plan <span className="count">best experience at each rank, sent out again as soon as it's back</span></h2>
             {choices}
+            <Working busy={busy}>Working out the plan…</Working>
             {answer && answer.error && <div className="error">{answer.error}</div>}
             {rank >= base.maxRank && <div className="status">This sub is at the top rank.</div>}
             {one && one.error && <div className="error">{one.error}</div>}
             {one && !one.error && (
-              <React.Fragment>
+              <div className={busy ? 'is-busy' : ''}>
                 <LvSummary plan={one} start={lvStart(chosen)} />
                 {!one.reached && <div className="tone-warn">{one.stuckAt ? `From rank ${one.stuckAt}, no route fits this sub's range${maxHours ? ` in ${maxHours}h` : ''}. Try a longer voyage or other parts.` : 'The plan stops here.'}</div>}
                 {suggest && one.swaps.length === 0 && <div className="dim">No part swap{standardOnly ? ' to a Standard part' : ''} makes this plan shorter.</div>}
                 <LvStages plan={one} sectorOf={sectorOf} onOpenPlanner={onOpenPlanner} />
-              </React.Fragment>
+              </div>
             )}
           </section>
         </React.Fragment>
@@ -246,13 +245,14 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
 
       {mode === 'fc' && (
         <section className="finder-band">
-          <h2 className="finder-heading">Every sub in {fcSelect} <span className="count">each to its next build's rank (else the top rank){busy ? ' · working out…' : ''}</span></h2>
-          {fcNote}
+          <h2 className="finder-heading">Every sub in {fcSelect} <span className="count">each to its next build's rank (else the top rank)</span></h2>
+          <div className="finder-row">{everyBox}{fcNote}</div>
           {choices}
+          <Working busy={busy}>Working out the plans…</Working>
           {answer && answer.error && <div className="error">{answer.error}</div>}
           {!fcSubs.length && <div className="status">No subs in this Free Company.</div>}
           {fcSubs.length > 0 && (
-            <div className="finder-table">
+            <div className={`finder-table${busy ? ' is-busy' : ''}`}>
               <table className="lv-fleet">
                 <thead><tr><th>Sub</th><th>Level to</th><th>Route now</th><th className="num">Voyages</th><th className="num">Reaches it</th><th /></tr></thead>
                 <tbody>

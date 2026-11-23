@@ -53,14 +53,14 @@ module.exports = async (t) => {
   await ev(`[...[...document.querySelectorAll('.finder-search-item')].find((x) => x.querySelector('.finder-search-name').innerText.startsWith(${JSON.stringify(itemName)})).querySelectorAll('.finder-search-row button')][0].click()`);
   await waitFor(`[...document.querySelectorAll('.finder-goal .planner-chip')].some((c) => c.innerText.includes(${JSON.stringify(itemName)}))`, 'the item added', 5000);
   check(true, 'Add puts the item on its sector as a goal');
-  await waitFor(`document.querySelectorAll('.finder-table tbody tr:not(.finder-group)').length > 0 && !document.body.innerText.includes('working out')`, 'the builds again', 30000);
+  await waitFor(`document.querySelectorAll('.finder-table tbody tr:not(.finder-group)').length > 0 && !document.querySelector('.working')`, 'the builds again', 30000);
 
   // Only these parts: Hull Standard only.
   await ev(`document.querySelector('.finder-slot-button').click()`);
   await ev(`document.querySelector('.finder-filter').scrollIntoView()`);
   await t.shot('build-finder-slot');
   await ev(`[...document.querySelectorAll('.finder-slot-panel button')].find((b) => b.innerText === 'Standard only').click()`);
-  await waitFor(`/with these parts/.test(document.querySelector('.finder-tally').innerText) && !document.body.innerText.includes('working out')`, 'the part filter', 30000);
+  await waitFor(`/with these parts/.test(document.querySelector('.finder-tally').innerText) && !document.querySelector('.working')`, 'the part filter', 30000);
   const hulls = await ev(`[...document.querySelectorAll('.finder-table tbody tr:not(.finder-group)')].map((tr) => tr.querySelector('.finder-part').innerText)`);
   const slotText = await ev(`document.querySelector('.finder-slot-button').innerText`);
   check(hulls.length > 0 && hulls.every((h) => !h.endsWith('+')) && /Standard only/.test(slotText), `Hull: Standard only leaves Standard hulls (${[...new Set(hulls)].join(', ')})`);
@@ -95,7 +95,7 @@ module.exports = async (t) => {
 
   // Fastest voyage first.
   await setSelect(`document.querySelector('.finder-options select')`, 'speed');
-  await waitFor(`!document.body.innerText.includes('working out') && document.querySelectorAll('.finder-group').length === 0`, 'the new order', 20000);
+  await waitFor(`!document.querySelector('.working') && document.querySelectorAll('.finder-group').length === 0`, 'the new order', 20000);
   check(await ev(`[...document.querySelectorAll('.finder-table thead th')][0].innerText.trim().toLowerCase() === 'rank'`), 'sorted another way: one list, with the Rank column in front');
   // In range first, then out of range; each part fastest first.
   const voyages = await ev(`[...document.querySelectorAll('.finder-table tbody tr:not(.finder-group)')].map((tr) => {
@@ -106,7 +106,7 @@ module.exports = async (t) => {
 
   // Open the first build in the Planner: its rank, parts and the two sectors.
   const firstRank = await ev(`parseInt(document.querySelector('.finder-table tbody tr:not(.finder-group) td').innerText, 10)`);
-  await ev(`[...document.querySelectorAll('.finder-table tbody button')].find((b) => b.innerText === 'Open in Planner').click()`);
+  await ev(`[...document.querySelectorAll('.finder-table tbody button')].find((b) => b.innerText === 'Open in Voyage Planner').click()`);
   await waitFor(`document.querySelectorAll('.planner-chip').length === 2 && document.querySelectorAll('.planner-stat').length === 5`, 'the Planner with that build', 15000);
   const rank = await ev(`Number(document.querySelector('.planner-fields input[type=number]').value)`);
   check(rank === firstRank, `Open in Planner loads the build at its rank (${rank}) and both sectors`);

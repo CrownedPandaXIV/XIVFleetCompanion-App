@@ -47,8 +47,8 @@ const ROUTE_OPT_COLUMN_DEFS = [
   // Green for more gil a day, red for less (as the plugin).
   { key: 'gain', label: 'Gil/day gain', cell: (r) => (r.gain === null ? <span className="dim">—</span>
     : <span className={r.gain > 0 ? 'tone-good' : r.gain < 0 ? 'tone-danger' : ''}>{r.gain > 0 ? '+' : r.gain < 0 ? '−' : ''}{Math.abs(r.gain).toLocaleString()}</span>), sort: (r) => r.gain },
-  { key: 'planner', label: 'Planner', cell: (r, ctx) => (ctx && ctx.onOpenPlanner
-    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(r.cid, r.sub_name)} title="Open this sub's build and route in Sub Calculator → Planner.">Open in Planner</button>
+  { key: 'planner', label: 'Voyage Planner', cell: (r, ctx) => (ctx && ctx.onOpenPlanner
+    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(r.cid, r.sub_name)} title="Open this sub's build and route in Sub Calculator → Voyage Planner.">Open in Voyage Planner</button>
     : null) }
 ];
 const ROUTE_OPT_DUPLICATE_EXTRAS = ['x_world'];

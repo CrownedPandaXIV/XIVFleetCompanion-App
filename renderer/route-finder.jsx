@@ -66,7 +66,7 @@ const RF_COLUMN_DEFS = [
     : <span className="rf-barcell"><span className="rf-lead">{r.itemPerDay.toFixed(2)}</span><RfBar value={r.itemPerDay} max={ctx.max.item} /></span>}</td>, sort: (r) => r.itemPerDay || 0 },
   { key: 'tiers', label: 'Loot tier per stop', td: (r) => <td><RfTiers stops={r.stops} /></td>, sort: (r) => r.stops.reduce((s, x) => s + (x.tier || 0), 0) },
   { key: 'range', label: 'Range', td: (r, ctx) => <td className="num" title={`${plannerN(ctx.range - r.range)} more range than this route uses (${plannerN(r.range)})`}><span className="finder-spare">+{plannerN(ctx.range - r.range)}</span></td>, sort: (r) => -r.range },
-  { key: 'planner', label: 'Planner', td: (r, ctx) => <td><button className="finder-open" onClick={() => ctx.onOpen(r)}>Open in Planner</button></td> },
+  { key: 'planner', label: 'Voyage Planner', td: (r, ctx) => <td><button className="finder-open" onClick={() => ctx.onOpen(r)}>Open in Voyage Planner</button></td> },
 ];
 
 function RouteFinderView({ refreshKey, onOpenPlanner }) {
@@ -183,12 +183,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
     onOpen: (r) => onOpenPlanner({ rank, parts, route: r.route }) };
   const discoveredHere = onMap.filter((s) => stateOf(s.id) === 'discovered');
   const chanceHere = onMap.filter((s) => stateOf(s.id) === 'chance');
-  const fcSelect = (
-    <select value={fcId ?? ''} onChange={(e) => setFcId(e.target.value || null)}>
-      {(base.fcs || []).length === 0 && <option value="">No Free Company yet</option>}
-      {(base.fcs || []).map((f) => <option key={f.fcId} value={f.fcId}>{f.name}{f.readAt ? '' : ' (not read yet)'}</option>)}
-    </select>
-  );
+  const fcSelect = <FcPicker fcs={base.fcs} value={fcId} onChange={setFcId} />;
   const notRead = (
     <span className="dim">Not read yet: every sector is allowed. The plugin reads it in the workshop once the Voyage Control Panel's submarines
       are opened (AutoRetainer does at each collection).</span>

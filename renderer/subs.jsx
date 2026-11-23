@@ -219,8 +219,8 @@ const SUB_COLUMN_DEFS = [
     ? <React.Fragment><span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span><FightClubBlocked blocked={s.target_blocked} /></React.Fragment>
     : <span className="dim">—</span>), sort: (r) => r.target_route || null },
   { key: 'targetGilDay', label: 'Target gil/day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
-  { key: 'planner', label: 'Planner', cell: (s, ctx) => (ctx && ctx.onOpenPlanner
-    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(s.cid, s.sub_name)} title="Open this sub's build and route in Sub Calculator → Planner.">Open in Planner</button>
+  { key: 'planner', label: 'Voyage Planner', cell: (s, ctx) => (ctx && ctx.onOpenPlanner
+    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(s.cid, s.sub_name)} title="Open this sub's build and route in Sub Calculator → Voyage Planner.">Open in Voyage Planner</button>
     : null) },
   { key: 'craft', label: 'Fight Club builds', cell: (s, ctx) => (
       <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)}

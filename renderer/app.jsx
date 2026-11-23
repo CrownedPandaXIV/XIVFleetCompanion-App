@@ -12,7 +12,7 @@ const VIEWS = [
   { key: 'parts', label: 'Parts', group: 'Submarines' },
   { key: 'supplies', label: 'Supplies', group: 'Submarines' },
   { key: 'salvage', label: 'Salvage', group: 'Submarines' },
-  { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
+  { key: 'planner', label: 'Voyage Planner', group: 'Sub Calculator' },
   { key: 'routeFinder', label: 'Route Finder', group: 'Sub Calculator' },
   { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
   { key: 'compare', label: 'Compare Builds', group: 'Sub Calculator' },
@@ -432,13 +432,13 @@ function App() {
     }).catch(() => {});
   }, []);
   const [trendsPreset, setTrendsPreset] = useState(null);
-  // "Open in Planner" on the Subs and Route Optimization pages: the sub to load, then the Planner page.
+  // "Open in Voyage Planner" on the Subs and Route Optimization pages: the sub to load, then the Voyage Planner page.
   const [plannerSub, setPlannerSub] = useState(null);
   const openInPlanner = (cid, subName) => { setPlannerSub({ cid, subName, at: Date.now() }); setCurrentView('planner'); };
   // From the Build Finder: a build and route (not one of your subs).
   const openBuildInPlanner = (build) => { setPlannerSub({ build, at: Date.now() }); setCurrentView('planner'); };
   // Sub Calculator → Compare: its builds (up to 3) and route, kept while you move between pages, so Add to compare on
-  // the Build Finder and Planner lands there. addToCompare: { rank, parts, route, label, who, world, fcId }; the route is
+  // the Build Finder and Voyage Planner lands there. addToCompare: { rank, parts, route, label, who, world, fcId }; the route is
   // taken only when Compare has none yet.
   const [compareState, setCompareState] = useState({ builds: [], route: [], mapId: null });
   const compareKeys = compareState.builds.map((b) => `${b.rank}|${b.parts.join(',')}`);

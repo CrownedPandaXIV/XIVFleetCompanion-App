@@ -148,7 +148,7 @@ function SuppliesView({ refreshKey }) {
   const [saveError, setSaveError] = useState(null);
   const typing = useRef(false);
   // The price of a Magitek repair material (repair kit): for the gil of what to buy here, Fight Club's gil a day after
-  // repairs and the Planner's repair cost. Saved when the box is left.
+  // repairs and the Voyage Planner's repair cost. Saved when the box is left.
   const [kitInput, setKitInput] = useState('');
   const [kitError, setKitError] = useState(null);
   const typingKit = useRef(false);
@@ -218,7 +218,7 @@ function SuppliesView({ refreshKey }) {
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} />
           {' '}days
         </label>
-        <label title="What one Magitek repair material (repair kit) costs you, in gil: for the cost of what to buy, Fight Club's gil a day after repairs and the Planner's repairs">
+        <label title="What one Magitek repair material (repair kit) costs you, in gil: for the cost of what to buy, Fight Club's gil a day after repairs and the Voyage Planner's repairs">
           Repair kit price{' '}
           <input type="number" min={0} value={kitInput} placeholder="e.g. 2000" style={{ width: '80px' }}
             onChange={(e) => setKitInput(e.target.value)} onFocus={() => { typingKit.current = true; }}

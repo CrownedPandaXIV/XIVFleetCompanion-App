@@ -505,6 +505,16 @@
     .planner-picker-list button.planner-picker-sub { display: grid; grid-template-columns: 1.3fr 0.6fr 0.6fr 1fr 1.4fr; gap: 8px; padding-left: 22px; font-size: 12px; font-variant-numeric: tabular-nums; }
     .planner-picker-list button.planner-picker-sub.chosen { outline: 1px solid var(--link); }
     .planner-picker-sub-name { font-weight: 500; }
+    .fc-picker { position: relative; vertical-align: middle; }
+    .fc-picker-button { min-width: 220px; }
+    .planner-picker-panel.fc-picker-panel { left: 0; width: 460px; max-width: 80vw; }
+    .planner-picker-list button.fc-picker-row { display: flex; justify-content: space-between; gap: 12px; padding-left: 22px; }
+    .planner-picker-list button.fc-picker-row.chosen { outline: 1px solid var(--link); }
+    /* A page working out its answer: a line saying so, and the old answer dimmed until the new one is in. */
+    .working { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--text-bright); font-weight: 600; }
+    .working-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--link) 30%, transparent); border-top-color: var(--link); animation: working-spin 0.8s linear infinite; }
+    @keyframes working-spin { to { transform: rotate(360deg); } }
+    .is-busy { opacity: 0.4; transition: opacity 0.15s; }
     /* Build Finder: what you want, the options, the builds (soft colour behind tags, from the look's own colours). */
     .finder { display: flex; flex-direction: column; gap: 14px; padding: 0 24px 12px; }
     .finder-band { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -591,7 +601,10 @@
     .lv-mid { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .lv-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--dim); }
     .lv-facts b { color: var(--text-bright); font-weight: 600; }
-    .lv-parts { margin-left: 10px; }
+    /* A stage's parts, set apart from its route: a line before them, a "Parts" label, outlined letters. */
+    .lv-parts { display: inline-flex; align-items: center; gap: 4px; margin-left: 14px; padding-left: 12px; border-left: 1px solid var(--border-strong); vertical-align: middle; }
+    .lv-parts-label { font-size: 11px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; margin-right: 2px; }
+    .finder-part.lv-part { background: transparent; color: var(--link); border: 1px solid color-mix(in srgb, var(--link) 55%, transparent); }
     .lv-better { font-size: 12px; color: var(--text-soft); }
     .lv-swap { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 7px; padding: 8px 12px; font-size: 13px; }
     .lv-swap b { color: var(--warn); }

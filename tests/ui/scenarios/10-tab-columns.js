@@ -31,7 +31,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Subs', nav: 'Subs',
-      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'planner', 'fight club builds'],
+      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'voyage planner', 'fight club builds'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
@@ -54,7 +54,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Route Optimization', nav: 'Route Optimization',
-      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain', 'planner'],
+      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain', 'voyage planner'],
       move: ['gil/day gain', 'sub'], remove: 'Sub', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
     },
     {
@@ -74,7 +74,7 @@ module.exports = async (t) => {
     },
     {
       // The Planner's first table (What this build reaches), once a synced sub is loaded from the sub picker.
-      name: 'Planner (what this build reaches)', nav: 'Planner', prepare: async () => {
+      name: 'Voyage Planner (what this build reaches)', nav: 'Voyage Planner', prepare: async () => {
         await waitFor(`document.querySelector('.planner-picker-button') && !document.querySelector('.planner-picker-button').disabled`, 'the sub picker', 20000);
         await ev(`document.querySelector('.planner-picker-button').click()`);
         await waitFor(`document.querySelectorAll('.planner-picker-sub').length > 0`, 'the subs to choose', 10000);

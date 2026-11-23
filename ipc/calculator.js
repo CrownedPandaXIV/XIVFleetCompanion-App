@@ -140,9 +140,27 @@ async function fcIdsOf(client) {
 }
 
 // Every Free Company with subs or a reading, by name, each with the sectors the plugin last read in its workshop
-// (database update 18): [{ fcId, name, readAt (ms, or null: not read yet), sectors: { id: [unlocked, explored] } }].
+// (database update 18): [{ fcId, name, world, accounts: [{ account ('' when none), sortIndex }], readAt (ms, or null: not
+// read yet), sectors: { id: [unlocked, explored] } }].
 async function fcSectors(client) {
   const fcIds = await fcIdsOf(client);
+  // Who is in each FC, for the pickers: the account labels its characters are on (each with the place of the first of
+  // them in the Character Roster), and its world.
+  const members = new Map();
+  try {
+    const { latestCharacter } = await snapshotFragments(client);
+    const rows = (await client.query(`SELECT c.cid::text AS cid, c.world, c.account_label, c.fc_id::text AS fc_id, so.sort_index
+      FROM ${latestCharacter} c LEFT JOIN character_sort_order so ON so.cid = c.cid`)).rows;
+    for (const r of rows) {
+      if (!r.fc_id || r.fc_id === '0') continue;
+      if (!members.has(r.fc_id)) members.set(r.fc_id, { world: '', accounts: new Map() });
+      const m = members.get(r.fc_id);
+      if (!m.world && r.world) m.world = r.world;
+      const account = r.account_label || '';
+      const at = r.sort_index === null || r.sort_index === undefined ? 1e9 : Number(r.sort_index);
+      m.accounts.set(account, Math.min(m.accounts.has(account) ? m.accounts.get(account) : 1e9, at));
+    }
+  } catch { /* no snapshots yet: the pickers show names only */ }
   const names = new Map();
   try {
     for (const r of (await client.query('SELECT cid, fc_name FROM companion_character_housing')).rows) {
@@ -163,6 +181,11 @@ async function fcSectors(client) {
     const at = r.read_at instanceof Date ? r.read_at.getTime() : typeof r.read_at === 'number' ? r.read_at * 1000 : new Date(r.read_at).getTime();
     one.readAt = Math.max(one.readAt || 0, at || 0) || null;
     one.sectors[Number(r.sector_id)] = [r.unlocked === true || Number(r.unlocked) === 1, r.explored === true || Number(r.explored) === 1];
+  }
+  for (const one of byFc.values()) {
+    const m = members.get(one.fcId);
+    one.world = m ? m.world : '';
+    one.accounts = m ? [...m.accounts.entries()].map(([account, sortIndex]) => ({ account, sortIndex })) : [];
   }
   return [...byFc.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -368,7 +391,8 @@ async function levellingFor(client, request = {}) {
   if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
   const { game } = cache;
   const maxHours = Number(request.maxHours) || null;
-  const read = readOf(request.fcId);
+  // everySector: as if every sector were discovered (the full-map plan), whatever the FC has read.
+  const read = request.everySector ? null : readOf(request.fcId);
   const searchFor = (r) => levelling.searches({ game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read: r, maxHours });
   const search = searchFor(read);
   const every = read ? searchFor(null) : null;

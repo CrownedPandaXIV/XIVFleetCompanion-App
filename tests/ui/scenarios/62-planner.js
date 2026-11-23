@@ -7,7 +7,7 @@ module.exports = async (t) => {
   await nav('Summary');
   check(await ev(`[...document.querySelectorAll('.sidebar-group-title')].some((g) => g.innerText.trim().toLowerCase() === 'sub calculator')`),
     'the sidebar has a Sub Calculator group');
-  await nav('Planner');
+  await nav('Voyage Planner');
   await waitFor(`document.querySelectorAll('.planner-stat').length === 5`, 'the Planner', 20000);
 
   // The sub picker: grouped by account and character, each sub saying where it is; the search narrows it.
@@ -59,8 +59,8 @@ module.exports = async (t) => {
 
   // "Open in Planner" on the Subs page loads that sub.
   await nav('Subs');
-  await waitFor(`[...document.querySelectorAll('button')].some((b) => b.innerText === 'Open in Planner')`, 'Open in Planner on Subs', 15000);
-  const subName = await ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText === 'Open in Planner');
+  await waitFor(`[...document.querySelectorAll('button')].some((b) => b.innerText === 'Open in Voyage Planner')`, 'Open in Planner on Subs', 15000);
+  const subName = await ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText === 'Open in Voyage Planner');
     const name = b.closest('tr').querySelector('td').innerText; b.click(); return name; })()`);
   await waitFor(`document.querySelector('.planner-picker-button') && !document.querySelector('.planner-picker-button').innerText.includes('Choose') && document.querySelectorAll('.planner-chip').length > 0`, 'the Planner with that sub', 15000);
   const chosenText = await ev(`document.querySelector('.planner-picker-button').innerText`);

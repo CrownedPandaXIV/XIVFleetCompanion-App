@@ -62,8 +62,8 @@ const FINDER_COLUMN_DEFS = [
     ? <td className="tone-good">All owned</td>
     : <td title={r.missingParts.map((p) => `${partNameOf(p.letter)} ${FINDER_SLOTS[p.slot]}`).join(', ')}>{r.missingParts.length} part{r.missingParts.length === 1 ? '' : 's'}</td>),
   sort: (r) => (r.missingParts ? r.missingParts.length : null) },
-  { key: 'planner', label: 'Planner / Compare', sortable: false, cell: (r, ctx) => (ctx && ctx.onOpen
-    ? <span className="finder-buttons"><button type="button" className="finder-open" onClick={() => ctx.onOpen(r)} title="Open this build and the route in Sub Calculator → Planner.">Open in Planner</button>
+  { key: 'planner', label: 'Voyage Planner / Compare', sortable: false, cell: (r, ctx) => (ctx && ctx.onOpen
+    ? <span className="finder-buttons"><button type="button" className="finder-open" onClick={() => ctx.onOpen(r)} title="Open this build and the route in Sub Calculator → Voyage Planner.">Open in Voyage Planner</button>
       <CmpAddButton compare={ctx.compare} build={{ label: r.parts.join(''), who: 'from the Build Finder', rank: r.rank, parts: r.parts, route: ctx.route }} /></span> : null) },
 ];
 
@@ -87,7 +87,7 @@ const finderChance = (c) => (c === null || c === undefined ? '' : c < 0.01 ? 'un
 // Find an item: every sector that drops it, on every map, with the rank it needs, the lowest tier it drops at, how
 // often and how many, and the surveillance that tier takes. Add puts the sector in with the item as its goal.
 // How many each time, at poor, normal and optimal retrieval ("1–5 · 5–10 · 10–15"), each saying on hover the retrieval it
-// needs there. The Planner shows the one a build reaches.
+// needs there. The Voyage Planner shows the one a build reaches.
 function FinderAmounts({ it }) {
   if (!it.amounts) return <span className="dim">{it.low === it.high ? it.low : `${it.low}–${it.high}`} each</span>;
   const span = ([a, b]) => (a === b ? `${a}` : `${a}–${b}`);
@@ -360,7 +360,8 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
       {found && found.error && <div className="error">Couldn't find builds: {found.error}</div>}
       {found && found.need && (
         <section className="finder-band">
-          <h2 className="finder-heading">Builds that get it {busy && <span className="count">working out…</span>}</h2>
+          <h2 className="finder-heading">Builds that get it</h2>
+          <Working busy={busy}>Working out the builds…</Working>
           <div className="finder-needs">
             {FINDER_NEEDED.filter(([k]) => found.need[k]).map(([k, label]) => {
               const bp = found.need[k];
@@ -404,7 +405,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
           {rows.length > 0 && (
             <React.Fragment>
               <div className="controls finder-columns"><ColumnPicker cols={cols} /></div>
-              <div className="finder-table">
+              <div className={`finder-table${busy ? ' is-busy' : ''}`}>
                 <table>
                   <thead><tr><ColumnHeadCells cols={cols} sortColumn={finderSort.sortColumn} sortDirection={finderSort.sortDirection} onSortClick={(k) => finderSort.handleSortClick(k)} /></tr></thead>
                   <tbody>

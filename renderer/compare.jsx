@@ -2,7 +2,7 @@
 // Same route: every build flies the one route you set, so the numbers compare the builds alone. Best route each: each
 // build gets its own best route on a map (as the Route Finder ranks them), so the numbers compare build and route
 // together. The best figure in each row is green. The builds come from your subs, typed in, or Add to compare on the
-// Build Finder and Planner; the app keeps them while you move between pages. The plugin's Compare page is the same.
+// Build Finder and Voyage Planner; the app keeps them while you move between pages. The plugin's Compare page is the same.
 
 const CMP_MAX = 3;
 const CMP_MODES = [['same', 'Same route'], ['best', 'Best route each']];
@@ -24,7 +24,7 @@ const CMP_VOYAGE_ROWS = [
   { key: 'netPerDay', label: 'Gil a day after repairs', show: (v) => plannerN(v), gil: true, title: 'Gil a day less the repair kits, at the Supplies page\'s kit price' },
 ];
 
-// "Add to compare" on the Build Finder and Planner (compare: the app's link to the Compare page). Once the build is
+// "Add to compare" on the Build Finder and Voyage Planner (compare: the app's link to the Compare page). Once the build is
 // in, the button opens Compare; with three in, it says so.
 function CmpAddButton({ compare, build }) {
   if (!compare) return null;
@@ -217,7 +217,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
         <div className="cmp-add">
           {!full && <PlannerSubPicker subs={base.subs} chosen={null} onChoose={addSub} />}
           <button onClick={addTyped} disabled={full}>Type one in</button>
-          <span className="dim">{full ? 'Take one out to add another.' : 'or use Add to compare on the Build Finder or Planner.'}</span>
+          <span className="dim">{full ? 'Take one out to add another.' : 'or use Add to compare on the Build Finder or Voyage Planner.'}</span>
         </div>
       </section>
 
@@ -274,10 +274,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
           <React.Fragment>
             <div className="rf-note">
               <span className="finder-field">Sectors explored by
-                <select value={fcShown ?? ''} onChange={(e) => setFcId(e.target.value || null)}>
-                  {(base.fcs || []).length === 0 && <option value="">No Free Company yet</option>}
-                  {(base.fcs || []).map((f) => <option key={f.fcId} value={f.fcId}>{f.name}{f.readAt ? '' : ' (not read yet)'}</option>)}
-                </select>
+                <FcPicker fcs={base.fcs} value={fcShown} onChange={setFcId} />
               </span>
               <span className="dim">{fc && fc.readAt ? `read at the workshop ${rfWhen(fc.readAt)}.` : 'Not read yet: every sector is allowed.'}</span>
             </div>
@@ -295,11 +292,12 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
       </section>
 
       <section className="finder-band">
-        <h2 className="finder-heading">Side by side <span className="count">green: the best of these builds{busy ? ' · working out…' : ''}</span></h2>
+        <h2 className="finder-heading">Side by side <span className="count">green: the best of these builds</span></h2>
+        <Working busy={busy && builds.length > 0}>Working out the comparison…</Working>
         {answer && answer.error && <div className="error">{answer.error}</div>}
-        {!builds.length && <div className="status">Add a build to start: one of your subs, one typed in, or Add to compare on the Build Finder or Planner.</div>}
+        {!builds.length && <div className="status">Add a build to start: one of your subs, one typed in, or Add to compare on the Build Finder or Voyage Planner.</div>}
         {builds.length > 0 && (
-          <div className="cmp-wrap">
+          <div className={`cmp-wrap${busy ? ' is-busy' : ''}`}>
             <table className="cmp-table">
               <thead>
                 <tr>
@@ -352,7 +350,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
                   {builds.map((b, i) => {
                     const c = cols && cols[i];
                     const rt = c && c.route.length ? c.route : route;
-                    return <td key={cmpKey(b)}><button className="finder-open" onClick={() => onOpenPlanner({ rank: b.rank, parts: b.parts, route: rt })}>Open in Planner</button></td>;
+                    return <td key={cmpKey(b)}><button className="finder-open" onClick={() => onOpenPlanner({ rank: b.rank, parts: b.parts, route: rt })}>Open in Voyage Planner</button></td>;
                   })}
                 </tr>
               </tbody>
@@ -362,7 +360,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
       </section>
 
       <div className="planner-foot dim">
-        Numbers as the Planner works them out. Best route each: as the Route Finder ranks them (up to 5 stops), only through sectors the
+        Numbers as the Voyage Planner works them out. Best route each: as the Route Finder ranks them (up to 5 stops), only through sectors the
         Free Company has discovered. A build that can't fly the route shows why instead of numbers.
       </div>
     </div>

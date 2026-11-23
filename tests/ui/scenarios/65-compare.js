@@ -57,7 +57,7 @@ module.exports = async (t) => {
 
   // Best route each.
   await button('Best route each');
-  await waitFor(`!/working out/.test(document.querySelector('.cmp').innerText)`, 'worked out', 20000);
+  await waitFor(`!document.querySelector('.cmp .working')`, 'worked out', 20000);
   await waitFor(`(() => { const tr = [...document.querySelectorAll('.cmp-table tbody tr')].find((r) => r.querySelector('th') && r.querySelector('th').innerText.trim() === 'Its best route');
     return tr && tr.querySelectorAll('td')[0].querySelectorAll('.rf-letter').length > 0; })()`, 'each build\'s best route', 20000);
   await ev(`document.querySelector('.cmp-table').scrollIntoView()`);
@@ -74,7 +74,7 @@ module.exports = async (t) => {
   await button('Same route');
 
   // Add to compare on the Planner: your sub is in already; another rank is added, and three is the most.
-  await nav('Planner');
+  await nav('Voyage Planner');
   await waitFor(`document.querySelectorAll('.planner-stat').length === 5`, 'the Planner', 15000);
   await setInput(`document.querySelector('.planner-fields input[type=number]')`, 50);
   await waitFor(`!!document.querySelector('.planner-compare button') && document.querySelector('.planner-compare button').innerText === 'Add to compare'`, 'Add to compare', 10000);
