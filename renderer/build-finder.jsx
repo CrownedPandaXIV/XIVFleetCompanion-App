@@ -233,7 +233,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
     setBusy(true);
     const timer = setTimeout(() => {
       window.api.findSubBuilds({ goals, sortBy, sureOnly, forCid: forSub ? forSub.cid : null, slots, limit: 200 }).then((r) => {
-        if (call !== latest.current) return;
+        if (call !== latest.current || r.stopped) return;
         setBusy(false);
         setFound(r.success ? r : { error: r.error });
       });

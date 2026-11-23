@@ -12,6 +12,7 @@ const { itemNames, itemPrices } = require('./details');
 const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
 const { snapshotFragments } = require('../db');
 const finder = require('../subs/build-finder');
+const { searchBuilds } = require('../subs/build-search');
 const routeFinder = require('../subs/route-finder');
 const compare = require('../subs/compare');
 const levelling = require('../subs/levelling');
@@ -437,7 +438,8 @@ async function levellingFor(client, request = {}) {
 // the app's other pages aren't held up, one worker per kind of job, kept for the next job. A newer job of a kind stops
 // the one before it instead of waiting for it. If a worker can't be started or fails, the job is worked out here.
 // -> { result } | { stopped: true } | { error }
-const IN_PROCESS = { levelling: (job) => levelling.plansFor(job), routes: (job) => routeFinder.findRoutes(job), compare: (job) => routeFinder.findRoutes(job) };
+const IN_PROCESS = { levelling: (job) => levelling.plansFor(job), routes: (job) => routeFinder.findRoutes(job), compare: (job) => routeFinder.findRoutes(job),
+  builds: (job) => searchBuilds(job) };
 const workers = new Map(); // kind -> { worker, pending: { job, finish } | null }
 const here = (kind, job) => { try { return { result: IN_PROCESS[kind](job) }; } catch (err) { return { error: err && err.message ? err.message : String(err) }; } };
 function runIn(kind, job) {
@@ -524,18 +526,15 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
   const route = sectors.length > 1 ? calc.bestOrder(sectors, start, 100) : sectors;
   const minRank = Math.max(1, ...sectors.map((s) => s.rankReq));
   const owned = await ownedParts(client, forCid);
-  const all = finder.findBuilds({ need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
-    minRank, maxRank: game.maxRank, route, start, owned, sureOnly, partRank: levelling.partRanks(game.parts) });
-  // The part filter applies before the list is cut, so the counts and rank groups follow it.
-  const rows = finder.sortBuilds(finder.filterByParts(all, slots, owned), sortBy);
+  // Searched in the background worker (subs/build-search.js); a newer search stops this one.
+  const worked = await runIn('builds', { need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
+    minRank, maxRank: game.maxRank, route, start, owned, sureOnly, gameParts: game.parts, slots, sortBy, limit });
+  if (worked.stopped) return { success: false, stopped: true, error: 'A newer search was asked for.' };
+  if (worked.error) return { success: false, error: worked.error };
   return {
-    unfiltered: all.length,
+    ...worked.result,
     success: true, need, why, missing, minRank, route: route.map((s) => s.id), rangeNeeded: calc.rangeUsed(route, start),
-    total: rows.length, sure: rows.filter((r) => r.sure).length, outOfRange: rows.filter((r) => r.rangeShort > 0).length,
-    // How many builds work from each rank (in range), for the page's group headings.
-    byRank: rows.reduce((counts, r) => { if (!(r.rangeShort > 0)) counts[r.rank] = (counts[r.rank] || 0) + 1; return counts; }, {}),
     sectorLetters: sectors.map((s) => s.letter),
-    rows: rows.slice(0, Math.max(1, Number(limit) || 200)),
   };
 }
 

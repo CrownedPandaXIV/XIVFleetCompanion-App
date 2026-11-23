@@ -11,6 +11,7 @@ Fixes to the Sub Calculator and the market price, from a full check of 1.12.0.
 - **Route Finder** and **Compare Builds** search only for the routes they show, in the background: "Any" on a 30-sector
   map takes a fraction of a second instead of several, and the rest of the app no longer waits on it. With the list cut
   to the best 100, the count reads "The best 100 routes" (the full count shows when every route fits on the list).
+- **Build Finder** searches in the background too, so the rest of the app doesn't wait on it.
 - Reopening a Sub Calculator page keeps the market prices already fetched.
 
 ### Numbers
