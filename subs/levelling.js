@@ -214,6 +214,18 @@ function markBetter(plan, every, read) {
   return plan;
 }
 
+// Where each part swap shows: before the first stage that uses it (the first voyage leaving at its rank or above; a
+// swap found where a new part opens can fall inside a stage, as when a voyage goes from rank 49 to 51), at that
+// stage's rank, when the sub is back in port to change it. -> [[{ ...swap, showRank }] per stage]
+function swapsByStage(plan) {
+  const out = plan.stages.map(() => []);
+  for (const s of plan.swaps || []) {
+    const i = plan.stages.findIndex((st) => st.fromRank >= s.atRank);
+    if (i >= 0) out[i].push({ ...s, showRank: plan.stages[i].fromRank });
+  }
+  return out;
+}
+
 // Every sub's plan for one request (ipc/calculator.js, run in subs/levelling-worker.js so a newer request can stop it).
 // job: { game (with expToNext), data, prices, repairKitCost, read (Map id -> { unlocked, explored }, or null), maxHours,
 // suggest, standardOnly, subs: [{ key, rank, exp, target, parts, owned: ['letter|slot'] }] } -> [{ key, rank, target, ...plan }]
@@ -227,8 +239,8 @@ function plansFor(job) {
     const plan = levellingPlan({ rank: s.rank, exp: s.exp, target: s.target, expToNext: game.expToNext, parts: s.parts, bestAt: search.bestAt, score: search.score,
       suggest: !!job.suggest, standardOnly: !!job.standardOnly, owned: new Set(s.owned || []), partRank });
     if (read) markBetter(plan, every, read);
-    return { key: s.key, rank: s.rank, target: s.target, ...plan };
+    return { key: s.key, rank: s.rank, target: s.target, ...plan, swapsByStage: swapsByStage(plan) };
   });
 }
 
-module.exports = { plansFor, searches, markBetter, partRanks, MAX_VOYAGES, MIN_GAIN, MAX_SWAPS, STANDARD, ALL_PARTS, simulate, partsWith, levellingPlan };
+module.exports = { swapsByStage, plansFor, searches, markBetter, partRanks, MAX_VOYAGES, MIN_GAIN, MAX_SWAPS, STANDARD, ALL_PARTS, simulate, partsWith, levellingPlan };

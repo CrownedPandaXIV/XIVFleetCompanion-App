@@ -74,3 +74,10 @@ test('an undiscovered sector is mentioned only when it gives at least 1% more an
   assert.ok(lv.markBetter(stage(99), every, read).stages[0].better); // about 1% more
   assert.deepStrictEqual(lv.markBetter(stage(90), every, read).stages[0].better.missing, [9]);
 });
+
+test('a swap shows before the first stage that uses it, even when found inside a stage', () => {
+  // Stages from 47 and 51 (a voyage goes from 49 to 51); a swap at 50 is first used from 51, and shown there.
+  const plan = { stages: [{ fromRank: 47 }, { fromRank: 51 }, { fromRank: 54 }], swaps: [{ atRank: 47, slot: 2 }, { atRank: 50, slot: 0 }, { atRank: 54, slot: 1 }] };
+  const by = lv.swapsByStage(plan);
+  assert.deepStrictEqual(by.map((l) => l.map((s) => `${s.slot}@${s.showRank}`)), [['2@47'], ['0@51'], ['1@54']]);
+});

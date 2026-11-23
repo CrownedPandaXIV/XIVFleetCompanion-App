@@ -18,7 +18,8 @@ const lvStart = (sub) => Math.max(Date.now(), sub && sub.returnTime ? sub.return
 
 // One plan's stages, with the part swaps between them and what each stage could gain from a sector not discovered.
 function LvStages({ plan, sectorOf, onOpenPlanner }) {
-  const swapsAt = (rank) => plan.swaps.filter((s) => s.atRank === rank);
+  // Each swap before the first stage that uses it (subs/levelling.js swapsByStage).
+  const swapsAt = plan.swapsByStage || plan.stages.map(() => []);
   return (
     <div className="lv-stages">
       {plan.stages.map((st, i) => {
@@ -27,9 +28,9 @@ function LvStages({ plan, sectorOf, onOpenPlanner }) {
         const opened = before ? st.route.filter((id) => !before.route.includes(id) && (sectorOf.get(id) || {}).rankReq > before.fromRank) : [];
         return (
           <React.Fragment key={`${st.fromRank}-${i}`}>
-            {swapsAt(st.fromRank).map((s) => (
+            {swapsAt[i].map((s) => (
               <div key={`swap-${s.atRank}-${s.slot}`} className="lv-swap">
-                <b>At rank {s.atRank}: {lvSlot[s.slot]} → {partNameOf(s.to)}</b>
+                <b>At rank {s.showRank}: {lvSlot[s.slot]} → {partNameOf(s.to)}</b>
                 <span>{s.owned ? '(you have one)' : '(to get)'}</span>
                 <span className="dim">→</span>
                 <span>{plannerN(s.gain * 100)}% more experience an hour, {lvDays(s.savedHours)} sooner in all</span>
