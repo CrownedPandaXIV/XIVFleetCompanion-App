@@ -16,13 +16,15 @@ const { version: APP_VERSION } = require('../../package.json');
 const DB_DIR = path.join(__dirname, '..', '..', 'db');
 const plugin = process.argv[2];
 
-// What a database looks like: the same queries run in the plugin's test (copied there through the fixture).
+// What a database looks like: the same queries run in the plugin's test (copied there through the fixture). Sorted
+// byte by byte (COLLATE "C"), so the order is the same whatever the database's own sort order (a "C" database puts
+// "companion_fc_sub_sector" before "companion_fcs", an English one after).
 const SIGNATURE = {
-  columns: `SELECT table_name || '.' || column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, '') AS v
+  columns: `SELECT v FROM (SELECT table_name || '.' || column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, '') AS v
             FROM information_schema.columns WHERE table_schema = 'public'
-              AND table_name NOT IN (SELECT table_name FROM information_schema.views WHERE table_schema = 'public') ORDER BY 1`,
-  indexes: `SELECT indexdef AS v FROM pg_indexes WHERE schemaname = 'public' ORDER BY 1`,
-  views: `SELECT viewname || ' ' || md5(definition) AS v FROM pg_views WHERE schemaname = 'public' ORDER BY 1`,
+              AND table_name NOT IN (SELECT table_name FROM information_schema.views WHERE table_schema = 'public')) s ORDER BY v COLLATE "C"`,
+  indexes: `SELECT v FROM (SELECT indexdef AS v FROM pg_indexes WHERE schemaname = 'public') s ORDER BY v COLLATE "C"`,
+  views: `SELECT v FROM (SELECT viewname || ' ' || md5(definition) AS v FROM pg_views WHERE schemaname = 'public') s ORDER BY v COLLATE "C"`,
   versions: `SELECT version || ' ' || name AS v FROM companion_schema_version ORDER BY version`,
   viewsChecksum: `SELECT checksum AS v FROM companion_views`,
 };
