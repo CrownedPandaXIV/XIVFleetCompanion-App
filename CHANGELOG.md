@@ -51,7 +51,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   - **Find an item:** type a name (Cocobolo Lumber, say) to see every sector on every map that drops it, with the
     rank it needs, the lowest tier it drops at, how often and how many, and the surveillance that tier takes. Add puts
     the sector in with the item as its goal; a sector on another map switches the map after asking.
-  - **Only these parts:** a dropdown per slot (hull, stern, bow, bridge) with Any, Plain only, Modified only, Ones I
+  - **Only these parts:** a dropdown per slot (hull, stern, bow, bridge) with Any, Standard only, Modified only, Ones I
     own, or parts to tick. It filters every build before the list is cut to 200, so the counts and rank groups follow it.
 - **Choosing one of your subs on the Planner.** The dropdown is replaced by a panel grouped by account, then
   character (with world and Free Company), each group folding away, with a search for character, world, account,
@@ -89,7 +89,7 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   the lowest to the highest.
 - **Planner: the notes under a tier, retrieval or double dip wrap** inside their column instead of being cut off.
 - **Column widths are saved once, when you let go** of a column's edge, not at every move of the mouse.
-- **Sub Calculator → Compare (new page).** Up to three builds side by side. Add one of your subs, type one in, or use
+- **Sub Calculator → Compare Builds (new page).** Up to three builds side by side. Add one of your subs, type one in, or use
   **Add to compare** on the Build Finder and Planner (the builds stay while you move between pages). Two ways to compare:
   - **Same route:** every build flies the route you set, so the numbers compare the builds alone. A build that can't fly
     it says why ("Out of range: needs 20 more", "Rank too low for R") instead of numbers.
@@ -98,6 +98,20 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
     and route together. Each build's route is shown at the top of its column.
   Rows: the five stats, range used, voyage, experience and gil a voyage and a day, repair kits a day, gil a day after
   repairs, and what each build reaches at each stop. The best figure in each row is green. Open in Planner on each.
+- **Sub Calculator → Levelling Plan (new page).** A sub's way from its rank to a target rank: by default the rank of its
+  next build (as on the Subs page), else the top rank. Each voyage is on the route best for experience an hour at the
+  rank it leaves at, as the Route Finder ranks them, on any map and only through sectors your Free Company has discovered.
+  Experience carries over into the next rank as the game gives it.
+  - **The plan:** ranks and experience needed, voyages, about how many days and the date it gets there, ceruleum tanks
+    and repair kits, and a strip showing how long each stage takes.
+  - **Stages:** a card per route, with its ranks, days and voyages, voyage length, experience a voyage and an hour, the
+    sectors a new rank opens, and, when a sector your FC hasn't discovered yet would do better, by how much. Open in
+    Planner on each.
+  - **Plan for one sub, or every sub in a Free Company** (one line each, with when it gets there; Stages opens it).
+  - **Keep this build, or suggest changes on the way:** at the start of each stage, the one-part swap that makes the
+    route at least 3% faster for experience and the whole plan shorter, saying whether you have the part and how much
+    sooner it gets there. **Standard parts only** leaves Modified parts out, for their cost and repairs.
+- **Build Finder: a slot's Any is highlighted** while that slot has a filter, as the way to clear it.
 
 ## 1.11.0 - 2026-11-21
 

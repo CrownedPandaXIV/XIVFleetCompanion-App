@@ -55,15 +55,19 @@ module.exports = async (t) => {
   check(true, 'Add puts the item on its sector as a goal');
   await waitFor(`document.querySelectorAll('.finder-table tbody tr:not(.finder-group)').length > 0 && !document.body.innerText.includes('working out')`, 'the builds again', 30000);
 
-  // Only these parts: Hull plain only.
+  // Only these parts: Hull Standard only.
   await ev(`document.querySelector('.finder-slot-button').click()`);
   await ev(`document.querySelector('.finder-filter').scrollIntoView()`);
   await t.shot('build-finder-slot');
-  await ev(`[...document.querySelectorAll('.finder-slot-panel button')].find((b) => b.innerText === 'Plain only').click()`);
+  await ev(`[...document.querySelectorAll('.finder-slot-panel button')].find((b) => b.innerText === 'Standard only').click()`);
   await waitFor(`/with these parts/.test(document.querySelector('.finder-tally').innerText) && !document.body.innerText.includes('working out')`, 'the part filter', 30000);
   const hulls = await ev(`[...document.querySelectorAll('.finder-table tbody tr:not(.finder-group)')].map((tr) => tr.querySelector('.finder-part').innerText)`);
   const slotText = await ev(`document.querySelector('.finder-slot-button').innerText`);
-  check(hulls.length > 0 && hulls.every((h) => !h.endsWith('+')) && /Plain only/.test(slotText), `Hull: plain only leaves plain hulls (${[...new Set(hulls)].join(', ')})`);
+  check(hulls.length > 0 && hulls.every((h) => !h.endsWith('+')) && /Standard only/.test(slotText), `Hull: Standard only leaves Standard hulls (${[...new Set(hulls)].join(', ')})`);
+  // With a filter on, the slot's Any is lit (the way to clear it); with none, it's a plain link.
+  if (!(await ev(`!!document.querySelector('.finder-slot-panel')`))) await ev(`document.querySelector('.finder-slot-button').click()`);
+  const anyLit = await ev(`(() => { const b = [...document.querySelectorAll('.finder-slot-panel button')].find((x) => x.innerText === 'Any'); return b ? b.className + '|' + b.title : ''; })()`);
+  check(/finder-any on/.test(anyLit) && /Clear this slot's filter/.test(anyLit), `Any is highlighted while the slot has a filter (${anyLit})`);
   const tallyFiltered = await ev(`document.querySelector('.finder-tally').innerText.replace(/\\s+/g, ' ')`);
   check(/[\d,]+ builds · [\d,]+ with these parts/.test(tallyFiltered), `the counts say how many have these parts (${tallyFiltered})`);
   await ev(`[...document.querySelectorAll('.finder-filter button')].find((b) => b.innerText === 'Clear filters').click()`);

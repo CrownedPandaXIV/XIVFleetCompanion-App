@@ -205,7 +205,37 @@ const compareAnswers = compareCases.map((c) => {
   return { ...c, columns, marks: cmp.bestMarks(columns.map((col) => col.values)) };
 });
 
-console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);
+// The Levelling Plan's answers (subs/levelling.js): subs from a rank to a target, with and without the FC's reading,
+// keeping the build or with swaps suggested (Standard parts only in one), on made-up experience a rank.
+const lv = require('../../subs/levelling');
+const expToNext = new Map(ranks.map((r) => [r.id, r.id < 125 ? 30000 + r.id * 2500 : 0]));
+const lvGame = { ...game, maps: [1, 2].map((id) => ({ id, name: `Map ${id}` })), stats: { rankStatsById, partStatsByClassSlot } };
+const lvOwned = ['W+|0', 'C|1', 'U+|2'];
+const levellingCases = [
+  { rank: 20, exp: 500, target: 45, parts: ['S', 'U', 'W', 'C'], read: false, maxHours: 24, suggest: false, standardOnly: false },
+  { rank: 40, exp: 0, target: 80, parts: ['W+', 'C+', 'W+', 'C+'], read: true, maxHours: 36, suggest: true, standardOnly: false },
+  { rank: 70, exp: 1200, target: 100, parts: ['S', 'S', 'S', 'S'], read: true, maxHours: 24, suggest: true, standardOnly: true },
+  { rank: 100, exp: 0, target: 125, parts: ['Y+', 'Y+', 'Y+', 'Y+'], read: false, maxHours: 48, suggest: true, standardOnly: false },
+];
+const lvSearch = new Map();
+const lvSearchFor = (withRead, maxHours) => {
+  const k = `${withRead}|${maxHours}`;
+  if (!lvSearch.has(k)) lvSearch.set(k, lv.searches({ game: lvGame, data, prices, repairKitCost, read: withRead ? read : null, maxHours }));
+  return lvSearch.get(k);
+};
+const levellingAnswers = levellingCases.map((c) => {
+  const search = lvSearchFor(c.read, c.maxHours);
+  const plan = lv.levellingPlan({ rank: c.rank, exp: c.exp, target: c.target, expToNext, parts: c.parts, bestAt: search.bestAt, score: search.score,
+    suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned) });
+  if (c.read) lv.markBetter(plan, lvSearchFor(false, c.maxHours), read);
+  return { ...c, voyages: plan.voyages, hours: r6(plan.hours), tanks: plan.tanks, kits: r6(plan.kits), expNeeded: plan.expNeeded, reached: plan.reached, stuckAt: plan.stuckAt,
+    keepHours: r6(plan.keepHours), swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),
+    stages: plan.stages.map((st) => ({ fromRank: st.fromRank, toRank: st.toRank, route: st.route, parts: st.parts, voyages: st.voyages, hours: r6(st.hours),
+      expPerVoyage: r6(st.expPerVoyage), expPerHour: r6(st.expPerHour), tanks: st.tanks, kits: r6(st.kits),
+      better: st.better ? { route: st.better.route, expPerHour: r6(st.better.expPerHour), missing: st.better.missing } : null })) };
+});
+
+console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Levelling: ${levellingAnswers.map((a) => `${a.voyages} voyages, ${a.stages.length} stages, ${a.swaps.length} swaps${a.reached ? '' : ` (stuck at ${a.stuckAt})`}`).join(' | ')}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);
 const file = process.argv[2];
 if (file) {
   fs.writeFileSync(file, JSON.stringify({
@@ -216,6 +246,7 @@ if (file) {
       cases: routeAnswers, unlocks: [{ read: 'all', maps, ...unlocksAnswer }, { read: 'early', maps, ...unlocksEarly }],
       fightClub: { rows: fightClubRows, maps: letterMaps.map((m) => ({ id: m.id, letters: [...m.byLetter.entries()] })), cases: fightClubAnswers } },
     compare: { cases: compareAnswers },
+    levelling: { expToNext: [...expToNext.entries()], owned: lvOwned, cases: levellingAnswers },
   }));
   console.log(`wrote ${file}`);
 }

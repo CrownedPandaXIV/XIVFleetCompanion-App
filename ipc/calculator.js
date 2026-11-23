@@ -11,6 +11,7 @@ const { snapshotFragments } = require('../db');
 const finder = require('../subs/build-finder');
 const routeFinder = require('../subs/route-finder');
 const compare = require('../subs/compare');
+const levelling = require('../subs/levelling');
 const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
@@ -57,7 +58,7 @@ async function loadGame(client) {
     : []).map((r) => ({ class: Number(r.class), slot: Number(r.slot), rank: Number(r.rank) || 0, repairKits: Number(r.kits) || 0 }))
     .filter((p) => p.class > 0);
   const maxRank = Math.max(1, ...[...expToNext.entries()].filter(([, e]) => e > 0).map(([r]) => r + 1));
-  return { sectors, startingPoints, maps, parts, stats, maxRank };
+  return { sectors, startingPoints, maps, parts, stats, maxRank, expToNext };
 }
 
 // The page's starting data: maps, sectors, part classes, the player's subs, and where the loot data is from.
@@ -82,7 +83,7 @@ async function loadCalculator(client) {
     subs = (await loadSubmarines(client)).map((s) => ({
       cid: String(s.cid), subName: s.sub_name, character: s.character_name || 'Unknown character', world: s.world || '',
       account: s.account_label || '', fc: fcNames.get(String(s.cid)) || '', fcId: fcIds.get(String(s.cid)) || null, sortIndex: s.sort_index ?? null,
-      rank: s.rank, parts: s.part_letters, routeText: s.current_route || '', returnTime: Number(s.return_time) || 0,
+      rank: s.rank, exp: Number(s.current_exp) || 0, parts: s.part_letters, routeText: s.current_route || '', returnTime: Number(s.return_time) || 0,
       route: Array.from(s.points || []).filter((b) => b > 0),
     })).filter((s) => s.parts.every((p) => CLASS_OF[p]));
   } catch { /* no subs yet: the page still works from scratch */ }
@@ -359,6 +360,34 @@ async function compareFor(client, request = {}) {
   return { success: true, mode, columns, marks: compare.bestMarks(columns.map((c) => c.values)), pricing };
 }
 
+// The Levelling Plan: { subs: [{ key, rank, exp, target, parts, cid }], fcId, maxHours, suggest, standardOnly }. Each
+// sub's plan from its rank to its target (subs/levelling.js), only through the sectors the FC has discovered; each
+// stage also says when a sector not discovered yet would give a better route.
+async function levellingFor(client, request = {}) {
+  if (!cache) await loadCalculator(client);
+  if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
+  const { game } = cache;
+  const maxHours = Number(request.maxHours) || null;
+  const read = readOf(request.fcId);
+  const searchFor = (r) => levelling.searches({ game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read: r, maxHours });
+  const search = searchFor(read);
+  const every = read ? searchFor(null) : null;
+  const { expToNext } = game;
+  const plans = [];
+  for (const s of (request.subs || []).slice(0, 8)) {
+    const rank = Math.max(1, Number(s.rank) || 1);
+    const target = Math.min(game.maxRank, Math.max(rank, Number(s.target) || game.maxRank));
+    const parts = (s.parts || []).slice(0, 4);
+    if (parts.length !== 4 || parts.some((l) => !CLASS_OF[l])) { plans.push({ key: s.key, error: 'This build has a part the calculator doesn\'t know.' }); continue; }
+    const owned = request.suggest && s.cid ? await ownedParts(client, s.cid).catch(() => new Set()) : new Set();
+    const plan = levelling.levellingPlan({ rank, exp: Number(s.exp) || 0, target, expToNext, parts, bestAt: search.bestAt, score: search.score,
+      suggest: !!request.suggest, standardOnly: !!request.standardOnly, owned });
+    if (read) levelling.markBetter(plan, every, read);
+    plans.push({ key: s.key, rank, target, ...plan });
+  }
+  return { success: true, read: !!read, plans };
+}
+
 // A part class's letter (Syldra is Y, not S).
 const LETTER_OF_CLASS = { Shark: 'S', Unkiu: 'U', Whale: 'W', Coelacanth: 'C', Syldra: 'Y' };
 
@@ -427,6 +456,7 @@ ipcMain.handle('find-sub-builds', (event, request) => withClient((client) => fin
 ipcMain.handle('find-sub-routes', (event, request) => withClient((client) => routesFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('get-fc-unlocks', (event, fcId) => withClient(async (client) => { if (!cache) await loadCalculator(client); return unlocksFor(fcId); }, (err) => ({ success: false, error: err.message })));
 ipcMain.handle('compare-sub-builds', (event, request) => withClient((client) => compareFor(client, request), (err) => ({ success: false, error: err.message })));
+ipcMain.handle('plan-sub-levelling', (event, request) => withClient((client) => levellingFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('plan-sub-voyage', (event, request) => withClient((client) => planPriced(client, request), (err) => ({ success: false, error: err.message })));
 
-module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts, routesFor, unlocksFor, fcSectors, compareFor };
+module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts, routesFor, unlocksFor, fcSectors, compareFor, levellingFor };

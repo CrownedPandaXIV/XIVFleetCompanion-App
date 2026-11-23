@@ -449,6 +449,12 @@ ipcMain.handle('get-submarines', async () => {
   });
 });
 
+// Each sub's next build rank (as the Subs page works it out), for the Levelling Plan's default target; nothing saved.
+ipcMain.handle('get-sub-next-builds', async () => withClient(async (client) => {
+  const rows = await loadSubmarinesWithRankUps(client);
+  return { success: true, rows: rows.filter((s) => s.rank_up && s.rank_up.nextBuild).map((s) => ({ cid: String(s.cid), subName: s.sub_name, rank: s.rank_up.nextBuild.rank })) };
+}, (err) => ({ success: false, error: err.message })));
+
 ipcMain.handle('get-forecast-accuracy', async () => {
   return withClient(async (client) => {
     return { success: true, accuracy: await loadForecastAccuracy(client) };

@@ -15,7 +15,8 @@ const VIEWS = [
   { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
   { key: 'routeFinder', label: 'Route Finder', group: 'Sub Calculator' },
   { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
-  { key: 'compare', label: 'Compare', group: 'Sub Calculator' },
+  { key: 'compare', label: 'Compare Builds', group: 'Sub Calculator' },
+  { key: 'levelling', label: 'Levelling Plan', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
   { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
@@ -726,6 +727,7 @@ function App() {
         {currentView === 'routeFinder' && <RouteFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
         {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} compare={compareLink} />}
         {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} compare={compareLink} />}
+        {currentView === 'levelling' && <LevellingView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
         {currentView === 'compare' && <CompareView refreshKey={refreshKey} state={compareState} setState={setCompareState} onOpenPlanner={openBuildInPlanner} />}
 
         {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}

@@ -153,15 +153,15 @@ function FinderItemSearch({ base, onAdd }) {
   );
 }
 
-// One slot's part filter: Any, Plain only, Modified only, Ones I own, or ticked parts.
-const FINDER_PLAIN = ['S', 'U', 'W', 'C', 'Y'];
+// One slot's part filter: Any, Standard only, Modified only, Ones I own, or ticked parts.
+const FINDER_STANDARD = ['S', 'U', 'W', 'C', 'Y'];
 const FINDER_MODIFIED = ['S+', 'U+', 'W+', 'C+', 'Y+'];
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
 function finderSlotText(value) {
   if (!value) return 'Any';
   if (value.own) return 'Ones I own';
   const l = value.letters;
-  if (sameSet(l, FINDER_PLAIN)) return 'Plain only';
+  if (sameSet(l, FINDER_STANDARD)) return 'Standard only';
   if (sameSet(l, FINDER_MODIFIED)) return 'Modified only';
   if (l.length > 3) return `${l.length} parts`;
   return l.map((x) => partNameOf(x).replace('Modified ', '') + (x.endsWith('+') ? '+' : '')).join(', ');
@@ -180,12 +180,13 @@ function FinderSlotFilter({ slot, value, onChange }) {
       {open && (
         <div className="finder-slot-panel">
           <div className="finder-slot-quick">
-            <button className="link-button" onClick={() => onChange(null)}>Any</button>
-            <button className="link-button" onClick={() => onChange({ letters: FINDER_PLAIN })}>Plain only</button>
+            {/* Any clears the slot's filter: lit while there is one, so it's plain how to clear it. */}
+            <button className={value ? 'finder-any on' : 'link-button'} onClick={() => onChange(null)} title={value ? "Clear this slot's filter" : undefined}>Any</button>
+            <button className="link-button" onClick={() => onChange({ letters: FINDER_STANDARD })}>Standard only</button>
             <button className="link-button" onClick={() => onChange({ letters: FINDER_MODIFIED })}>Modified only</button>
             <button className="link-button" onClick={() => onChange({ own: true })}>Ones I own</button>
           </div>
-          {[...FINDER_PLAIN, ...FINDER_MODIFIED].map((l) => (
+          {[...FINDER_STANDARD, ...FINDER_MODIFIED].map((l) => (
             <label key={l} className="finder-check">
               <input type="checkbox" checked={letters.includes(l)} onChange={() => toggle(l)} /> {partNameOf(l)}
             </label>

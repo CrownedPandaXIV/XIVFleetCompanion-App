@@ -14,7 +14,7 @@ module.exports = async (t) => {
   const row = (label) => ev(`(() => { const tr = [...document.querySelectorAll('.cmp-table tbody tr')].find((r) => r.querySelector('th') && r.querySelector('th').innerText.trim() === ${JSON.stringify(label)});
     return tr ? [...tr.querySelectorAll('td')].map((td) => ({ text: td.innerText.trim(), best: td.classList.contains('cmp-best') })) : null; })()`);
 
-  await nav('Compare');
+  await nav('Compare Builds');
   await waitFor(`/Add a build to start/.test(document.body.innerText)`, 'the empty Compare page', 20000);
   check(true, 'with no builds it says how to add one');
 

@@ -29,11 +29,11 @@ const CMP_VOYAGE_ROWS = [
 function CmpAddButton({ compare, build }) {
   if (!compare) return null;
   const inIt = compare.keys.includes(cmpKey(build));
-  if (inIt) return <button type="button" className="finder-open" onClick={compare.open} title="This build is in Compare: open it">In Compare ({compare.count}) ›</button>;
+  if (inIt) return <button type="button" className="finder-open" onClick={compare.open} title="This build is in Compare Builds: open it">In Compare ({compare.count}) ›</button>;
   const full = compare.count >= CMP_MAX;
   return (
     <button type="button" className="finder-open" disabled={full} onClick={() => compare.add(build)}
-      title={full ? 'Compare holds 3 builds: take one out there first.' : 'Add this build to Sub Calculator → Compare, to see it beside others.'}>Add to compare</button>
+      title={full ? 'Compare Builds holds 3 builds: take one out there first.' : 'Add this build to Sub Calculator → Compare Builds, to see it beside others.'}>Add to compare</button>
   );
 }
 
@@ -135,7 +135,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
 
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
   if (!base) return <div className="status">Loading...</div>;
-  if (base.missingGameData) return <div className="status">Compare needs the game data's sub tables. Update them in Settings → Data → Game Data.</div>;
+  if (base.missingGameData) return <div className="status">Compare Builds needs the game data's sub tables. Update them in Settings → Data → Game Data.</div>;
 
   const sectorOf = new Map(base.sectors.map((s) => [s.id, s]));
   const onMap = base.sectors.filter((s) => s.map === mapId).sort((a, b) => a.id - b.id);
