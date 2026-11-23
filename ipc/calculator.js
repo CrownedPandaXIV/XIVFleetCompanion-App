@@ -71,7 +71,8 @@ async function loadCalculator(client) {
   const data = calculatorData.load();
   const itemIds = [...new Set(data.sectors.flatMap((s) => Object.values(s.pools).flatMap((p) => p.loot.map((l) => l[0]))))];
   const [names, prices, repairKitCost] = await Promise.all([itemNames(client, itemIds), itemPrices(client, itemIds), repairKitCostFrom(client)]);
-  cache = { game, data, names, prices, repairKitCost, live: await universalisEnabled(client).catch(() => false), market: new Map(),
+  // The market answers already had (5 minutes each) are kept when a page opens again.
+  cache = { game, data, names, prices, repairKitCost, live: await universalisEnabled(client).catch(() => false), market: (cache && cache.market) || new Map(),
     fcs: await fcSectors(client).catch(() => []) };
 
   // The player's subs for the sub picker: who has them (account, character, world, Free Company), their build,
@@ -181,7 +182,8 @@ async function fcSectors(client) {
   } catch { /* a database without update 18 yet: nothing read */ }
   for (const r of rows) {
     const fc = String(r.fc_id);
-    if (!byFc.has(fc)) byFc.set(fc, { fcId: fc, name: names.get(fc) || `Free Company ${fc}`, readAt: null, sectors: {} });
+    // A Free Company no character is in any more (its characters removed): left out.
+    if (!byFc.has(fc)) continue;
     const one = byFc.get(fc);
     const at = r.read_at instanceof Date ? r.read_at.getTime() : typeof r.read_at === 'number' ? r.read_at * 1000 : new Date(r.read_at).getTime();
     one.readAt = Math.max(one.readAt || 0, at || 0) || null;
@@ -192,7 +194,7 @@ async function fcSectors(client) {
     one.world = m ? m.world : '';
     one.accounts = m ? [...m.accounts.entries()].map(([account, sortIndex]) => ({ account, sortIndex })) : [];
   }
-  return [...byFc.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...byFc.values()].sort((a, b) => a.name.localeCompare(b.name) || (a.fcId < b.fcId ? -1 : a.fcId > b.fcId ? 1 : 0));
 }
 
 // One FC's reading as subs/route-finder.js reads it (Map id -> { unlocked, explored }), or null when not read.
@@ -238,14 +240,24 @@ async function routesFor(client, request = {}) {
   const start = calc.startFor(onMap[0].id, game.startingPoints);
   const mustOk = must.every((id) => allowed.some((x) => x.id === id));
   const itemId = request.rankBy === 'item' && request.itemId ? Number(request.itemId) : null;
-  const routes = mustOk ? routeFinder.findRoutes({ sectors: allowed, start, stats, maxStops: request.maxStops, maxHours: Number(request.maxHours) || null,
-    must, values, rankBy: itemId ? 'item' : request.rankBy === 'gil' ? 'gil' : 'exp', itemId, opens: routeFinder.opensOf(openerOf), states,
-    exploreFirst: !!request.exploreFirst }) : [];
   const limit = Math.max(1, Number(request.limit) || 100);
+  // Only the best `limit` are searched for (sooner), unless new sectors come first: then every route, to sort them.
+  const exploreFirst = !!request.exploreFirst;
+  let routes = [];
+  if (mustOk) {
+    const worked = await runIn(request.kind === 'compare' ? 'compare' : 'routes', { sectors: allowed, start, stats, maxStops: request.maxStops,
+      maxHours: Number(request.maxHours) || null, must, values, rankBy: itemId ? 'item' : request.rankBy === 'gil' ? 'gil' : 'exp', itemId,
+      opens: routeFinder.opensOf(openerOf), states, exploreFirst, limit: exploreFirst ? 0 : limit });
+    if (worked.stopped) return { success: false, stopped: true, error: 'A newer search was asked for.' };
+    if (worked.error) return { success: false, error: worked.error };
+    routes = worked.result || [];
+  }
   return {
     success: true, stats, read: !!read, pricing,
     tiles: onMap.map((x) => ({ id: x.id, state: states.get(x.id), rankOk: x.rankReq <= rank, allowed: allowed.some((a) => a.id === x.id) })),
-    total: routes.length, newOnes: routes.filter((r) => r.explores + r.chances > 0).length,
+    // total: how many fit, known only when every route was looked at (null: at least the ones shown).
+    total: exploreFirst ? routes.length : routes.length < limit ? routes.length : null,
+    newOnes: routes.slice(0, exploreFirst ? routes.length : limit).filter((r) => r.explores + r.chances > 0).length,
     routes: routes.slice(0, limit).map((r) => ({ ...r, stops: r.route.map((id) => ({ id, tier: values.get(id).tier, tierSure: values.get(id).tierSure })) })),
   };
 }
@@ -359,6 +371,7 @@ async function compareFor(client, request = {}) {
   const mode = request.mode === 'best' ? 'best' : 'same';
   const builds = (request.builds || []).slice(0, compare.MAX_BUILDS);
   const columns = [];
+  const partRank = levelling.partRanks(game.parts);
   let pricing = { source: 'vendor' };
   for (const b of builds) {
     const rank = Number(b.rank);
@@ -370,22 +383,25 @@ async function compareFor(client, request = {}) {
       route = (request.route || []).map(Number).filter((id) => game.sectors.has(id)).slice(0, 5);
     } else {
       const r = await routesFor(client, { rank, parts: b.parts, mapId: request.mapId, maxStops: 5, maxHours: Number(request.maxHours) || null,
-        must: request.must || [], rankBy: request.rankBy === 'gil' ? 'gil' : 'exp', fcId: request.fcId, place: request.place, scope: request.scope, limit: 1 });
-      found = r.success ? r.total : 0;
+        must: request.must || [], rankBy: request.rankBy === 'gil' ? 'gil' : 'exp', fcId: request.fcId, place: request.place, scope: request.scope, limit: 1, kind: 'compare' });
+      if (r.stopped) return { success: false, stopped: true, error: r.error };
+      if (!r.success) return { success: false, error: r.error };
+      found = r.routes.length;
       route = r.success && r.routes && r.routes[0] ? r.routes[0].route : [];
     }
     const sectors = route.map((id) => game.sectors.get(id));
-    const check = compare.routeCheck(sectors, sectors.length ? calc.startFor(sectors[0].id, game.startingPoints) : null, stats, rank);
-    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0;
+    const check = compare.routeCheck(sectors, sectors.length ? calc.startFor(sectors[0].id, game.startingPoints) : null, stats, rank, b.parts || [], partRank);
+    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0 && check.partsNeed === 0;
     const plan = route.length ? await planPriced(client, { rank, parts: b.parts, route, place: request.place, scope: request.scope }) : null;
     if (plan && plan.pricing) pricing = plan.pricing;
     columns.push({
-      stats, route, found, used: check.used, short: check.short, tooHigh: check.tooHigh, flies,
+      stats, route, found, used: check.used, short: check.short, tooHigh: check.tooHigh, partsNeed: check.partsNeed, flies,
       sectors: plan && plan.sectors ? plan.sectors.map((s) => ({ id: s.id, letter: s.letter, hasData: s.hasData, result: s.result })) : [],
       values: compare.rowValues(stats, plan && plan.success ? plan : null, flies),
     });
   }
-  return { success: true, mode, columns, marks: compare.bestMarks(columns.map((c) => c.values)), pricing };
+  // A build whose parts can't be fitted at its rank isn't marked best at anything.
+  return { success: true, mode, columns, marks: compare.bestMarks(columns.map((c) => (c.partsNeed ? {} : c.values))), pricing };
 }
 
 // The Levelling Plan: { subs: [{ key, rank, exp, target, parts, cid }], fcId, maxHours, suggest, standardOnly }. Each
@@ -410,33 +426,53 @@ async function levellingFor(client, request = {}) {
   }
   const job = { game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read, maxHours,
     suggest: !!request.suggest, standardOnly: !!request.standardOnly, subs: asked };
-  const worked = await runLevelling(job);
+  const worked = await runIn('levelling', job);
   if (worked.stopped) return { success: false, stopped: true, error: 'A newer plan was asked for.' };
   if (worked.error) return { success: false, error: worked.error };
-  const byKey = new Map([...worked.plans, ...bad].map((p) => [p.key, p]));
+  const byKey = new Map([...worked.result, ...bad].map((p) => [p.key, p]));
   return { success: true, read: !!read, plans: (request.subs || []).slice(0, 8).map((s) => byKey.get(s.key)).filter(Boolean) };
 }
 
-// The Levelling Plan is worked out in a worker thread (subs/levelling-worker.js), so the app's other pages aren't held
-// up, and a newer request stops the one before it instead of waiting for it. If a worker can't be started, it's worked
-// out here.
-let levellingWorker = null;
-function runLevelling(job) {
-  if (levellingWorker) { levellingWorker.stop(); levellingWorker = null; }
+// The longer working out (the Levelling Plan, route searches) is done in a worker thread (subs/calculator-worker.js), so
+// the app's other pages aren't held up, one worker per kind of job, kept for the next job. A newer job of a kind stops
+// the one before it instead of waiting for it. If a worker can't be started or fails, the job is worked out here.
+// -> { result } | { stopped: true } | { error }
+const IN_PROCESS = { levelling: (job) => levelling.plansFor(job), routes: (job) => routeFinder.findRoutes(job), compare: (job) => routeFinder.findRoutes(job) };
+const workers = new Map(); // kind -> { worker, pending: { job, finish } | null }
+const here = (kind, job) => { try { return { result: IN_PROCESS[kind](job) }; } catch (err) { return { error: err && err.message ? err.message : String(err) }; } };
+function runIn(kind, job) {
+  const was = workers.get(kind);
+  if (was && was.pending) {
+    // A job still running: stop it (its worker goes; the next one starts fresh).
+    workers.delete(kind);
+    const p = was.pending;
+    was.pending = null;
+    p.finish({ stopped: true });
+    was.worker.terminate().catch(() => {});
+  }
   return new Promise((resolve) => {
-    let worker;
-    try {
-      worker = new Worker(path.join(__dirname, '..', 'subs', 'levelling-worker.js'));
-    } catch {
-      resolve({ plans: levelling.plansFor(job) });
-      return;
+    let entry = workers.get(kind);
+    if (!entry) {
+      let worker;
+      try {
+        worker = new Worker(path.join(__dirname, '..', 'subs', 'calculator-worker.js'));
+      } catch {
+        resolve(here(kind, job));
+        return;
+      }
+      entry = { worker, pending: null };
+      const settle = (answer) => { const p = entry.pending; entry.pending = null; worker.unref(); if (p) p.finish(answer); };
+      worker.on('message', (m) => settle(m && m.error ? { error: m.error } : { result: m && m.result }));
+      // The worker failed: worked out here instead, and the next job gets a new worker.
+      const failed = () => { if (workers.get(kind) === entry) workers.delete(kind); const p = entry.pending; if (p) settle(here(kind, p.job)); };
+      worker.on('error', failed);
+      worker.on('exit', failed);
+      workers.set(kind, entry);
     }
     let done = false;
-    const finish = (answer) => { if (done) return; done = true; if (levellingWorker && levellingWorker.worker === worker) levellingWorker = null; worker.terminate().catch(() => {}); resolve(answer); };
-    levellingWorker = { worker, stop: () => finish({ stopped: true }) };
-    worker.once('message', (m) => finish(m && m.error ? { error: m.error } : { plans: m.plans }));
-    worker.once('error', () => { if (!done) finish({ plans: levelling.plansFor(job) }); });
-    worker.postMessage(job);
+    entry.pending = { job, finish: (answer) => { if (!done) { done = true; resolve(answer); } } };
+    entry.worker.ref();
+    entry.worker.postMessage({ kind, job });
   });
 }
 

@@ -35,7 +35,7 @@ const LV_STAGE_COLUMN_DEFS = [
   { key: 'kits', label: 'Repair kits', default: false, td: (r) => <td className="num">{plannerN(r.kits)}</td>, sort: (r) => r.kits },
   { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better ? (
     <span className="lv-better">{r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? "isn't" : "aren't"} discovered yet:
-      with {r.better.missing.length === 1 ? 'it' : 'them'}, {r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives {plannerN((r.better.expPerHour / r.expPerHour - 1) * 100)}% more an hour.</span>
+      with {r.better.missing.length === 1 ? 'it' : 'them'}, {r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives {plannerN(r.better.gain * 100)}% more an hour{r.better.atRank > r.fromRank ? ` from rank ${r.better.atRank}` : ''}.</span>
   ) : <span className="dim">—</span>}</td> },
   { key: 'planner', label: 'Voyage Planner', sortable: false, cell: (r, ctx) => (
     <button className="finder-open" onClick={() => ctx.onOpenPlanner({ rank: r.fromRank, parts: r.parts, route: r.route })}>Open in Voyage Planner</button>) },
@@ -70,7 +70,7 @@ function LvStages({ plan, sectorOf, onOpenPlanner }) {
                     <b>At rank {s.showRank}: {lvSlot[s.slot]} → {partNameOf(s.to)}</b>
                     <span>{s.owned ? ' (you have one)' : ' (to get)'}</span>
                     <span className="dim"> → </span>
-                    <span>{plannerN(s.gain * 100)}% more experience an hour, {lvDays(s.savedHours)} sooner in all</span>
+                    <span>{s.gain === null ? `no route fits with the parts it has, ${lvDays(plan.hours)} to the target with this` : `${plannerN(s.gain * 100)}% more experience an hour, ${lvDays(s.savedHours)} sooner in all`}</span>
                   </td></tr>
                 ))}
                 <tr className={`lv-stage ${LV_STAGE_CLASSES[r.i % 4]}`}><ColumnBodyCells cols={cols} row={r} ctx={ctx} /></tr>
@@ -177,15 +177,18 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const keyOf = (s) => `${s.cid}|${s.subName}`;
   const defaultTarget = (s, r) => Math.min(base ? base.maxRank : r, Math.max(r + 1, nextBuilds.get(keyOf(s)) || (base ? base.maxRank : r)));
   const fcSubs = base ? base.subs.filter((s) => fcId && s.fcId === fcId) : [];
-  const goal = target ?? (chosen ? defaultTarget(chosen, rank) : base ? base.maxRank : rank);
+  // A target at or below the rank (the rank changed after it was picked) is the next rank up.
+  const goal = Math.min(base ? base.maxRank : rank, Math.max(rank + 1, target ?? (chosen ? defaultTarget(chosen, rank) : base ? base.maxRank : rank)));
+  // A sub's own target, while it's still above its rank (else the default).
+  const targetOf = (s) => (targets[keyOf(s)] > s.rank ? targets[keyOf(s)] : defaultTarget(s, s.rank));
 
   const latest = useRef(0);
   useEffect(() => {
     if (!base || base.missingGameData) return undefined;
     const subs = mode === 'one'
       ? [{ key: 'one', rank, exp, target: goal, parts, cid: chosen ? chosen.cid : null }]
-      : fcSubs.filter((s) => s.rank < base.maxRank).map((s) => ({ key: keyOf(s), rank: s.rank, exp: s.exp, target: targets[keyOf(s)] || defaultTarget(s, s.rank), parts: s.parts, cid: s.cid }));
-    if (!subs.length) { setAnswer(null); return undefined; }
+      : fcSubs.filter((s) => s.rank < base.maxRank).map((s) => ({ key: keyOf(s), rank: s.rank, exp: s.exp, target: targetOf(s), parts: s.parts, cid: s.cid }));
+    if (!subs.length) { setAnswer(null); latest.current += 1; setBusy(false); return undefined; }
     const call = ++latest.current;
     setBusy(true);
     const timer = setTimeout(() => {
@@ -218,7 +221,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const nextRank = chosen ? nextBuilds.get(keyOf(chosen)) : null;
   const fcSelect = <FcPicker fcs={base.fcs} value={fcId} onChange={setFcId} />;
   const everyBox = <label className="finder-check" title="Plan as if every sector were discovered: how long it takes once the Free Company has found them"><input type="checkbox" checked={everySector} onChange={(e) => setEverySector(e.target.checked)} /> Use every sector</label>;
-  const fcNote = <span className="dim">{everySector ? 'Every sector, as if all were discovered.' : fc && fc.readAt ? `Only sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}).` : 'Not read yet: every sector is allowed.'}</span>;
+  const fcNote = <span className="dim lv-note">{everySector ? 'Every sector, as if all were discovered.' : fc && fc.readAt ? `Only sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}).` : 'Not read yet: every sector is allowed.'}</span>;
   const choices = (
     <div className="finder-row">
       <span className="finder-field">Longest voyage
@@ -311,9 +314,9 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
           {fcSubs.length > 0 && (
             <div className={busy ? 'is-busy' : ''}>
               <LvFleet rows={fcSubs.map((s) => ({ ...s, key: keyOf(s), plan: plans ? plans.find((x) => x.key === keyOf(s)) || null : null, top: s.rank >= base.maxRank,
-                target: targets[keyOf(s)] || defaultTarget(s, s.rank) }))}
+                target: targetOf(s) }))}
                 ctx={{ sectorOf, maxRank: base.maxRank, setTarget: (s, r) => setTargets({ ...targets, [s.key]: r }),
-                  open: (s) => { loadSub(s); setTarget(targets[s.key] || null); setMode('one'); } }} />
+                  open: (s) => { loadSub(s); setTarget(targets[s.key] > s.rank ? targets[s.key] : null); setMode('one'); } }} />
             </div>
           )}
         </section>

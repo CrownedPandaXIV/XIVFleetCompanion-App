@@ -374,7 +374,8 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
     if (first) setMapId(first.map);
   };
   const add = () => {
-    const id = Number(adding || (onMap[0] && onMap[0].id));
+    // The sector picked, while it's still on this map and not on the route; else the first that is.
+    const id = Number(onMap.some((s) => String(s.id) === String(adding)) ? adding : onMap[0] && onMap[0].id);
     if (id && route.length < 5) { setRoute([...route, id]); setAdding(''); }
   };
   const bestOrder = () => window.api.planSubVoyage({ rank, parts, route, bestOrder: true }).then((r) => { if (r.success && r.route) setRoute(r.route); });
@@ -408,7 +409,8 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
             ))}
           </div>
           <PartRankNote base={base} rank={rank} parts={parts} />
-          {plan && !stats && <div className="supply-card-note">This rank or one of these parts isn't in the game data.</div>}
+          {plan && plan.error && <div className="error">Couldn't work out the plan: {plan.error}</div>}
+          {plan && !plan.error && !stats && <div className="supply-card-note">This rank or one of these parts isn't in the game data.</div>}
           {stats && compare && (
             <div className="planner-compare">
               <CmpAddButton compare={compare} build={chosen && chosen.rank === rank && chosen.parts.join() === parts.join()
@@ -428,7 +430,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
             </label>
             <label>Add a sector
               <span className="planner-add">
-                <select value={adding} onChange={(e) => setAdding(e.target.value)} disabled={route.length >= 5}>
+                <select value={onMap.some((s) => String(s.id) === String(adding)) ? adding : ''} onChange={(e) => setAdding(e.target.value)} disabled={route.length >= 5}>
                   {onMap.map((s) => <option key={s.id} value={s.id}>{s.letter}: {s.name} (rank {s.rankReq}){s.hasData ? '' : ', no loot data yet'}</option>)}
                 </select>
                 <button onClick={add} disabled={route.length >= 5 || !onMap.length}>Add</button>
@@ -456,7 +458,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
               <div><span>Voyage</span><b>{plannerHours(plan.hours)}</b></div>
               <div><span>Experience</span><b>{plannerN(plan.expSure)}</b>
                 <div className="dim" title="Bonus experience, from Pepper's FFXIV Ship Guide: optimal retrieval +25% (sure once its breakpoint is met); T2 loot +25%, T3 loot +50%, HQ materials +25% and a double dip +25% (luck); at most +100% a sector">
-                  {plan.expSure > plan.exp ? `${plannerN(plan.exp)} + sure bonus; ` : ''}up to {plannerN(plan.expBest)} with luck</div></div>
+                  {plan.expSure > plan.exp ? `${plannerN(plan.exp)} experience + sure bonus; ` : ''}up to {plannerN(plan.expBest)} with luck</div></div>
               <div><span>Ceruleum</span><b>{plannerN(plan.tanks)} tank{plan.tanks === 1 ? '' : 's'}</b></div>
             </div>
           )}
@@ -494,7 +496,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
                   {plan.pricing.adjusted} price{plan.pricing.adjusted === 1 ? '' : 's'} adjusted for odd listings</span>
               )}
               {plan.pricing && plan.pricing.error && <span className="tone-warn">Universalis: {plan.pricing.error} Vendor prices are shown.</span>}
-              {plan.pricing && plan.pricing.stale && <span className="tone-warn">Some prices are from earlier: {plan.pricing.stale.problem}</span>}
+              {plan.pricing && plan.pricing.stale && <span className="tone-warn">Some prices are from {plan.pricing.stale.since ? new Date(plan.pricing.stale.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'earlier'}: {plan.pricing.stale.problem}</span>}
             </div>
           )}
           <div className="supplies-summary planner-summary">

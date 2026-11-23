@@ -67,12 +67,41 @@ test('suggestions: only parts the sub\'s rank allows, looked at again from the r
 });
 
 test('an undiscovered sector is mentioned only when it gives at least 1% more an hour', () => {
-  const stage = (expPerHour) => ({ stages: [{ fromRank: 5, parts: ['S', 'S', 'S', 'S'], expPerHour }] });
+  const stage = (expPerHour) => ({ stages: [{ fromRank: 5, toRank: 6, parts: ['S', 'S', 'S', 'S'], expPerHour }] });
   const every = { bestAt: () => ({ route: [1, 9], expPerHour: 100 }) };
   const read = new Map([[1, { unlocked: true }]]);
   assert.strictEqual(lv.markBetter(stage(99.99), every, read).stages[0].better, null); // 0.01% more: not worth a line
   assert.ok(lv.markBetter(stage(99), every, read).stages[0].better); // about 1% more
   assert.deepStrictEqual(lv.markBetter(stage(90), every, read).stages[0].better.missing, [9]);
+  // Every rank of a stage is looked at, against the route it runs at that rank: only at rank 7 is it better.
+  const long = { stages: [{ fromRank: 5, toRank: 9, parts: ['S', 'S', 'S', 'S'], expPerHour: 100 }] };
+  const every2 = { bestAt: (r) => ({ route: [1, 9], expPerHour: r === 7 ? 120 : 100 }) };
+  const own = { bestAt: () => ({ route: [1], expPerHour: 100 }) };
+  const b = lv.markBetter(long, every2, read, own).stages[0].better;
+  assert.strictEqual(b.atRank, 7);
+  assert.ok(Math.abs(b.gain - 0.2) < 1e-9);
+});
+
+test('a stage shows its own averages, not its first voyage\'s', () => {
+  // The same route the whole way, but each rank gives more experience a voyage.
+  const grow = (rank) => ({ route: [1], hours: 10, exp: 100 * rank, expPerHour: 10 * rank });
+  const plan = lv.simulate({ rank: 1, exp: 0, target: 4, expToNext, partsAt: () => ['S', 'S', 'S', 'S'], bestAt: grow });
+  assert.strictEqual(plan.stages.length, 1);
+  const st = plan.stages[0];
+  assert.strictEqual(st.exp, plan.stages.reduce((s, x) => s + x.exp, 0));
+  assert.ok(Math.abs(st.expPerVoyage * st.voyages - st.exp) < 1e-6);
+  assert.ok(Math.abs(st.expPerHour * st.hours - st.exp) < 1e-6);
+  assert.ok(st.expPerVoyage > 100);
+});
+
+test('a plan stuck at its rank gets the one-part swap that lets it fly', () => {
+  // With a W in the first slot nothing fits; any other part there does.
+  const fly = (rank, parts) => (parts[0] === 'W' ? null : { route: [1], hours: 10, exp: 1000, expPerHour: 100 });
+  const plan = lv.levellingPlan({ rank: 1, exp: 0, target: 4, expToNext, parts: ['W', 'S', 'S', 'S'], bestAt: fly, score: () => 100, suggest: true });
+  assert.ok(plan.reached);
+  assert.strictEqual(plan.swaps[0].atRank, 1);
+  assert.strictEqual(plan.swaps[0].slot, 0);
+  assert.strictEqual(plan.swaps[0].gain, null);
 });
 
 test('a swap shows before the first stage that uses it, even when found inside a stage', () => {

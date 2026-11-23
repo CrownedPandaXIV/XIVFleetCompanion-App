@@ -1,0 +1,34 @@
+name: Sub Calculator data
+
+# Each week (and by hand): whether XIVStats or Pepper's guide has newer Sub Calculator data than the committed copy.
+# It changes nothing: when there is some, a warning says so, and the new data comes in as a change of its own
+# (node .github/scripts/refresh-sub-data.js, then the tests, then the plugin's copy), so what ships is always tested.
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+    - name: Read the sources again
+      shell: bash
+      run: |
+        cp subs/calculator-data.json /tmp/committed.json
+        node .github/scripts/refresh-sub-data.js
+        if cmp -s subs/calculator-data.json /tmp/committed.json; then
+          echo "The committed Sub Calculator data is up to date."
+        else
+          echo "::warning title=Sub Calculator data::Newer data is out. Refresh it with node .github/scripts/refresh-sub-data.js, run the tests and copy it to the plugin."
+          git --no-pager diff --stat -- subs/calculator-data.json
+        fi

@@ -26,14 +26,17 @@ const ROWS = [
 const STAT_KEYS = ['surveillance', 'retrieval', 'speed', 'range', 'favor'];
 
 // Whether a build can fly a route as given. sectors: in route order ({ id, letter, rankReq, x, y, z, surveyDistance });
-// start: the map's starting point. { used: range the route uses, short: range missing (0: in range), tooHigh: the
-// sectors above the build's rank }.
-function routeCheck(sectors, start, stats, rank) {
+// start: the map's starting point; parts: the 4 letters and partRank(letter, slot) -> the rank a part needs (levelling
+// partRanks). { used: range the route uses, short: range missing (0: in range), tooHigh: the sectors above the build's
+// rank, partsNeed: the rank its parts need when that's above its rank (0: they fit) }.
+function routeCheck(sectors, start, stats, rank, parts = [], partRank = null) {
   const used = sectors.length && start ? calc.rangeUsed(sectors, start) : null;
+  const need = partRank ? Math.max(0, ...parts.map((l, slot) => Number(partRank(l, slot)) || 0)) : 0;
   return {
     used,
     short: used !== null && stats ? Math.max(0, used - stats.range) : 0,
     tooHigh: sectors.filter((s) => s.rankReq > rank).map((s) => s.id),
+    partsNeed: need > rank ? need : 0,
   };
 }
 

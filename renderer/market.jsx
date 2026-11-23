@@ -19,7 +19,7 @@ const MARKET_ACCOUNT_COLUMN_DEFS = [
 const MARKET_SCOPE_NAMES = { world: 'World', dc: 'DC', region: 'Region' };
 const MARKET_CHEAPEST_DEFS = ['world', 'dc', 'region'].map((scope) => ({
   key: `cheapest_${scope}`,
-  label: `Cheapest on ${MARKET_SCOPE_NAMES[scope]}`,
+  label: `Market on ${MARKET_SCOPE_NAMES[scope]}`,
   td: (l) => {
     const o = l.others && l.others[scope];
     const cheaper = o && o.price < Number(l.unit_price);

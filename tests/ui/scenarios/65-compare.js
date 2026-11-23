@@ -29,6 +29,8 @@ module.exports = async (t) => {
   await button('Type one in');
   await waitFor(`document.querySelectorAll('.cmp-table thead .cmp-head').length === 2 && !!document.querySelector('.cmp-edit')`, 'the typed build, open to change', 5000);
   await setInput(`document.querySelector('.cmp-edit input[type=number]')`, 1);
+  // Shark parts, which rank 1 can fit (the Modified ones it starts with need rank 50).
+  for (let i = 0; i < 4; i++) await setSelect(`document.querySelectorAll('.cmp-edit select')[${i}]`, 'S');
   await button('Done');
   const heads = await ev(`[...document.querySelectorAll('.cmp-name')].map((n) => n.firstChild.textContent)`);
   check(heads[0] === subName && /^Build 2$/.test(heads[1]), `two builds as columns: your sub and a typed one (${heads.join(', ')})`);

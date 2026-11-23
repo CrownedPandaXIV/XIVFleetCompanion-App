@@ -12,9 +12,13 @@ test('a route out of range or above the rank says by how much', () => {
   const start = { x: 0, y: 0, z: 0 };
   const sectors = [{ id: 1, rankReq: 10, x: 1000, y: 0, z: 0, surveyDistance: 5 }, { id: 2, rankReq: 50, x: 2000, y: 0, z: 0, surveyDistance: 5 }];
   // 35 + 5, then 35 + 5: 80 range.
-  assert.deepStrictEqual(cmp.routeCheck(sectors, start, stats(100), 60), { used: 80, short: 0, tooHigh: [] });
-  assert.deepStrictEqual(cmp.routeCheck(sectors, start, stats(70), 40), { used: 80, short: 10, tooHigh: [2] });
-  assert.deepStrictEqual(cmp.routeCheck([], null, stats(70), 40), { used: null, short: 0, tooHigh: [] });
+  assert.deepStrictEqual(cmp.routeCheck(sectors, start, stats(100), 60), { used: 80, short: 0, tooHigh: [], partsNeed: 0 });
+  assert.deepStrictEqual(cmp.routeCheck(sectors, start, stats(70), 40), { used: 80, short: 10, tooHigh: [2], partsNeed: 0 });
+  assert.deepStrictEqual(cmp.routeCheck([], null, stats(70), 40), { used: null, short: 0, tooHigh: [], partsNeed: 0 });
+  // Parts that need a higher rank than the build's.
+  const needs = (l) => (l.endsWith('+') ? 50 : 1);
+  assert.strictEqual(cmp.routeCheck(sectors, start, stats(100), 20, ['W+', 'S', 'S', 'S'], needs).partsNeed, 50);
+  assert.strictEqual(cmp.routeCheck(sectors, start, stats(100), 60, ['W+', 'S', 'S', 'S'], needs).partsNeed, 0);
 });
 
 test('the rows: stats always, the voyage only when the build can fly it', () => {
