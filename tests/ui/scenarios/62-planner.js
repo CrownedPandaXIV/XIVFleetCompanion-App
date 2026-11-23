@@ -65,4 +65,17 @@ module.exports = async (t) => {
   await waitFor(`document.querySelector('.planner-picker-button') && !document.querySelector('.planner-picker-button').innerText.includes('Choose') && document.querySelectorAll('.planner-chip').length > 0`, 'the Planner with that sub', 15000);
   const chosenText = await ev(`document.querySelector('.planner-picker-button').innerText`);
   check(chosenText.includes(subName), `Open in Planner on Subs loads that sub (${subName}: "${chosenText}")`);
+
+  // A part the build's rank can't fit yet (Modified parts need rank 50 here): an amber note, the build still worked out.
+  const setField = (selector, value, kind) => ev(`(() => { const el = ${selector};
+    Object.getOwnPropertyDescriptor(${kind}.prototype, 'value').set.call(el, ${JSON.stringify(String(value))});
+    el.dispatchEvent(new Event(${kind === 'HTMLSelectElement' ? "'change'" : "'input'"}, { bubbles: true })); return true; })()`);
+  await setField(`document.querySelector('.planner-fields input[type=number]')`, 10, 'HTMLInputElement');
+  await setField(`document.querySelectorAll('.planner-fields select')[0]`, 'W+', 'HTMLSelectElement');
+  await waitFor(`!!document.querySelector('.part-rank-note')`, 'the part rank note', 10000);
+  const note = await ev(`document.querySelector('.part-rank-note').innerText`);
+  check(/^Not fittable at rank 10 yet: Modified Whale \(Hull\) needs rank 50\.$/.test(note), `a part above the build's rank gets an amber note (${note})`);
+  await setField(`document.querySelector('.planner-fields input[type=number]')`, 50, 'HTMLInputElement');
+  await waitFor(`!document.querySelector('.part-rank-note')`, 'the note gone at rank 50', 10000);
+  check(true, 'at the rank it needs, the note goes');
 };

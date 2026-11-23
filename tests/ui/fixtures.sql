@@ -96,7 +96,8 @@ update ffxiv_submarineexploration set destination = case id when '1' then 'the I
 alter table ffxiv_submarinerank add column surveillance_bonus text, add column retrieval_bonus text, add column favor_bonus text;
 update ffxiv_submarinerank set surveillance_bonus = id, retrieval_bonus = id, favor_bonus = id;
 alter table ffxiv_submarinepart add column surveillance text, add column retrieval text, add column favor text, add column rank text, add column repair_materials text;
-update ffxiv_submarinepart set surveillance = '20', retrieval = '25', favor = '15', rank = '1', repair_materials = '2';
+update ffxiv_submarinepart set surveillance = '20', retrieval = '25', favor = '15', rank = case when "class"::int >= 6 then '50' else '1' end, repair_materials = '2';
+-- Modified parts (classes 6 to 10) need rank 50, as in the game.
 
 -- Retainer look-ups used by the Retainers tab
 alter table ffxiv_classjob add column abbreviation text;

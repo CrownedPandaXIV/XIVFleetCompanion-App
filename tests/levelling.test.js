@@ -53,3 +53,15 @@ test('suggestions: the best one-part swap on the route being run, with the time 
   assert.strictEqual(off.swaps.length, 0);
   assert.strictEqual(off.hours, off.keepHours);
 });
+
+test('suggestions: only parts the sub\'s rank allows, looked at again from the rank a part opens', () => {
+  // W+ is the best part but needs rank 4; the plan runs one route from rank 1, so W+ comes in at rank 4, not before.
+  const score = (rank, parts, route) => (parts[0] === 'W+' ? 2 : 1) * route.length;
+  const partRank = (letter) => (letter === 'W+' ? 4 : 0);
+  const plan = lv.levellingPlan({ rank: 1, exp: 0, target: 8, expToNext, parts: ['S', 'S', 'S', 'S'], bestAt, score, suggest: true, partRank });
+  assert.ok(plan.swaps.every((s) => s.to !== 'W+' || s.atRank >= 4), JSON.stringify(plan.swaps));
+  assert.ok(plan.stages.every((s) => s.parts[0] !== 'W+' || s.fromRank >= 4));
+  // From the game's parts: Modified parts at rank 50, Shark from 1, Whale from 25.
+  const ranksOf = lv.partRanks([{ class: 3, slot: 0, rank: 1 }, { class: 1, slot: 2, rank: 25 }, { class: 6, slot: 0, rank: 50 }]);
+  assert.deepStrictEqual([ranksOf('S', 0), ranksOf('W', 2), ranksOf('W+', 0), ranksOf('Y', 1)], [1, 25, 50, 0]);
+});

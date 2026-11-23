@@ -91,7 +91,7 @@ module.exports = async (t) => {
   await t.shot('build-finder-in-range');
   for (const r of was) await t.query(`UPDATE ffxiv_submarinerank SET range_bonus = ${r.range_bonus === null ? 'NULL' : `'${String(r.range_bonus).replace(/'/g, "''")}'`} WHERE id = '${String(r.id).replace(/'/g, "''")}'`);
   await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
-  await waitFor(`[...document.querySelectorAll('.finder-group')].some((tr) => /^Out of range/.test(tr.innerText))`, 'the range put back', 30000);
+  await waitFor(`/[1-9][\\d,]* out of range/.test(document.querySelector('.finder-tally').innerText) && !document.querySelector('.working')`, 'the range put back', 30000);
 
   // Fastest voyage first.
   await setSelect(`document.querySelector('.finder-options select')`, 'speed');

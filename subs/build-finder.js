@@ -55,9 +55,10 @@ function needsFor(goals, dataOf, letterOf = (id) => String(id)) {
 // Every build that reaches the needs, each at the lowest rank it does, from minRank (the highest rank the sectors
 // need) up to maxRank. route: the sectors in the order using the least range ({ x, y, z, surveyMinutes,
 // surveyDistance }); start: its map's starting point; owned: Set of "letter|slot" the player has; sureOnly: list only
-// builds sure to reach them (past both sources' figures), at the rank they are sure from.
+// builds sure to reach them (past both sources' figures), at the rank they are sure from. partRank(letter, slot): the
+// rank a part needs (levelling.js partRanks); a build is never put below the highest its parts need.
 // Rows: { parts, rank, sure, sureRank, stats, spare, rangeNeeded, rangeShort, inRangeFrom, hours, missingParts }.
-function findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank = 1, maxRank, route = [], start = null, owned = null, sureOnly = false }) {
+function findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank = 1, maxRank, route = [], start = null, owned = null, sureOnly = false, partRank = () => 0 }) {
   const ranks = [];
   for (let r = Math.max(1, minRank); r <= maxRank; r++) {
     const s = rankStatsById.get(r);
@@ -80,6 +81,9 @@ function findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank = 1, ma
       }
     }
     if (!known) continue;
+    // The rank its parts can be fitted from.
+    let fitted = 0;
+    for (let slot = 0; slot < 4; slot++) fitted = Math.max(fitted, Number(partRank(parts[slot], slot)) || 0);
     const statsAt = (s) => {
       // The rank's figure first, then the parts' in slot order, as buildStats adds them.
       const out = {};
@@ -89,6 +93,7 @@ function findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank = 1, ma
     let found = null;
     let sureRank = null;
     for (const [r, s] of ranks) {
+      if (r < fitted) continue;
       const stats = statsAt(s);
       if (!found && meets(stats, 'low')) found = { rank: r, stats };
       if (meets(stats, 'high')) { sureRank = r; if (!found) found = { rank: r, stats }; break; }

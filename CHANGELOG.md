@@ -110,11 +110,21 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   - **Plan for one sub, or every sub in a Free Company** (one line each, with when it gets there; Stages opens it).
   - **Keep this build, or suggest changes on the way:** at the start of each stage, the one-part swap that makes the
     route at least 3% faster for experience and the whole plan shorter, saying whether you have the part and how much
-    sooner it gets there. **Standard parts only** leaves Modified parts out, for their cost and repairs. With swaps,
-    each stage's parts sit apart from its route, after a "Parts" label.
+    sooner it gets there. **Standard parts only** leaves Modified parts out, for their cost and repairs. Only parts the
+    sub's rank allows are suggested (Unkiu from rank 15, Whale 25, Coelacanth 35, Syldra 45, Modified parts 50), and
+    each rank a part opens at is looked at too. With swaps, each stage's parts sit apart from its route, after a "Parts"
+    label.
+  - **Quick on any voyage length:** the route search only follows routes that could still beat the best found, so a
+    plan from rank 1 to 145 on "Any" takes about a second instead of minutes, with the same answers. Changing a choice
+    stops the plan being worked out and starts the new one.
+    It's worked out away from the app's other pages, so they aren't held up.
   - **Use every sector:** the plan as if every sector were discovered, to see how long it takes once your Free
     Company has found them.
 - **Build Finder: a slot's Any is highlighted** while that slot has a filter, as the way to clear it.
+- **Build Finder: no build below the rank its parts need.** A build is listed from the highest rank its parts can be
+  fitted at (Unkiu 15, Whale 25, Coelacanth 35, Syldra 45, Modified parts 50), not just where its stats are enough.
+- **Voyage Planner and Compare Builds: an amber note for a part the rank can't fit yet** ("Not fittable at rank 10
+  yet: Modified Whale (Hull) needs rank 50."). The build is still worked out as typed.
 - **Working out… on the busy pages.** While the Levelling Plan, Compare Builds or Build Finder works out its answer, a
   line says so and the old answer is dimmed until the new one is in.
 - **Choosing a Free Company** (Levelling Plan, Route Finder, Compare Builds) works like choosing a sub: a panel grouped

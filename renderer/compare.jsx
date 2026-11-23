@@ -50,6 +50,7 @@ function CmpBuildHead({ build, base, editing, onEdit, onChange, onRemove }) {
         <span className="rf-pill">Rank {build.rank}</span>
         <span className="finder-parts">{build.parts.map((p, i) => <span key={i} className="finder-part">{p}</span>)}</span>
       </div>
+      <PartRankNote base={base} rank={build.rank} parts={build.parts} />
       <button className="link-button" onClick={onEdit}>{editing ? 'Done' : 'Change'}</button>
       {editing && (
         <div className="cmp-edit">

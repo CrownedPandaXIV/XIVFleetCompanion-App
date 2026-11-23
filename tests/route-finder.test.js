@@ -107,3 +107,24 @@ test("Fight Club routes against the FC's sectors: what's missing, and the best i
   const all = new Map([...read, [18, { unlocked: true, explored: false }]]);
   assert.deepStrictEqual(rf.fightClubCheck({ options, rank: 90, maps, read: all, bestOf }).missing, [], 'discovered is enough');
 });
+
+test('best only: the same best route as the whole list, with or without a rate to beat', () => {
+  for (let k = 0; k < 40; k++) {
+    const sectors = made(6 + (k % 12));
+    const stats = { speed: 20 + (k % 5) * 10, range: 150 + (k % 7) * 60 };
+    const values = valuesOf(sectors);
+    for (const maxHours of [24, 48, null]) {
+      const args = { sectors, start, stats, maxStops: 5, maxHours, values, rankBy: 'exp' };
+      const all = rf.findRoutes(args);
+      const one = rf.findRoutes({ ...args, bestOnly: true });
+      assert.deepStrictEqual(one.map((r) => r.route), all.slice(0, 1).map((r) => r.route), `case ${k}, ${maxHours}h`);
+      // A rate to beat: the best is kept when it reaches it; below it, nothing at least that good is claimed.
+      if (all[0]) {
+        const under = rf.findRoutes({ ...args, bestOnly: true, atLeast: all[0].expPerHour * 0.9 });
+        assert.deepStrictEqual(under[0].route, all[0].route);
+        const over = rf.findRoutes({ ...args, bestOnly: true, atLeast: all[0].expPerHour * 1.1 });
+        assert.ok(!over[0] || over[0].expPerHour < all[0].expPerHour * 1.1);
+      }
+    }
+  }
+});

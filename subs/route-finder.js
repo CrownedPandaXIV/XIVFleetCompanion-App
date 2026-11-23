@@ -80,9 +80,13 @@ function sectorValue(sector, dataSector, stats, prices) {
 // start: the map's starting point; stats: the build's; maxStops (1-5); maxHours (null: any); must: sector ids every route
 // has; values: Map id -> sectorValue; rankBy 'exp' | 'gil' | 'item' (itemId); opens: Map id -> [ids it may open];
 // states: Map id -> sectorStates' state; exploreFirst: routes exploring or with chances at new sectors first.
+// bestOnly (ranking by experience): only the best route is wanted (the Levelling Plan), so an order that can't beat the
+// best found so far however it goes on is not followed; the answer is the same as the whole list's first, sooner.
+// atLeast (with bestOnly): experience an hour already had elsewhere (another map); a route below it may be left out,
+// so the answer is the best route only when that is at least atLeast (else it's below atLeast, or none).
 // [{ route: [ids], hours, range, exp, expPerHour, gilPerVoyage, gilPerDay, itemPerDay, explores, chances }], best first.
 function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = null, must = [], values, rankBy = 'exp', itemId = null,
-  opens = new Map(), states = new Map(), exploreFirst = false }) {
+  opens = new Map(), states = new Map(), exploreFirst = false, bestOnly = false, atLeast = 0 }) {
   if (!start || !stats || !sectors.length) return [];
   const list = sectors.slice().sort((a, b) => a.id - b.id);
   const n = list.length;
@@ -93,6 +97,52 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   const mustMask = list.reduce((m, s, i) => (must.includes(s.id) ? m | (1 << i) : m), 0);
   const first = list.map((s) => leg(start, s, stats.speed));
   const legs = list.map((a) => list.map((b) => leg(a, b, stats.speed)));
+
+  // bestOnly: the most experience an hour any order could still reach, from its experience and seconds so far: with m
+  // more stops, at most the m best sectors' experience, and at least the m shortest ways into a sector (its survey and
+  // the shortest leg to it) in time.
+  const pruning = bestOnly && rankBy === 'exp' && !exploreFirst;
+  const expOf = list.map((s) => (values.get(s.id) || { exp: 0 }).exp);
+  const top = [0];
+  for (const e of expOf.slice().sort((a, b) => b - a)) top.push(top[top.length - 1] + Math.max(0, e));
+  const into = list.map((_, j) => { let m = Infinity; for (let i = 0; i < n; i++) if (i !== j) m = Math.min(m, legs[i][j].seconds); return Number.isFinite(m) ? m : 0; });
+  const least = [0];
+  for (const c of into.slice().sort((a, b) => a - b)) least.push(least[least.length - 1] + c);
+  let bestRate = pruning && atLeast > 0 ? atLeast / 3600 : -Infinity;
+  const couldBeat = (exp, seconds, size) => {
+    if (!pruning || bestRate <= 0) return true;
+    for (let m = 0; m <= stops - size && m < top.length; m++) {
+      if ((exp + top[m]) / (seconds + least[m]) >= bestRate * (1 - 1e-9)) return true;
+    }
+    return false;
+  };
+  // A good route to start from, so little is followed that can't beat it: from each sector, the next stop that gives
+  // the most experience an hour so far, while it fits.
+  if (pruning && !mustMask) {
+    for (let i = 0; i < n; i++) {
+      let at = i;
+      let seconds = FIXED_VOYAGE_SECONDS + first[i].seconds;
+      let range = first[i].range;
+      let exp = expOf[i];
+      let used = 1 << i;
+      if (range > rangeMax || seconds > secondsMax) continue;
+      bestRate = Math.max(bestRate, exp / seconds);
+      for (let size = 1; size < stops; size++) {
+        let pick = -1;
+        let pickRate = -Infinity;
+        for (let j = 0; j < n; j++) {
+          if (used & (1 << j)) continue;
+          const l = legs[at][j];
+          if (range + l.range > rangeMax || seconds + l.seconds > secondsMax) continue;
+          const rate = (exp + expOf[j]) / (seconds + l.seconds);
+          if (rate > pickRate) { pickRate = rate; pick = j; }
+        }
+        if (pick < 0) break;
+        seconds += legs[at][pick].seconds; range += legs[at][pick].range; exp += expOf[pick]; used |= 1 << pick; at = pick;
+        bestRate = Math.max(bestRate, exp / seconds);
+      }
+    }
+  }
 
   // Orders built a stop at a time: per set of sectors (a bit each) and the last one, the orders not beaten on both time
   // and range by another. { seconds, range, last: index, before: the label one stop shorter }.
@@ -107,11 +157,12 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
     map.set(key, kept);
   };
   const keep = (mask, label) => {
+    if (pruning && (mask & mustMask) === mustMask) bestRate = Math.max(bestRate, label.exp / label.seconds);
     const was = best.get(mask);
     if (!was || label.seconds < was.seconds || (label.seconds === was.seconds && label.range < was.range)) best.set(mask, label);
   };
   for (let i = 0; i < n; i++) {
-    const label = { seconds: FIXED_VOYAGE_SECONDS + first[i].seconds, range: first[i].range, last: i, before: null };
+    const label = { seconds: FIXED_VOYAGE_SECONDS + first[i].seconds, range: first[i].range, last: i, before: null, exp: expOf[i] };
     if (label.range > rangeMax || label.seconds > secondsMax) continue;
     offer(layer, (1 << i) * 32 + i, label);
   }
@@ -126,8 +177,9 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
         for (let j = 0; j < n; j++) {
           if (mask & (1 << j)) continue;
           const l = legs[last][j];
-          const grown = { seconds: label.seconds + l.seconds, range: label.range + l.range, last: j, before: label };
+          const grown = { seconds: label.seconds + l.seconds, range: label.range + l.range, last: j, before: label, exp: label.exp + expOf[j] };
           if (grown.range > rangeMax || grown.seconds > secondsMax) continue;
+          if (!couldBeat(grown.exp, grown.seconds, size + 1)) continue;
           offer(next, (mask | (1 << j)) * 32 + j, grown);
         }
       }
@@ -160,8 +212,9 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   }
   const score = (r) => (rankBy === 'gil' ? r.gilPerDay : rankBy === 'item' ? r.itemPerDay || 0 : r.expPerHour);
   const newOnes = (r) => r.explores + r.chances;
-  return routes.sort((a, b) => (exploreFirst ? newOnes(b) - newOnes(a) : 0) || score(b) - score(a) || a.hours - b.hours
+  const sorted = routes.sort((a, b) => (exploreFirst ? newOnes(b) - newOnes(a) : 0) || score(b) - score(a) || a.hours - b.hours
     || a.route.length - b.route.length || (a.route.join(',') < b.route.join(',') ? -1 : a.route.join(',') > b.route.join(',') ? 1 : 0));
+  return pruning ? sorted.slice(0, 1) : sorted;
 }
 
 // ---- Unlocks ----

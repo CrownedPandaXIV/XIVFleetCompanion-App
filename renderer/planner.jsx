@@ -166,6 +166,19 @@ function PlannerSubPicker({ subs, chosen, onChoose }) {
   );
 }
 
+// The parts a build has that its rank can't fit yet (each part needs a rank: Unkiu 15, Whale 25 and so on, Modified
+// parts 50), as an amber note; null when they all fit. The build is still worked out as typed.
+function PartRankNote({ base, rank, parts }) {
+  const high = (parts || []).map((p, slot) => ({ slot, p, needs: (base.partRanks || {})[`${p}|${slot}`] || 0 })).filter((x) => x.needs > rank);
+  if (!high.length) return null;
+  const nameOf = (l) => ((base.partLetters || []).find((x) => x.letter === l) || { name: l }).name;
+  return (
+    <div className="tone-warn part-rank-note">
+      Not fittable at rank {rank} yet: {high.map((x) => `${nameOf(x.p)} (${PLANNER_SLOTS[x.slot]}) needs rank ${x.needs}`).join(', ')}.
+    </div>
+  );
+}
+
 // Choosing a Free Company (Levelling Plan, Route Finder, Compare Builds): the Voyage Planner's way, a panel grouped by
 // account label (in name order, no label last), each account's Free Companies as the Character Roster orders their
 // characters, with their world and whether the workshop's sectors have been read; a search across name, world and
@@ -387,6 +400,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
               <div key={key} className="planner-stat"><b>{stats ? plannerN(stats[key]) : '—'}</b><span>{label}</span></div>
             ))}
           </div>
+          <PartRankNote base={base} rank={rank} parts={parts} />
           {plan && !stats && <div className="supply-card-note">This rank or one of these parts isn't in the game data.</div>}
           {stats && compare && (
             <div className="planner-compare">

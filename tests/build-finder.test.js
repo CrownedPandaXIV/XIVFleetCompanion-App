@@ -103,3 +103,14 @@ test('the part filter: any part, chosen parts, or one you own, slot by slot', ()
   assert.deepStrictEqual(finder.filterByParts(rows, [{ own: true }, null, null, { own: true }], owned).map((r) => r.parts.join('')), ['YY+SU']);
   assert.strictEqual(finder.filterByParts(rows, [{ letters: [] }, null, null, null], owned).length, 0);
 });
+
+test('a build is never put below the rank its parts need', () => {
+  const need = { surveillance: null, retrieval: null, favor: null };
+  // W+ needs rank 7, W rank 4; every build reaches "no needs" at once, so its rank is what its parts need.
+  const partRank = (letter) => (letter === 'W+' ? 7 : letter === 'W' ? 4 : 0);
+  const rows = finder.findBuilds({ need, rankStatsById, partStatsByClassSlot, maxRank: 10, partRank });
+  for (const r of rows) {
+    const needs = Math.max(...r.parts.map((p, slot) => partRank(p, slot)), 1);
+    assert.strictEqual(r.rank, needs, `${r.parts.join('')} at ${r.rank}`);
+  }
+});

@@ -112,7 +112,7 @@ for (const goals of finderGoals) {
     const route = sectorsHere.length > 1 ? calc.bestOrder(sectorsHere, start, 100) : sectorsHere;
     const { need, why, missing } = finder.needsFor(goals, dataOf, (id) => game.sectors.get(id).letter);
     const minRank = Math.max(1, ...sectorsHere.map((s) => s.rankReq));
-    const rows = finder.findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank, maxRank: 125, route, start, owned, sureOnly });
+    const rows = finder.findBuilds({ need, rankStatsById, partStatsByClassSlot, minRank, maxRank: 125, route, start, owned, sureOnly, partRank: require('../../subs/levelling').partRanks(game.parts) });
     const sorted = {};
     for (const by of Object.keys(finder.SORTS)) {
       sorted[by] = finder.sortBuilds(rows, by).slice(0, 25).map((r) => ({ parts: r.parts, rank: r.rank, sure: r.sure, sureRank: r.sureRank, stats: r.stats, spare: r.spare,
@@ -226,7 +226,7 @@ const lvSearchFor = (withRead, maxHours) => {
 const levellingAnswers = levellingCases.map((c) => {
   const search = lvSearchFor(c.read, c.maxHours);
   const plan = lv.levellingPlan({ rank: c.rank, exp: c.exp, target: c.target, expToNext, parts: c.parts, bestAt: search.bestAt, score: search.score,
-    suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned) });
+    suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned), partRank: lv.partRanks(game.parts) });
   if (c.read) lv.markBetter(plan, lvSearchFor(false, c.maxHours), read);
   return { ...c, voyages: plan.voyages, hours: r6(plan.hours), tanks: plan.tanks, kits: r6(plan.kits), expNeeded: plan.expNeeded, reached: plan.reached, stuckAt: plan.stuckAt,
     keepHours: r6(plan.keepHours), swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),

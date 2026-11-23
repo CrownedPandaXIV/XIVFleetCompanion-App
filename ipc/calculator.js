@@ -6,6 +6,8 @@ const { withClient } = require('../db');
 const { columnsByKey } = require('./shopping');
 const { loadSubmarines, loadStatTables, loadRankUpGameData } = require('./subs');
 const rankUp = require('../subs/rank-up');
+const { Worker } = require('worker_threads');
+const path = require('path');
 const { itemNames, itemPrices } = require('./details');
 const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
 const { snapshotFragments } = require('../db');
@@ -113,6 +115,8 @@ async function loadCalculator(client) {
       return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items, from: d ? Number(d.unlockedFrom) || 0 : null };
     }),
     partLetters: PART_LETTERS.map((letter) => ({ letter, name: partName(letter) })),
+    // The rank each part needs ("letter|slot" -> rank), for the note when a build has a part its rank can't fit yet.
+    partRanks: Object.fromEntries(PART_LETTERS.flatMap((letter) => [0, 1, 2, 3].map((slot) => [`${letter}|${slot}`, levelling.partRanks(game.parts)(letter, slot)]))),
     maxRank: game.maxRank,
     subs,
     // The Free Companies, with the sectors each has unlocked and explored as the plugin last read them (Route Finder).
@@ -394,23 +398,46 @@ async function levellingFor(client, request = {}) {
   const maxHours = Number(request.maxHours) || null;
   // everySector: as if every sector were discovered (the full-map plan), whatever the FC has read.
   const read = request.everySector ? null : readOf(request.fcId);
-  const searchFor = (r) => levelling.searches({ game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read: r, maxHours });
-  const search = searchFor(read);
-  const every = read ? searchFor(null) : null;
-  const { expToNext } = game;
-  const plans = [];
+  const asked = [];
+  const bad = [];
   for (const s of (request.subs || []).slice(0, 8)) {
     const rank = Math.max(1, Number(s.rank) || 1);
     const target = Math.min(game.maxRank, Math.max(rank, Number(s.target) || game.maxRank));
     const parts = (s.parts || []).slice(0, 4);
-    if (parts.length !== 4 || parts.some((l) => !CLASS_OF[l])) { plans.push({ key: s.key, error: 'This build has a part the calculator doesn\'t know.' }); continue; }
+    if (parts.length !== 4 || parts.some((l) => !CLASS_OF[l])) { bad.push({ key: s.key, error: 'This build has a part the calculator doesn\'t know.' }); continue; }
     const owned = request.suggest && s.cid ? await ownedParts(client, s.cid).catch(() => new Set()) : new Set();
-    const plan = levelling.levellingPlan({ rank, exp: Number(s.exp) || 0, target, expToNext, parts, bestAt: search.bestAt, score: search.score,
-      suggest: !!request.suggest, standardOnly: !!request.standardOnly, owned });
-    if (read) levelling.markBetter(plan, every, read);
-    plans.push({ key: s.key, rank, target, ...plan });
+    asked.push({ key: s.key, rank, exp: Number(s.exp) || 0, target, parts, owned: [...owned] });
   }
-  return { success: true, read: !!read, plans };
+  const job = { game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read, maxHours,
+    suggest: !!request.suggest, standardOnly: !!request.standardOnly, subs: asked };
+  const worked = await runLevelling(job);
+  if (worked.stopped) return { success: false, stopped: true, error: 'A newer plan was asked for.' };
+  if (worked.error) return { success: false, error: worked.error };
+  const byKey = new Map([...worked.plans, ...bad].map((p) => [p.key, p]));
+  return { success: true, read: !!read, plans: (request.subs || []).slice(0, 8).map((s) => byKey.get(s.key)).filter(Boolean) };
+}
+
+// The Levelling Plan is worked out in a worker thread (subs/levelling-worker.js), so the app's other pages aren't held
+// up, and a newer request stops the one before it instead of waiting for it. If a worker can't be started, it's worked
+// out here.
+let levellingWorker = null;
+function runLevelling(job) {
+  if (levellingWorker) { levellingWorker.stop(); levellingWorker = null; }
+  return new Promise((resolve) => {
+    let worker;
+    try {
+      worker = new Worker(path.join(__dirname, '..', 'subs', 'levelling-worker.js'));
+    } catch {
+      resolve({ plans: levelling.plansFor(job) });
+      return;
+    }
+    let done = false;
+    const finish = (answer) => { if (done) return; done = true; if (levellingWorker && levellingWorker.worker === worker) levellingWorker = null; worker.terminate().catch(() => {}); resolve(answer); };
+    levellingWorker = { worker, stop: () => finish({ stopped: true }) };
+    worker.once('message', (m) => finish(m && m.error ? { error: m.error } : { plans: m.plans }));
+    worker.once('error', () => { if (!done) finish({ plans: levelling.plansFor(job) }); });
+    worker.postMessage(job);
+  });
 }
 
 // A part class's letter (Syldra is Y, not S).
@@ -462,7 +489,7 @@ async function findFor(client, { goals = [], sureOnly = false, sortBy = 'rank', 
   const minRank = Math.max(1, ...sectors.map((s) => s.rankReq));
   const owned = await ownedParts(client, forCid);
   const all = finder.findBuilds({ need, rankStatsById: game.stats.rankStatsById, partStatsByClassSlot: game.stats.partStatsByClassSlot,
-    minRank, maxRank: game.maxRank, route, start, owned, sureOnly });
+    minRank, maxRank: game.maxRank, route, start, owned, sureOnly, partRank: levelling.partRanks(game.parts) });
   // The part filter applies before the list is cut, so the counts and rank groups follow it.
   const rows = finder.sortBuilds(finder.filterByParts(all, slots, owned), sortBy);
   return {
