@@ -58,7 +58,7 @@ async function loadSubmarines(client) {
 
   const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
-  const topRank = Math.max(0, ...[...rankStatsById.keys()].filter((r) => rankStatsById.get(r).speed !== null));
+  const topRank = rankUp.topRank(rankStatsById, (await loadRankUpGameData(client)).expToNext);
   // Fight Club's routes against the sectors each FC has discovered (read in its workshop by the plugin): each map's
   // letters, each FC's reading, and the sector each opens from (XIVStats).
   const options = fightClubOptions(fightClubRows, repairKitCost);
@@ -255,7 +255,7 @@ async function addRankUps(client, subs) {
   const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules ORDER BY id')).rows;
   const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
-  const top = rankUp.maxRank(game.expToNext);
+  const top = rankUp.topRank(stats.rankStatsById, game.expToNext);
 
   // Recorded rank and experience per slot (plugin 0.7.0), over the window plus the value before it.
   const now = Date.now();

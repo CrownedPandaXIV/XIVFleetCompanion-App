@@ -119,6 +119,18 @@ function maxRank(expToNext) {
   return r;
 }
 
+// The top rank a sub can reach: the last rank the game gives stats to (any bonus above 0). The game's table also lists
+// experience "to the next rank" on the top rank (145 shows 46,234,004 with 146 an empty row), so that can't be used
+// alone. rankStatsById: Map rank -> { surveillance, retrieval, speed, range, favor }; without any stats (an old game
+// data table), the first rank with no experience to the next.
+function topRank(rankStatsById, expToNext) {
+  let top = 0;
+  for (const [r, s] of rankStatsById || new Map()) {
+    if (r > top && s && Object.values(s).some((v) => Number(v) > 0)) top = r;
+  }
+  return top > 0 ? top : maxRank(expToNext || new Map());
+}
+
 // The first rank above `rank` (up to maxRank) at which buildAt(r) gives a different build, or null.
 function nextBuildRank(rank, top, buildAt) {
   const key = (b) => (b ? b.join('-') : '');
@@ -131,5 +143,5 @@ function nextBuildRank(rank, top, buildAt) {
 }
 
 module.exports = {
-  MIN_MEASURED_DAYS, totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, nextBuildRank,
+  MIN_MEASURED_DAYS, totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, topRank, nextBuildRank,
 };

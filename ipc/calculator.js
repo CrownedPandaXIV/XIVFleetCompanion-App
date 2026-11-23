@@ -5,6 +5,7 @@ const { ipcMain } = require('electron');
 const { withClient } = require('../db');
 const { columnsByKey } = require('./shopping');
 const { loadSubmarines, loadStatTables, loadRankUpGameData } = require('./subs');
+const rankUp = require('../subs/rank-up');
 const { itemNames, itemPrices } = require('./details');
 const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
 const { snapshotFragments } = require('../db');
@@ -57,7 +58,7 @@ async function loadGame(client) {
     ? (await client.query(`SELECT class, slot, ${quote(partCols.get('rank'))} AS rank, ${quote(partCols.get('repairmaterials'))} AS kits FROM ffxiv_submarinepart`)).rows
     : []).map((r) => ({ class: Number(r.class), slot: Number(r.slot), rank: Number(r.rank) || 0, repairKits: Number(r.kits) || 0 }))
     .filter((p) => p.class > 0);
-  const maxRank = Math.max(1, ...[...expToNext.entries()].filter(([, e]) => e > 0).map(([r]) => r + 1));
+  const maxRank = Math.max(1, rankUp.topRank(stats.rankStatsById, expToNext));
   return { sectors, startingPoints, maps, parts, stats, maxRank, expToNext };
 }
 
