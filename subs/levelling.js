@@ -203,13 +203,13 @@ function searches({ game, data, prices, repairKitCost, read, maxHours }) {
 }
 
 // Each stage of a plan made through an FC's reading (read: Map id -> { unlocked }), told when a sector it hasn't
-// discovered yet would give a better route at that rank (every: searches() with every sector):
+// discovered yet would give a route at least 1% better at that rank (every: searches() with every sector):
 // stage.better = { route, expPerHour, missing: [ids] } or null.
 function markBetter(plan, every, read) {
   for (const st of plan.stages) {
     const better = every ? every.bestAt(st.fromRank, st.parts) : null;
     const missing = better ? better.route.filter((id) => !(read.get(id) || {}).unlocked) : [];
-    st.better = better && missing.length && better.expPerHour > st.expPerHour * 1.0001 ? { route: better.route, expPerHour: better.expPerHour, missing } : null;
+    st.better = better && missing.length && better.expPerHour >= st.expPerHour * 1.01 ? { route: better.route, expPerHour: better.expPerHour, missing } : null;
   }
   return plan;
 }

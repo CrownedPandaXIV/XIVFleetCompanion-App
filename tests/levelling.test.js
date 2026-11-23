@@ -65,3 +65,12 @@ test('suggestions: only parts the sub\'s rank allows, looked at again from the r
   const ranksOf = lv.partRanks([{ class: 3, slot: 0, rank: 1 }, { class: 1, slot: 2, rank: 25 }, { class: 6, slot: 0, rank: 50 }]);
   assert.deepStrictEqual([ranksOf('S', 0), ranksOf('W', 2), ranksOf('W+', 0), ranksOf('Y', 1)], [1, 25, 50, 0]);
 });
+
+test('an undiscovered sector is mentioned only when it gives at least 1% more an hour', () => {
+  const stage = (expPerHour) => ({ stages: [{ fromRank: 5, parts: ['S', 'S', 'S', 'S'], expPerHour }] });
+  const every = { bestAt: () => ({ route: [1, 9], expPerHour: 100 }) };
+  const read = new Map([[1, { unlocked: true }]]);
+  assert.strictEqual(lv.markBetter(stage(99.99), every, read).stages[0].better, null); // 0.01% more: not worth a line
+  assert.ok(lv.markBetter(stage(99), every, read).stages[0].better); // about 1% more
+  assert.deepStrictEqual(lv.markBetter(stage(90), every, read).stages[0].better.missing, [9]);
+});
