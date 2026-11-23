@@ -182,7 +182,10 @@ const compareCases = [
   { mode: 'same', route: [32, 35, 40], builds: [{ rank: 90, parts: ['S+', 'U+', 'W+', 'C+'] }, { rank: 125, parts: ['Y+', 'Y+', 'Y+', 'Y+'] }] },
   { mode: 'best', mapId: 1, rankBy: 'exp', maxHours: 48, must: [], builds: [{ rank: 125, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 90, parts: ['S+', 'U+', 'W+', 'C+'] }, { rank: 40, parts: ['S', 'U', 'W', 'C'] }] },
   { mode: 'best', mapId: 2, rankBy: 'gil', maxHours: null, must: [35], builds: [{ rank: 110, parts: ['Y+', 'Y+', 'Y+', 'Y+'] }, { rank: 125, parts: ['W+', 'C+', 'W+', 'C+'] }] },
+  // Modified parts at rank 20: they can't be fitted yet, so no voyage numbers and no best marks.
+  { mode: 'same', route: [1, 9], builds: [{ rank: 20, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 20, parts: ['S', 'S', 'S', 'S'] }] },
 ];
+const cmpPartRank = require('../../subs/levelling').partRanks(game.parts);
 const compareAnswers = compareCases.map((c) => {
   const columns = c.builds.map((b) => {
     const stats = buildStats(b.rank, b.parts, rankStatsById, partStatsByClassSlot);
@@ -192,17 +195,17 @@ const compareAnswers = compareCases.map((c) => {
       const allowed = rf.usableSectors({ onMap, rank: b.rank, states, leaveOut: [] });
       const values = new Map(onMap.map((x) => [x.id, rf.sectorValue(x, dataOf.get(x.id), stats, prices)]));
       const routes = c.must.every((id) => allowed.some((x) => x.id === id)) ? rf.findRoutes({ sectors: allowed, start: calc.startFor(onMap[0].id, game.startingPoints), stats,
-        maxStops: 5, maxHours: c.maxHours, must: c.must, values, rankBy: c.rankBy, opens: rf.opensOf(openerOf), states }) : [];
+        maxStops: 5, maxHours: c.maxHours, must: c.must, values, rankBy: c.rankBy, opens: rf.opensOf(openerOf), states, limit: 1 }) : [];
       route = routes.length ? routes[0].route : [];
     }
     const sectorsHere = route.map((id) => game.sectors.get(id));
-    const check = cmp.routeCheck(sectorsHere, sectorsHere.length ? calc.startFor(sectorsHere[0].id, game.startingPoints) : null, stats, b.rank);
-    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0;
+    const check = cmp.routeCheck(sectorsHere, sectorsHere.length ? calc.startFor(sectorsHere[0].id, game.startingPoints) : null, stats, b.rank, b.parts, cmpPartRank);
+    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0 && check.partsNeed === 0;
     const p = route.length ? calc.plan({ route, stats, partClasses: b.parts.map((l) => CLASS_OF[l]), game, data, prices, repairKitCost }) : null;
     const values = cmp.rowValues(stats, p, flies);
-    return { route, used: check.used, short: check.short, tooHigh: check.tooHigh, flies, values: Object.fromEntries(Object.entries(values).map(([k, v]) => [k, r6(v)])) };
+    return { route, used: check.used, short: check.short, tooHigh: check.tooHigh, partsNeed: check.partsNeed, flies, values: Object.fromEntries(Object.entries(values).map(([k, v]) => [k, r6(v)])) };
   });
-  return { ...c, columns, marks: cmp.bestMarks(columns.map((col) => col.values)) };
+  return { ...c, columns, marks: cmp.bestMarks(columns.map((col) => (col.partsNeed ? {} : col.values))) };
 });
 
 // The Levelling Plan's answers (subs/levelling.js): subs from a rank to a target, with and without the FC's reading,
@@ -216,6 +219,8 @@ const levellingCases = [
   { rank: 40, exp: 0, target: 80, parts: ['W+', 'C+', 'W+', 'C+'], read: true, maxHours: 36, suggest: true, standardOnly: false },
   { rank: 70, exp: 1200, target: 100, parts: ['S', 'S', 'S', 'S'], read: true, maxHours: 24, suggest: true, standardOnly: true },
   { rank: 100, exp: 0, target: 125, parts: ['Y+', 'Y+', 'Y+', 'Y+'], read: false, maxHours: 48, suggest: true, standardOnly: false },
+  // Parts too slow for any route in 12h at first: stuck, so the one-part swap that lets it fly.
+  { rank: 80, exp: 0, target: 100, parts: ['W', 'W', 'W', 'W'], read: false, maxHours: 13, suggest: true, standardOnly: false },
 ];
 const lvSearch = new Map();
 const lvSearchFor = (withRead, maxHours) => {
@@ -227,12 +232,12 @@ const levellingAnswers = levellingCases.map((c) => {
   const search = lvSearchFor(c.read, c.maxHours);
   const plan = lv.levellingPlan({ rank: c.rank, exp: c.exp, target: c.target, expToNext, parts: c.parts, bestAt: search.bestAt, score: search.score,
     suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned), partRank: lv.partRanks(game.parts) });
-  if (c.read) lv.markBetter(plan, lvSearchFor(false, c.maxHours), read);
+  if (c.read) lv.markBetter(plan, lvSearchFor(false, c.maxHours), read, search);
   return { ...c, voyages: plan.voyages, hours: r6(plan.hours), tanks: plan.tanks, kits: r6(plan.kits), expNeeded: plan.expNeeded, reached: plan.reached, stuckAt: plan.stuckAt,
     keepHours: r6(plan.keepHours), swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),
     stages: plan.stages.map((st) => ({ fromRank: st.fromRank, toRank: st.toRank, route: st.route, parts: st.parts, voyages: st.voyages, hours: r6(st.hours),
       expPerVoyage: r6(st.expPerVoyage), expPerHour: r6(st.expPerHour), tanks: st.tanks, kits: r6(st.kits),
-      better: st.better ? { route: st.better.route, expPerHour: r6(st.better.expPerHour), missing: st.better.missing } : null })) };
+      better: st.better ? { atRank: st.better.atRank, route: st.better.route, expPerHour: r6(st.better.expPerHour), gain: r6(st.better.gain), missing: st.better.missing } : null })) };
 });
 
 console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Levelling: ${levellingAnswers.map((a) => `${a.voyages} voyages, ${a.stages.length} stages, ${a.swaps.length} swaps${a.reached ? '' : ` (stuck at ${a.stuckAt})`}`).join(' | ')}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);

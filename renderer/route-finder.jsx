@@ -111,7 +111,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
     const timer = setTimeout(() => {
       window.api.findSubRoutes({ rank, parts, mapId, maxStops, maxHours, must, leaveOut, rankBy: rankBy === 'item' && !itemId ? 'exp' : rankBy,
         itemId: rankBy === 'item' ? itemId : null, exploreFirst, fcId, place, scope: 'dc', limit: 100 }).then((r) => {
-        if (call !== latest.current) return;
+        if (call !== latest.current || r.stopped) return;
         setBusy(false);
         setFound(r.success ? r : { error: r.error });
       });
@@ -150,9 +150,9 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
     setParts(s.parts);
     if (s.fcId) setFcId(s.fcId);
     const first = sectorOf.get(s.route[0]);
-    if (first) { setMapId(first.map); setMust([]); setLeaveOut([]); }
+    if (first) { if (first.map !== mapId) setItemId(''); setMapId(first.map); setMust([]); setLeaveOut([]); }
   };
-  const pickMap = (id) => { setMapId(id); setMust([]); setLeaveOut([]); };
+  const pickMap = (id) => { setMapId(id); setMust([]); setLeaveOut([]); setItemId(''); };
   // A tile: any → must → left out → any. Sectors the sub can't go to don't change.
   const cycle = (id) => {
     const t = tileOf.get(id);
@@ -166,6 +166,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
   const findThrough = (ids, explore) => {
     const first = sectorOf.get(ids[0]);
     if (!first) return;
+    if (first.map !== mapId) setItemId('');
     setMapId(first.map);
     setLeaveOut([]);
     setMust(ids.length === 1 ? ids : []);
@@ -257,7 +258,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
             </div>
             <div className="rf-note">
               <span className="finder-field">Sectors explored by {fcSelect}</span>
-              {fc && fc.readAt ? <span className="dim">read at the workshop {rfWhen(fc.readAt)}. Click a sector to make it a must, again to leave it out.</span> : notRead}
+              {fc && fc.readAt ? <span className="dim">read at the workshop {rfWhen(fc.readAt)}.</span> : notRead}
             </div>
             <div className="finder-legend">
               <span><RfLetter sector={{ letter: 'A' }} state="explored" /> explored</span>
@@ -265,6 +266,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
               <span><RfLetter sector={{ letter: 'C' }} state="chance" /> could open by chance</span>
               <span><RfLetter sector={{ letter: 'D' }} state="locked" /> not yet</span>
               <span><RfLetter sector={{ letter: 'E' }} must /> must be in the route</span>
+              <span>Click a sector to make it a must, again to leave it out.</span>
             </div>
             <div className="rf-tiles">
               {onMap.map((s) => {
@@ -300,26 +302,28 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
 
           <section className="finder-band">
             <h2 className="finder-heading">Routes <span className="count">{exploreFirst ? 'new sectors first, then ' : ''}{rankBy === 'gil' ? 'most gil a day' : rankBy === 'item' && itemId ? 'most of the item a day' : 'best experience an hour'} first</span></h2>
+            <Working busy={busy}>Working out the routes…</Working>
             {found && found.error && <div className="error">{found.error}</div>}
             {found && !found.error && (
               <div className="finder-tally">
-                <span><b>{plannerN(found.total)}</b> route{found.total === 1 ? '' : 's'} fit{maxHours ? ` in ${maxHours}h` : ''} and in range</span>
+                {found.total === null
+                  ? <span>The best <b>{plannerN(routes.length)}</b> routes that fit{maxHours ? ` in ${maxHours}h` : ''} and are in range</span>
+                  : <span><b>{plannerN(found.total)}</b> route{found.total === 1 ? '' : 's'} fit{maxHours ? ` in ${maxHours}h` : ''} and in range</span>}
                 {must.length > 0 && <span>with <b>{must.map((id) => sectorOf.get(id).letter).join(', ')}</b></span>}
-                {found.newOnes > 0 && <span className="warn"><b>{plannerN(found.newOnes)}</b> explore or could open something new</span>}
+                {found.newOnes > 0 && <span className="warn"><b>{plannerN(found.newOnes)}</b> {found.total === null ? 'of these ' : ''}explore or could open something new</span>}
                 <span>{found.pricing && found.pricing.source === 'market' ? `gil at market prices (${found.pricing.place})` : 'gil at vendor prices'}</span>
-                {busy && <span>working out…</span>}
               </div>
             )}
             {routes.length > 0 && (
               <React.Fragment>
                 <div className="controls finder-columns"><ColumnPicker cols={cols} /></div>
-                <div className="finder-table">
+                <div className={`finder-table${busy ? ' is-busy' : ''}`}>
                   <table>
                     <thead><tr><ColumnHeadCells cols={cols} sortColumn={sort.sortColumn} sortDirection={sort.sortDirection} onSortClick={(k) => sort.handleSortClick(k)} /></tr></thead>
                     <tbody>{routes.map((r) => <tr key={r.route.join('-')}><ColumnBodyCells cols={cols} row={r} ctx={ctx} /></tr>)}</tbody>
                   </table>
                 </div>
-                {found.total > routes.length && <div className="finder-more dim">Showing the best {routes.length} of {plannerN(found.total)}.</div>}
+                {found.total !== null && found.total > routes.length && <div className="finder-more dim">Showing the best {routes.length} of {plannerN(found.total)}.</div>}
                 <div className="finder-legend">
                   <span className="rf-tiers"><span className="rf-tier sure">T3</span><span className="rf-tier maybe">T2</span></span> loot tier this build reaches at each stop (amber: the sources differ, so it might not)
                   <span className="finder-spare">+11</span> range to spare

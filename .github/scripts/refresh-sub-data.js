@@ -7,7 +7,8 @@
 //
 //   node .github/scripts/refresh-sub-data.js [file ...]
 //
-// Writes subs/calculator-data.json, or the files named (the plugin's copy). Run at each release, by hand any time.
+// Writes subs/calculator-data.json, or the files named (the plugin's copy). Run by hand; sub-data.yml checks weekly
+// whether there is newer data. Releases ship the committed copy.
 // Nothing here stops a release: when XIVStats can't be read, or what comes back doesn't pass the checks, the file
 // stays as it is; when Pepper's sheet can't be read, Pepper's breakpoints stay as they were. Each is said on a
 // "::warning::" line, which GitHub shows on the run. Node's own fetch only, no packages.

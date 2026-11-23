@@ -254,10 +254,13 @@ test('market price: a lone low listing is skipped (under half the middle of the 
 test("market price: checked against the last week's sales", () => {
   const now = 1_800_000_000_000;
   const sale = (price, daysAgo = 1) => ({ pricePerUnit: price, quantity: 1, hq: false, timestamp: Math.floor((now - daysAgo * 86_400_000) / 1000) });
-  // Every listing low (no lone outlier), but sales around 1,000: the sales' middle price is used.
-  const low = marketPrice([listing(300), listing(320), listing(350)], [sale(900), sale(1000), sale(1100), sale(50, 10)], { now });
+  // Low listings with fewer than three near the cheapest, and sales around 1,000: the sales' middle price is used.
+  const low = marketPrice([listing(300), listing(320), listing(900)], [sale(900), sale(1000), sale(1100), sale(50, 10)], { now });
   assert.deepStrictEqual([low.price, low.adjusted, low.sales], [1000, true, 3]);
   assert.match(low.note, /well below the last week's 3 sales, around 1,000\. Using 1,000 gil\./);
+  // Three or more listings agree on the low price: the market has moved, the listings stand.
+  const moved = marketPrice([listing(400), listing(400), listing(410), listing(420), listing(430), listing(440)], [sale(1000), sale(1000), sale(1000)], { now });
+  assert.deepStrictEqual([moved.price, moved.adjusted], [400, false]);
   // Listings in line with sales: unchanged; fewer than three sales: no check.
   assert.strictEqual(marketPrice([listing(800)], [sale(900), sale(1000), sale(1100)], { now }).price, 800);
   assert.strictEqual(marketPrice([listing(300)], [sale(1000), sale(1100)], { now }).price, 300);

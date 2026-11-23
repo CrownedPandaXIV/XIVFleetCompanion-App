@@ -22,6 +22,7 @@ const WEEK_MS = SALES_WITHIN_S * 1000;
 // A listing under this share of the typical price is an outlier: of the five cheapest listings' middle price
 // (step 2), then of the last week's middle sale price (step 3). A starting guess, easy to change.
 const OUTLIER_SHARE = 0.5;
+const AGREEING_LISTINGS = 3; // listings near the cheapest that make it the market price, whatever the sales were
 // How long one request may take, answer included, before it counts as no answer (the plugin's too).
 const TIMEOUT_MS = 20 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
@@ -122,7 +123,9 @@ const middle = (values) => {
 //   2. skipping lone low listings: with three or more listings, any under half the middle price of the five
 //      cheapest is left out, and the cheapest of the rest is used;
 //   3. checked against recent sales: if that is still under half the middle price of the last week's sales (three
-//      or more of them), the sales' middle price is used instead. No listings at all: the sales' middle price.
+//      or more of them), and fewer than three listings back it up (at most twice its price), the sales' middle price
+//      is used instead; when three or more listings agree, the market has moved and they're kept. No listings at
+//      all: the sales' middle price.
 // { price, world, adjusted, skipped: [{ price, world }], salesMiddle, sales, note } or null when there is neither.
 // `note` says, in plain words, what was changed and why (for a hover).
 function marketPrice(listings, history, { hq, exclude, world, now = Date.now() } = {}) {
@@ -157,7 +160,9 @@ function marketPrice(listings, history, { hq, exclude, world, now = Date.now() }
   }
   let price = pick.price;
   let usedWorld = pick.world;
-  if (salesMiddle !== null && price < salesMiddle * OUTLIER_SHARE) {
+  // Listings at the price picked or close to it (at most twice it): three or more agreeing are a real market drop.
+  const agreeing = selling.filter((l) => l.price >= price && l.price <= price / OUTLIER_SHARE).length;
+  if (salesMiddle !== null && price < salesMiddle * OUTLIER_SHARE && agreeing < AGREEING_LISTINGS) {
     notes.push(`The cheapest listing (${gil(price)} gil) is well below the last week's ${sales.length} sales, around ${gil(salesMiddle)}.`);
     price = salesMiddle;
     usedWorld = null;

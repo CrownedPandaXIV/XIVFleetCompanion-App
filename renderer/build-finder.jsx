@@ -228,12 +228,12 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
   const latest = useRef(0);
   useEffect(() => {
     if (!base || base.missingGameData) return undefined;
-    if (!goals.length) { setFound(null); return undefined; }
+    if (!goals.length) { setFound(null); latest.current += 1; setBusy(false); return undefined; }
     const call = ++latest.current;
     setBusy(true);
     const timer = setTimeout(() => {
       window.api.findSubBuilds({ goals, sortBy, sureOnly, forCid: forSub ? forSub.cid : null, slots, limit: 200 }).then((r) => {
-        if (call !== latest.current) return;
+        if (call !== latest.current || r.stopped) return;
         setBusy(false);
         setFound(r.success ? r : { error: r.error });
       });
@@ -258,7 +258,8 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
   const onMap = base.sectors.filter((s) => s.map === mapId && !chosen.includes(s.id)).sort((a, b) => a.id - b.id);
   const change = (i, patch) => setGoals(goals.map((g, j) => (j === i ? { ...g, ...patch } : g)));
   const add = () => {
-    const id = Number(adding || (onMap[0] && onMap[0].id));
+    // The sector picked, while it's still on this map and not a goal; else the first that is.
+    const id = Number(onMap.some((s) => String(s.id) === String(adding)) ? adding : onMap[0] && onMap[0].id);
     if (id && goals.length < 5) { setGoals([...goals, { sectorId: id, tier: 0, optimal: false, doubleDip: false, items: [] }]); setAdding(''); }
   };
   // A sector from the item search, with the item as its goal: added to it when already chosen; another map starts fresh.
@@ -303,7 +304,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
             </select>
           </label>
           <label className="finder-field">Add a sector
-            <select value={adding} onChange={(e) => setAdding(e.target.value)} disabled={goals.length >= 5}>
+            <select value={onMap.some((s) => String(s.id) === String(adding)) ? adding : ''} onChange={(e) => setAdding(e.target.value)} disabled={goals.length >= 5}>
               {onMap.map((s) => <option key={s.id} value={s.id}>{s.letter}: {s.name} (rank {s.rankReq}){s.hasData ? '' : ', no loot data yet'}</option>)}
             </select>
           </label>
@@ -362,6 +363,7 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
       </div>
 
       {found && found.error && <div className="error">Couldn't find builds: {found.error}</div>}
+      {busy && !(found && found.need) && <Working busy={busy}>Working out the builds…</Working>}
       {found && found.need && (
         <section className="finder-band">
           <h2 className="finder-heading">Builds that get it</h2>

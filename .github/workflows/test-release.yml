@@ -35,11 +35,8 @@ jobs:
         node-version: 22
         cache: npm
 
-    # The Sub Calculator's loot and breakpoints, read again from XIVStats and Pepper's guide so each build ships the
-    # latest. When they can't be read, the copy in the repository is used and a warning says so; it never stops the build.
-    - name: Refresh the Sub Calculator data
-      shell: bash
-      run: node .github/scripts/refresh-sub-data.js
+    # The Sub Calculator's data ships as committed: the copy the tests ran on and the plugin has too. Newer XIVStats
+    # and Pepper data comes in as a change of its own (sub-data.yml says when there is some).
 
     # No token here: installing and building run other people's code (every package's install scripts), which must not
     # reach the one that publishes updates.

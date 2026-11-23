@@ -117,7 +117,9 @@ ipcMain.handle('remove-character', async (event, cid) => {
              to_regclass('companion_character_snapshot') IS NOT NULL AS has_history,
              to_regclass('companion_metric_latest') IS NOT NULL AS has_latest,
              to_regclass('companion_rankup_forecast') IS NOT NULL AS has_forecasts,
-             to_regclass('companion_character_login') IS NOT NULL AS has_logins`);
+             to_regclass('companion_character_login') IS NOT NULL AS has_logins,
+             to_regclass('companion_sub_part_condition') IS NOT NULL AS has_part_condition,
+             to_regclass('companion_fc_sub_sector') IS NOT NULL AS has_fc_sectors`);
     const fcResult = await client.query(`
       SELECT fc_id FROM ${latestCharacter} c WHERE c.cid = $1 AND c.fc_id IS NOT NULL
       UNION
@@ -148,6 +150,7 @@ ipcMain.handle('remove-character', async (event, cid) => {
       }
       if (tables.has_forecasts) await client.query('DELETE FROM companion_rankup_forecast WHERE cid = $1', [cid]);
       if (tables.has_logins) await client.query('DELETE FROM companion_character_login WHERE cid = $1', [cid]);
+      if (tables.has_part_condition) await client.query('DELETE FROM companion_sub_part_condition WHERE cid = $1', [cid]);
       if (fcIds.length) {
         // Free Companies no other character is in (the character's own rows are already gone).
         const { rows: orphans } = await client.query(`
@@ -156,6 +159,9 @@ ipcMain.handle('remove-character', async (event, cid) => {
         const orphanIds = orphans.map((r) => r.id);
         if (orphanIds.length) {
           await client.query('DELETE FROM companion_fc_inventory_snapshot WHERE fc_id = ANY($1::numeric[])', [orphanIds]);
+          // The Free Company's explored sectors and part readings: no character left to show them for.
+          if (tables.has_fc_sectors) await client.query('DELETE FROM companion_fc_sub_sector WHERE fc_id = ANY($1::numeric[])', [orphanIds]);
+          if (tables.has_part_condition) await client.query('DELETE FROM companion_sub_part_condition WHERE fc_id = ANY($1::numeric[])', [orphanIds]);
           if (tables.has_latest) {
             await client.query(`DELETE FROM companion_metric_latest WHERE subject_type = 'fc' AND subject_id = ANY($1::numeric[])`, [orphanIds]);
           }

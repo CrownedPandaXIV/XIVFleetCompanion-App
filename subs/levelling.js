@@ -21,7 +21,8 @@ const routeKey = (r) => r.route.join('-');
 // The plan with the parts each rank uses. rank, exp: where the sub is (exp: into this rank); target: the rank to reach;
 // expToNext: Map rank -> experience to the next; partsAt(rank) -> [4 letters]; bestAt(rank, parts) -> the voyage it
 // would run: { route: [ids], hours, exp, expPerHour, range, tanks, kits } or null when nothing fits.
-// { stages: [{ fromRank, toRank, route, parts, voyages, hours, expPerVoyage, expPerHour, tanks, kits }], voyages, hours,
+// { stages: [{ fromRank, toRank, route, parts, voyages, hours, exp, expPerVoyage, expPerHour (the stage's averages), tanks,
+//   kits }], voyages, hours,
 //   tanks, kits, expNeeded, reached, stuckAt }
 function simulate({ rank, exp = 0, target, expToNext, partsAt, bestAt }) {
   const stages = [];
@@ -37,11 +38,15 @@ function simulate({ rank, exp = 0, target, expToNext, partsAt, bestAt }) {
     const last = stages[stages.length - 1];
     let stage = last && routeKey(last) === routeKey(best) && last.parts.join() === parts.join() ? last : null;
     if (!stage) {
-      stage = { fromRank: r, toRank: r, route: best.route, parts: parts.slice(), voyages: 0, hours: 0, expPerVoyage: best.exp, expPerHour: best.expPerHour, tanks: 0, kits: 0 };
+      stage = { fromRank: r, toRank: r, route: best.route, parts: parts.slice(), voyages: 0, hours: 0, exp: 0, expPerVoyage: 0, expPerHour: 0, tanks: 0, kits: 0 };
       stages.push(stage);
     }
     stage.voyages += 1;
     stage.hours += best.hours;
+    // The stage's own averages: experience a voyage still grows with rank inside a stage.
+    stage.exp += best.exp;
+    stage.expPerVoyage = stage.exp / stage.voyages;
+    stage.expPerHour = stage.exp / stage.hours;
     stage.tanks += best.tanks || 0;
     stage.kits += best.kits || 0;
     into += best.exp;
@@ -81,6 +86,27 @@ function levellingPlan({ rank, exp, target, expToNext, parts, bestAt, score = nu
   for (const to of letters) for (let slot = 0; slot < 4; slot++) { const r = Number(partRank(to, slot)) || 0; if (r > rank && r < target) opens.add(r); }
   const swaps = [];
   let plan = keep;
+  // A plan stuck where its parts can't fly any route (none could be scored there): the one-part swap at that rank that
+  // gets it to the target soonest, if any does.
+  if (plan.stuckAt !== null && !plan.reached) {
+    const at = plan.stuckAt;
+    const now = partsWith(parts, swaps)(at);
+    let pick = null;
+    let pickPlan = null;
+    for (let slot = 0; slot < 4; slot++) {
+      for (const to of letters) {
+        if (to === now[slot] || (Number(partRank(to, slot)) || 0) > at) continue;
+        const tried = now.slice();
+        tried[slot] = to;
+        if (!bestAt(at, tried)) continue;
+        const swap = { atRank: at, slot, from: now[slot], to, owned: owned.has(`${to}|${slot}`), gain: null };
+        const next = simulate({ rank, exp, target, expToNext, partsAt: partsWith(parts, [swap]), bestAt });
+        if (!next.reached) continue;
+        if (!pickPlan || next.hours < pickPlan.hours - 1e-9 || (Math.abs(next.hours - pickPlan.hours) <= 1e-9 && swap.owned && !pick.owned)) { pick = swap; pickPlan = next; }
+      }
+    }
+    if (pick) { pick.savedHours = null; swaps.push(pick); plan = pickPlan; }
+  }
   let after = -Infinity; // the last rank looked at
   while (swaps.length < MAX_SWAPS) {
     const points = [...new Set([...plan.stages.map((st) => st.fromRank), ...opens])].filter((r) => r > after && r < target).sort((a, b) => a - b);
@@ -203,13 +229,22 @@ function searches({ game, data, prices, repairKitCost, read, maxHours }) {
 }
 
 // Each stage of a plan made through an FC's reading (read: Map id -> { unlocked }), told when a sector it hasn't
-// discovered yet would give a route at least 1% better at that rank (every: searches() with every sector):
-// stage.better = { route, expPerHour, missing: [ids] } or null.
-function markBetter(plan, every, read) {
+// discovered yet would give a route at least 1% better at one of its ranks (every: searches() with every sector; own:
+// searches() through the reading): stage.better = { atRank, route, expPerHour, gain, missing: [ids] } (the first rank
+// it happens at) or null.
+function markBetter(plan, every, read, own) {
   for (const st of plan.stages) {
-    const better = every ? every.bestAt(st.fromRank, st.parts) : null;
-    const missing = better ? better.route.filter((id) => !(read.get(id) || {}).unlocked) : [];
-    st.better = better && missing.length && better.expPerHour >= st.expPerHour * 1.01 ? { route: better.route, expPerHour: better.expPerHour, missing } : null;
+    st.better = null;
+    if (!every) continue;
+    for (let r = st.fromRank; r < Math.max(st.toRank, st.fromRank + 1); r++) {
+      const better = every.bestAt(r, st.parts);
+      if (!better) continue;
+      const missing = better.route.filter((id) => !(read.get(id) || {}).unlocked);
+      if (!missing.length) continue;
+      const now = own ? own.bestAt(r, st.parts) : null;
+      const base = now ? now.expPerHour : st.expPerHour;
+      if (better.expPerHour >= base * 1.01) { st.better = { atRank: r, route: better.route, expPerHour: better.expPerHour, gain: better.expPerHour / base - 1, missing }; break; }
+    }
   }
   return plan;
 }
@@ -226,7 +261,7 @@ function swapsByStage(plan) {
   return out;
 }
 
-// Every sub's plan for one request (ipc/calculator.js, run in subs/levelling-worker.js so a newer request can stop it).
+// Every sub's plan for one request (ipc/calculator.js, run in subs/calculator-worker.js so a newer request can stop it).
 // job: { game (with expToNext), data, prices, repairKitCost, read (Map id -> { unlocked, explored }, or null), maxHours,
 // suggest, standardOnly, subs: [{ key, rank, exp, target, parts, owned: ['letter|slot'] }] } -> [{ key, rank, target, ...plan }]
 function plansFor(job) {
@@ -238,7 +273,7 @@ function plansFor(job) {
   return job.subs.map((s) => {
     const plan = levellingPlan({ rank: s.rank, exp: s.exp, target: s.target, expToNext: game.expToNext, parts: s.parts, bestAt: search.bestAt, score: search.score,
       suggest: !!job.suggest, standardOnly: !!job.standardOnly, owned: new Set(s.owned || []), partRank });
-    if (read) markBetter(plan, every, read);
+    if (read) markBetter(plan, every, read, search);
     return { key: s.key, rank: s.rank, target: s.target, ...plan, swapsByStage: swapsByStage(plan) };
   });
 }

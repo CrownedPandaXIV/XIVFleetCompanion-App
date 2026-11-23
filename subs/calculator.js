@@ -171,13 +171,15 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
     .sort((a, b) => b.gil - a.gil || b.perVoyage - a.perVoyage);
   const gilPerVoyage = loot.reduce((sum, l) => sum + l.gil, 0);
 
-  // Wear: each part's condition lost on this voyage, and the repair materials that comes to (a part's repair, spread
-  // over the voyages it lasts).
+  // Wear: each part's condition lost on this voyage, and the repair materials that comes to. A part can still sail
+  // while its condition is above 0, so it lasts until the voyage that takes it to 0 (as SubmarineTracker counts), and a
+  // repair is always a full one: the part's repair, spread over the voyages it lasts.
   const partRows = partClasses.map((cls, slot) => game.parts.find((p) => p.class === cls && p.slot === slot) || null);
   const wear = partRows.map((p) => {
     if (!p) return null;
     const lost = sectors.reduce((sum, s) => sum + sectorDamage(s.rankReq, p.rank), 0);
-    return { slot: p.slot, lost, voyagesLasting: lost > 0 ? Math.floor(FULL_CONDITION / lost) : null, kitsPerVoyage: (p.repairKits || 0) * lost / FULL_CONDITION };
+    const voyagesLasting = lost > 0 ? Math.ceil(FULL_CONDITION / lost) : null;
+    return { slot: p.slot, lost, voyagesLasting, kitsPerVoyage: voyagesLasting ? (p.repairKits || 0) / voyagesLasting : 0 };
   });
   const kitsPerVoyage = wear.every(Boolean) ? wear.reduce((sum, w) => sum + w.kitsPerVoyage, 0) : null;
   const perDay = v.hours > 0 ? 24 / v.hours : 0;

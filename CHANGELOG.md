@@ -3,6 +3,52 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.12.1 - 2026-11-23
+
+Fixes to the Sub Calculator and the market price, from a full check of 1.12.0.
+
+### Faster
+- **Route Finder** and **Compare Builds** search only for the routes they show, in the background: "Any" on a 30-sector
+  map takes a fraction of a second instead of several, and the rest of the app no longer waits on it. With the list cut
+  to the best 100, the count reads "The best 100 routes" (the full count shows when every route fits on the list).
+- **Build Finder** searches in the background too, so the rest of the app doesn't wait on it.
+- Reopening a Sub Calculator page keeps the market prices already fetched.
+
+### Numbers
+- **Repair kits:** a part can still sail until its condition reaches 0, so it lasts one voyage longer than shown before,
+  and a repair is always a full one. Kits a day and "parts last" were up to 45% too high.
+- **Levelling Plan:** a stage's Exp a voyage and Exp an hour are now its averages, not its first voyage's (they grow with
+  rank inside a stage).
+- **Levelling Plan:** the "not discovered yet" hint looks at every rank of a stage, not just its first, and says the rank
+  when it's later.
+- **Levelling Plan:** when the parts can't fly any route at all, it suggests the one part swap that lets the sub level.
+- **Compare Builds:** a build whose parts can't be fitted at its rank says so ("Its parts can't be fitted until rank 50")
+  and gets no voyage numbers or green "best" marks.
+- **Market price:** the check against last week's sales no longer overrides three or more listings that agree with each
+  other: that's the market dropping, not a lone low listing. Undercuts show again on Gil & Market, and Income values the
+  loot at what it sells for now.
+- Routes that tie exactly (same time and range) always come in the same order.
+
+### Pages
+- Build Finder, Compare and Levelling no longer show old results after their goals or builds are cleared mid-search, and
+  the Levelling Plan's "Working out…" can't stay on for good.
+- Levelling Plan: a target at or below the sub's rank (after changing the rank, or a sub that levelled past its target)
+  moves to the next rank up.
+- Add (Voyage Planner, Build Finder, Compare) can no longer put in a sector from the map before, or one twice.
+- Route Finder: an item picked on one map is cleared on another; "Working out the routes…" and the dimmed table as on
+  the other pages; the click hint always shows under the tiles.
+- Voyage Planner shows the real error when a plan can't be worked out; stale prices say from when.
+- Build Finder shows "Working out the builds…" from its first search; "Clear goals" has room next to the count.
+- The Levelling Plan's sector note is the same size as the text around it.
+- Gil & Market: the columns read "Market on World/DC/Region" (the price can be the recent sales'); Settings no longer
+  says the Shopping List uses that price.
+
+### Your data
+- Removing a character also removes its sub part readings, and the sectors and part readings of a Free Company no one
+  is left in, so the Free Company pickers don't show a nameless "Free Company …".
+- Releases ship the Sub Calculator data the tests ran on (and the plugin has). A weekly check says when XIVStats or
+  Pepper's guide has newer data.
+
 ## 1.12.0 - 2026-11-23
 
 The Sub Calculator: five new pages for planning sub builds, routes and levelling, under a new Sub Calculator group in

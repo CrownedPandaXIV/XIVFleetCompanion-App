@@ -118,7 +118,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
 
   const latest = useRef(0);
   useEffect(() => {
-    if (!base || base.missingGameData || !builds.length) { setAnswer(null); return undefined; }
+    if (!base || base.missingGameData || !builds.length) { setAnswer(null); latest.current += 1; setBusy(false); return undefined; }
     const call = ++latest.current;
     setBusy(true);
     const home = builds.find((b) => b.world);
@@ -164,7 +164,8 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
   const pickMap = (id) => { setState({ ...state, mapId: id, route: [] }); setMust([]); };
   const addSector = () => {
     const free = onMap.filter((s) => !route.includes(s.id));
-    const id = Number(adding || (free[0] && free[0].id));
+    // The sector picked, while it's still on this map and not on the route; else the first that is.
+    const id = Number(free.some((s) => String(s.id) === String(adding)) ? adding : free[0] && free[0].id);
     if (id && route.length < 5) { setRoute([...route, id]); setAdding(''); }
   };
   // Best order for the route: the fastest the build with the most range can fly (time doesn't depend on the build).
@@ -179,7 +180,8 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
   const marks = (answer && answer.marks) || {};
   const isBest = (key, i) => (marks[key] || []).includes(i);
   const fc = (base.fcs || []).find((f) => f.fcId === fcShown) || null;
-  const why = (c) => (c.route.length === 0 ? (mode === 'best' ? 'No route fits' : 'No route yet')
+  const why = (c) => (c.partsNeed ? `Its parts can't be fitted until rank ${c.partsNeed}`
+    : c.route.length === 0 ? (mode === 'best' ? 'No route fits' : 'No route yet')
     : c.tooHigh.length ? `Rank too low for ${c.tooHigh.map((id) => sectorOf.get(id).letter).join(', ')}`
       : c.short > 0 ? `Out of range: needs ${plannerN(c.short)} more` : null);
   const numberRow = (row) => (
@@ -239,7 +241,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
           {mode === 'same' && (
             <label className="finder-field">Add a sector
               <span className="planner-add">
-                <select value={adding} onChange={(e) => setAdding(e.target.value)} disabled={route.length >= 5}>
+                <select value={onMap.some((s) => !route.includes(s.id) && String(s.id) === String(adding)) ? adding : ''} onChange={(e) => setAdding(e.target.value)} disabled={route.length >= 5}>
                   {onMap.filter((s) => !route.includes(s.id)).map((s) => <option key={s.id} value={s.id}>{s.letter}: {s.name} (rank {s.rankReq})</option>)}
                 </select>
                 <button onClick={addSector} disabled={route.length >= 5}>Add</button>

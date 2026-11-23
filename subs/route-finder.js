@@ -84,9 +84,11 @@ function sectorValue(sector, dataSector, stats, prices) {
 // best found so far however it goes on is not followed; the answer is the same as the whole list's first, sooner.
 // atLeast (with bestOnly): experience an hour already had elsewhere (another map); a route below it may be left out,
 // so the answer is the best route only when that is at least atLeast (else it's below atLeast, or none).
+// limit: only the best this many are wanted (the Route Finder, Compare), so, the same way, an order that can't reach the
+// limit-th best found so far is not followed; the answer is the whole list's first `limit`, sooner (not with exploreFirst).
 // [{ route: [ids], hours, range, exp, expPerHour, gilPerVoyage, gilPerDay, itemPerDay, explores, chances }], best first.
 function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = null, must = [], values, rankBy = 'exp', itemId = null,
-  opens = new Map(), states = new Map(), exploreFirst = false, bestOnly = false, atLeast = 0 }) {
+  opens = new Map(), states = new Map(), exploreFirst = false, bestOnly = false, atLeast = 0, limit = 0 }) {
   if (!start || !stats || !sectors.length) return [];
   const list = sectors.slice().sort((a, b) => a.id - b.id);
   const n = list.length;
@@ -98,17 +100,35 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   const first = list.map((s) => leg(start, s, stats.speed));
   const legs = list.map((a) => list.map((b) => leg(a, b, stats.speed)));
 
-  // bestOnly: the most experience an hour any order could still reach, from its experience and seconds so far: with m
-  // more stops, at most the m best sectors' experience, and at least the m shortest ways into a sector (its survey and
-  // the shortest leg to it) in time.
-  const pruning = bestOnly && rankBy === 'exp' && !exploreFirst;
-  const expOf = list.map((s) => (values.get(s.id) || { exp: 0 }).exp);
+  // bestOnly or limit: the most an hour (of what the routes are ranked by) any order could still reach, from what it has
+  // and its seconds so far: with m more stops, at most the m best sectors' amounts, and at least the m shortest ways into
+  // a sector (its survey and the shortest leg to it) in time.
+  const want = bestOnly && rankBy === 'exp' ? 1 : Math.max(0, Math.floor(Number(limit) || 0));
+  const pruning = want > 0 && !exploreFirst;
+  const amountOf = (v) => (!v ? 0 : rankBy === 'gil' ? v.gil : rankBy === 'item' ? (itemId !== null && v.items ? v.items.get(Number(itemId)) || 0 : 0) : v.exp);
+  const expOf = list.map((s) => amountOf(values.get(s.id)));
   const top = [0];
   for (const e of expOf.slice().sort((a, b) => b - a)) top.push(top[top.length - 1] + Math.max(0, e));
   const into = list.map((_, j) => { let m = Infinity; for (let i = 0; i < n; i++) if (i !== j) m = Math.min(m, legs[i][j].seconds); return Number.isFinite(m) ? m : 0; });
   const least = [0];
   for (const c of into.slice().sort((a, b) => a - b)) least.push(least[least.length - 1] + c);
-  let bestRate = pruning && atLeast > 0 ? atLeast / 3600 : -Infinity;
+  let bestRate = pruning && want === 1 && rankBy === 'exp' && atLeast > 0 ? atLeast / 3600 : -Infinity;
+  // With a limit above 1: each set's best rate so far, for the `want` best sets; bestRate is the lowest of them once full.
+  const tops = new Map();
+  const ranked = (mask, rate) => {
+    if (want === 1) { bestRate = Math.max(bestRate, rate); return; }
+    const was = tops.get(mask);
+    if (was !== undefined) { if (rate <= was) return; tops.set(mask, rate); } else if (tops.size < want) tops.set(mask, rate);
+    else {
+      if (rate <= bestRate) return;
+      let lowMask = -1;
+      let low = Infinity;
+      for (const [m, r] of tops) if (r < low) { low = r; lowMask = m; }
+      tops.delete(lowMask);
+      tops.set(mask, rate);
+    }
+    if (tops.size === want) { let low = Infinity; for (const r of tops.values()) if (r < low) low = r; bestRate = low; }
+  };
   const couldBeat = (exp, seconds, size) => {
     if (!pruning || bestRate <= 0) return true;
     for (let m = 0; m <= stops - size && m < top.length; m++) {
@@ -118,7 +138,7 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   };
   // A good route to start from, so little is followed that can't beat it: from each sector, the next stop that gives
   // the most experience an hour so far, while it fits.
-  if (pruning && !mustMask) {
+  if (pruning && want === 1 && !mustMask) {
     for (let i = 0; i < n; i++) {
       let at = i;
       let seconds = FIXED_VOYAGE_SECONDS + first[i].seconds;
@@ -148,18 +168,30 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   // and range by another. { seconds, range, last: index, before: the label one stop shorter }.
   let layer = new Map();
   const best = new Map(); // set -> the fastest order in range (least range on a tie)
+  // On an exact tie (same time and range) the order that comes first by its stops wins, whichever was found first, so
+  // the answer doesn't depend on what the search left out.
+  const orderOf = (label) => { const out = []; for (let at = label; at; at = at.before) out.unshift(at.last); return out; };
+  const earlier = (a, b) => {
+    const x = orderOf(a);
+    const y = orderOf(b);
+    for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] < y[i];
+    return x.length < y.length;
+  };
   const offer = (map, key, label) => {
     const was = map.get(key);
     if (!was) { map.set(key, [label]); return; }
-    for (const o of was) if (o.seconds <= label.seconds && o.range <= label.range) return;
+    for (const o of was) {
+      if (o.seconds === label.seconds && o.range === label.range && earlier(label, o)) continue;
+      if (o.seconds <= label.seconds && o.range <= label.range) return;
+    }
     const kept = was.filter((o) => !(label.seconds <= o.seconds && label.range <= o.range));
     kept.push(label);
     map.set(key, kept);
   };
   const keep = (mask, label) => {
-    if (pruning && (mask & mustMask) === mustMask) bestRate = Math.max(bestRate, label.exp / label.seconds);
+    if (pruning && (mask & mustMask) === mustMask) ranked(mask, label.exp / label.seconds);
     const was = best.get(mask);
-    if (!was || label.seconds < was.seconds || (label.seconds === was.seconds && label.range < was.range)) best.set(mask, label);
+    if (!was || label.seconds < was.seconds || (label.seconds === was.seconds && (label.range < was.range || (label.range === was.range && earlier(label, was))))) best.set(mask, label);
   };
   for (let i = 0; i < n; i++) {
     const label = { seconds: FIXED_VOYAGE_SECONDS + first[i].seconds, range: first[i].range, last: i, before: null, exp: expOf[i] };
@@ -214,7 +246,7 @@ function findRoutes({ sectors, start, stats, maxStops = MAX_STOPS, maxHours = nu
   const newOnes = (r) => r.explores + r.chances;
   const sorted = routes.sort((a, b) => (exploreFirst ? newOnes(b) - newOnes(a) : 0) || score(b) - score(a) || a.hours - b.hours
     || a.route.length - b.route.length || (a.route.join(',') < b.route.join(',') ? -1 : a.route.join(',') > b.route.join(',') ? 1 : 0));
-  return pruning ? sorted.slice(0, 1) : sorted;
+  return pruning ? sorted.slice(0, want) : sorted;
 }
 
 // ---- Unlocks ----
