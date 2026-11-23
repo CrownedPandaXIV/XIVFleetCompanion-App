@@ -10,6 +10,7 @@ const { repairKitCostFrom, sparePartLookup, SLOT_KEYS } = require('./parts');
 const { snapshotFragments } = require('../db');
 const finder = require('../subs/build-finder');
 const routeFinder = require('../subs/route-finder');
+const compare = require('../subs/compare');
 const { buildStats, partLetter } = require('../subs/submarine-builds');
 const calculatorData = require('../subs/calculator-data');
 const calc = require('../subs/calculator');
@@ -318,6 +319,46 @@ async function planPriced(client, request = {}) {
   }
 }
 
+// The Compare page: { builds: [{ rank, parts }] (up to 3), mode: 'same' | 'best', route: [sector ids] (same), mapId,
+// rankBy 'exp' | 'gil', maxHours, must, fcId (best: as the Route Finder), place, scope }. Per build: its stats, the
+// route it flies (same: the one given, as given; best: its best on the map), whether it can, its plan, and the
+// numbers for each row; then which build is best in each row (subs/compare.js).
+async function compareFor(client, request = {}) {
+  if (!cache) await loadCalculator(client);
+  if (!cache || !cache.game || cache.game.missing) return { success: false, error: 'The game data has no sub tables yet.' };
+  const { game } = cache;
+  const mode = request.mode === 'best' ? 'best' : 'same';
+  const builds = (request.builds || []).slice(0, compare.MAX_BUILDS);
+  const columns = [];
+  let pricing = { source: 'vendor' };
+  for (const b of builds) {
+    const rank = Number(b.rank);
+    const stats = buildStats(rank, b.parts || [], game.stats.rankStatsById, game.stats.partStatsByClassSlot);
+    if (!stats) { columns.push({ stats: null, route: [], values: compare.rowValues(null, null, false) }); continue; }
+    let route = [];
+    let found = null;
+    if (mode === 'same') {
+      route = (request.route || []).map(Number).filter((id) => game.sectors.has(id)).slice(0, 5);
+    } else {
+      const r = await routesFor(client, { rank, parts: b.parts, mapId: request.mapId, maxStops: 5, maxHours: Number(request.maxHours) || null,
+        must: request.must || [], rankBy: request.rankBy === 'gil' ? 'gil' : 'exp', fcId: request.fcId, place: request.place, scope: request.scope, limit: 1 });
+      found = r.success ? r.total : 0;
+      route = r.success && r.routes && r.routes[0] ? r.routes[0].route : [];
+    }
+    const sectors = route.map((id) => game.sectors.get(id));
+    const check = compare.routeCheck(sectors, sectors.length ? calc.startFor(sectors[0].id, game.startingPoints) : null, stats, rank);
+    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0;
+    const plan = route.length ? await planPriced(client, { rank, parts: b.parts, route, place: request.place, scope: request.scope }) : null;
+    if (plan && plan.pricing) pricing = plan.pricing;
+    columns.push({
+      stats, route, found, used: check.used, short: check.short, tooHigh: check.tooHigh, flies,
+      sectors: plan && plan.sectors ? plan.sectors.map((s) => ({ id: s.id, letter: s.letter, hasData: s.hasData, result: s.result })) : [],
+      values: compare.rowValues(stats, plan && plan.success ? plan : null, flies),
+    });
+  }
+  return { success: true, mode, columns, marks: compare.bestMarks(columns.map((c) => c.values)), pricing };
+}
+
 // A part class's letter (Syldra is Y, not S).
 const LETTER_OF_CLASS = { Shark: 'S', Unkiu: 'U', Whale: 'W', Coelacanth: 'C', Syldra: 'Y' };
 
@@ -385,6 +426,7 @@ ipcMain.handle('get-sub-calculator', () => withClient((client) => loadCalculator
 ipcMain.handle('find-sub-builds', (event, request) => withClient((client) => findFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('find-sub-routes', (event, request) => withClient((client) => routesFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('get-fc-unlocks', (event, fcId) => withClient(async (client) => { if (!cache) await loadCalculator(client); return unlocksFor(fcId); }, (err) => ({ success: false, error: err.message })));
+ipcMain.handle('compare-sub-builds', (event, request) => withClient((client) => compareFor(client, request), (err) => ({ success: false, error: err.message })));
 ipcMain.handle('plan-sub-voyage', (event, request) => withClient((client) => planPriced(client, request), (err) => ({ success: false, error: err.message })));
 
-module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts, routesFor, unlocksFor, fcSectors };
+module.exports = { loadCalculator, planFor, planPriced, partLetter, findFor, ownedParts, routesFor, unlocksFor, fcSectors, compareFor };

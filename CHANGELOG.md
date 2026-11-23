@@ -89,6 +89,15 @@ The Sub Calculator, built in steps. This entry grows until 1.12.0 is released.
   the lowest to the highest.
 - **Planner: the notes under a tier, retrieval or double dip wrap** inside their column instead of being cut off.
 - **Column widths are saved once, when you let go** of a column's edge, not at every move of the mouse.
+- **Sub Calculator → Compare (new page).** Up to three builds side by side. Add one of your subs, type one in, or use
+  **Add to compare** on the Build Finder and Planner (the builds stay while you move between pages). Two ways to compare:
+  - **Same route:** every build flies the route you set, so the numbers compare the builds alone. A build that can't fly
+    it says why ("Out of range: needs 20 more", "Rank too low for R") instead of numbers.
+  - **Best route each:** each build gets its own best route on a map, for experience or gil, as the Route Finder ranks
+    them (with a longest voyage, musts, and only sectors your Free Company has discovered), so the numbers compare build
+    and route together. Each build's route is shown at the top of its column.
+  Rows: the five stats, range used, voyage, experience and gil a voyage and a day, repair kits a day, gil a day after
+  repairs, and what each build reaches at each stop. The best figure in each row is green. Open in Planner on each.
 
 ## 1.11.0 - 2026-11-21
 

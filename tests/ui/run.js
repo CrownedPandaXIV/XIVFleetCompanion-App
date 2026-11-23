@@ -93,6 +93,7 @@ async function recordDatabaseVersion() {
       if (t.failures.length) failed++;
     } catch (e) {
       console.log('SCENARIO ERROR:', e.stack.split('\n').slice(0, 4).join(' | '));
+      if (t && t.errors.length) console.log('  page errors:', t.errors.join(' | '));
       failed++;
     } finally {
       try { t && t.close(); } catch (e) { /* ignore */ }

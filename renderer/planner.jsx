@@ -184,7 +184,7 @@ function pricePlaceOf(base, chosen, scope, picked) {
   return home ? home[scope] : null;
 }
 
-function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
+function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
   const [base, setBase] = useState(null);
   const [error, setError] = useState(null);
   const [rank, setRank] = useState(100);
@@ -307,6 +307,13 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed }) {
             ))}
           </div>
           {plan && !stats && <div className="supply-card-note">This rank or one of these parts isn't in the game data.</div>}
+          {stats && compare && (
+            <div className="planner-compare">
+              <CmpAddButton compare={compare} build={chosen && chosen.rank === rank && chosen.parts.join() === parts.join()
+                ? { label: chosen.subName, who: [chosen.character, chosen.world].filter(Boolean).join(' · '), world: chosen.world, fcId: chosen.fcId, rank, parts, route }
+                : { label: parts.join(''), who: 'from the Planner', world: chosen ? chosen.world : undefined, rank, parts, route }} />
+            </div>
+          )}
         </div>
 
         <div className="account-group planner-panel">

@@ -62,8 +62,9 @@ const FINDER_COLUMN_DEFS = [
     ? <td className="tone-good">All owned</td>
     : <td title={r.missingParts.map((p) => `${partNameOf(p.letter)} ${FINDER_SLOTS[p.slot]}`).join(', ')}>{r.missingParts.length} part{r.missingParts.length === 1 ? '' : 's'}</td>),
   sort: (r) => (r.missingParts ? r.missingParts.length : null) },
-  { key: 'planner', label: 'Planner', sortable: false, cell: (r, ctx) => (ctx && ctx.onOpen
-    ? <button type="button" className="finder-open" onClick={() => ctx.onOpen(r)} title="Open this build and the route in Sub Calculator → Planner.">Open in Planner</button> : null) },
+  { key: 'planner', label: 'Planner / Compare', sortable: false, cell: (r, ctx) => (ctx && ctx.onOpen
+    ? <span className="finder-buttons"><button type="button" className="finder-open" onClick={() => ctx.onOpen(r)} title="Open this build and the route in Sub Calculator → Planner.">Open in Planner</button>
+      <CmpAddButton compare={ctx.compare} build={{ label: r.parts.join(''), who: 'from the Build Finder', rank: r.rank, parts: r.parts, route: ctx.route }} /></span> : null) },
 ];
 
 // A popover that closes on a click elsewhere or Escape.
@@ -195,7 +196,7 @@ function FinderSlotFilter({ slot, value, onChange }) {
   );
 }
 
-function BuildFinderView({ refreshKey, onOpenPlanner }) {
+function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
   const [base, setBase] = useState(null);
   const [error, setError] = useState(null);
   const [mapId, setMapId] = useState(null);
@@ -271,7 +272,8 @@ function BuildFinderView({ refreshKey, onOpenPlanner }) {
     setGoals([...goals, { sectorId: sector.id, tier: 0, optimal: false, doubleDip: false, items: [itemId] }]);
   };
   const filtered = slots.some(Boolean);
-  const ctx = { onOpen: (r) => onOpenPlanner({ rank: r.rank, parts: r.parts, route: found.route }), need: found && found.need, why: found && found.why };
+  const ctx = { onOpen: (r) => onOpenPlanner({ rank: r.rank, parts: r.parts, route: found.route }), need: found && found.need, why: found && found.why,
+    compare, route: found && found.route };
   const rows = found && found.rows ? (finderSort.sortColumn ? applyColumnSort(cols.rows, finderSort.sortColumn, finderSort.sortDirection, cols.accessors) : cols.rows) : [];
   const groupOf = (r) => (r.rangeShort > 0 ? 'out' : r.rank);
 

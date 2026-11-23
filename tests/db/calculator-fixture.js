@@ -174,7 +174,38 @@ const fightClubAnswers = [85, 88, 90, 99].map((rank) => {
   return { rank, best: check.best ? check.best.row.route : null, missing: check.missing, alt: check.alt ? check.alt.row.route : null };
 });
 
-console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}`);
+// Compare's answers (subs/compare.js): builds on one route as given, and each on its own best route on a map (through
+// the FC's reading above), with the numbers for each row and the best in each.
+const cmp = require('../../subs/compare');
+const compareCases = [
+  { mode: 'same', route: [1, 9], builds: [{ rank: 125, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 60, parts: ['S', 'U', 'W', 'C'] }, { rank: 1, parts: ['S', 'S', 'S', 'S'] }] },
+  { mode: 'same', route: [32, 35, 40], builds: [{ rank: 90, parts: ['S+', 'U+', 'W+', 'C+'] }, { rank: 125, parts: ['Y+', 'Y+', 'Y+', 'Y+'] }] },
+  { mode: 'best', mapId: 1, rankBy: 'exp', maxHours: 48, must: [], builds: [{ rank: 125, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 90, parts: ['S+', 'U+', 'W+', 'C+'] }, { rank: 40, parts: ['S', 'U', 'W', 'C'] }] },
+  { mode: 'best', mapId: 2, rankBy: 'gil', maxHours: null, must: [35], builds: [{ rank: 110, parts: ['Y+', 'Y+', 'Y+', 'Y+'] }, { rank: 125, parts: ['W+', 'C+', 'W+', 'C+'] }] },
+];
+const compareAnswers = compareCases.map((c) => {
+  const columns = c.builds.map((b) => {
+    const stats = buildStats(b.rank, b.parts, rankStatsById, partStatsByClassSlot);
+    let route = c.route || [];
+    if (c.mode === 'best') {
+      const onMap = [...game.sectors.values()].filter((x) => x.map === c.mapId).sort((x, y) => x.id - y.id);
+      const allowed = rf.usableSectors({ onMap, rank: b.rank, states, leaveOut: [] });
+      const values = new Map(onMap.map((x) => [x.id, rf.sectorValue(x, dataOf.get(x.id), stats, prices)]));
+      const routes = c.must.every((id) => allowed.some((x) => x.id === id)) ? rf.findRoutes({ sectors: allowed, start: calc.startFor(onMap[0].id, game.startingPoints), stats,
+        maxStops: 5, maxHours: c.maxHours, must: c.must, values, rankBy: c.rankBy, opens: rf.opensOf(openerOf), states }) : [];
+      route = routes.length ? routes[0].route : [];
+    }
+    const sectorsHere = route.map((id) => game.sectors.get(id));
+    const check = cmp.routeCheck(sectorsHere, sectorsHere.length ? calc.startFor(sectorsHere[0].id, game.startingPoints) : null, stats, b.rank);
+    const flies = route.length > 0 && check.short === 0 && check.tooHigh.length === 0;
+    const p = route.length ? calc.plan({ route, stats, partClasses: b.parts.map((l) => CLASS_OF[l]), game, data, prices, repairKitCost }) : null;
+    const values = cmp.rowValues(stats, p, flies);
+    return { route, used: check.used, short: check.short, tooHigh: check.tooHigh, flies, values: Object.fromEntries(Object.entries(values).map(([k, v]) => [k, r6(v)])) };
+  });
+  return { ...c, columns, marks: cmp.bestMarks(columns.map((col) => col.values)) };
+});
+
+console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);
 const file = process.argv[2];
 if (file) {
   fs.writeFileSync(file, JSON.stringify({
@@ -184,6 +215,7 @@ if (file) {
     routeFinder: { read: [...read.entries()].map(([id, r]) => ({ id, unlocked: r.unlocked, explored: r.explored })), openerOf: [...openerOf.entries()],
       cases: routeAnswers, unlocks: [{ read: 'all', maps, ...unlocksAnswer }, { read: 'early', maps, ...unlocksEarly }],
       fightClub: { rows: fightClubRows, maps: letterMaps.map((m) => ({ id: m.id, letters: [...m.byLetter.entries()] })), cases: fightClubAnswers } },
+    compare: { cases: compareAnswers },
   }));
   console.log(`wrote ${file}`);
 }

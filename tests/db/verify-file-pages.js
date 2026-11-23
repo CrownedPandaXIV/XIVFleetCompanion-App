@@ -195,6 +195,9 @@ async function moreReads(pg) {
     ['find-sub-routes', { rank: 60, parts: ['W+', 'C+', 'W+', 'C+'], mapId: 1, maxStops: 5, maxHours: null, must: [], leaveOut: [], rankBy: 'exp', fcId: fcs[0], limit: 50 }],
     ['find-sub-routes', { rank: 60, parts: ['S', 'U', 'W', 'C'], mapId: 1, maxStops: 3, maxHours: 48, must: [1], leaveOut: [], rankBy: 'gil', exploreFirst: true, limit: 50 }],
     ['get-fc-unlocks', fcs[0]],
+    // Compare: three builds on one route, then each on its own best route through one FC's explored sectors.
+    ['compare-sub-builds', { builds: [{ rank: 60, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 20, parts: ['S', 'U', 'W', 'C'] }, { rank: 1, parts: ['S', 'S', 'S', 'S'] }], mode: 'same', route: [1, 2] }],
+    ['compare-sub-builds', { builds: [{ rank: 60, parts: ['W+', 'C+', 'W+', 'C+'] }, { rank: 20, parts: ['S', 'U', 'W', 'C'] }], mode: 'best', mapId: 1, rankBy: 'gil', maxHours: 48, must: [], fcId: fcs[0] }],
     ['get-shopping-list', { buyFromVendors: true, aheadDays: 7, priceScope: 'fleet' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'level', targetValue: 90, onlyCrafted: false, slotLabel: 'Main Hand' }],
     ['get-gear-suggestions', { jobAbbreviation: 'BSM', targetMode: 'ilvl', targetValue: 600, onlyCrafted: true, slotLabel: 'Main Hand' }],

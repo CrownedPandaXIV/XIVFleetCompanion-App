@@ -15,6 +15,7 @@ const VIEWS = [
   { key: 'planner', label: 'Planner', group: 'Sub Calculator' },
   { key: 'routeFinder', label: 'Route Finder', group: 'Sub Calculator' },
   { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
+  { key: 'compare', label: 'Compare', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
   { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
@@ -435,6 +436,16 @@ function App() {
   const openInPlanner = (cid, subName) => { setPlannerSub({ cid, subName, at: Date.now() }); setCurrentView('planner'); };
   // From the Build Finder: a build and route (not one of your subs).
   const openBuildInPlanner = (build) => { setPlannerSub({ build, at: Date.now() }); setCurrentView('planner'); };
+  // Sub Calculator → Compare: its builds (up to 3) and route, kept while you move between pages, so Add to compare on
+  // the Build Finder and Planner lands there. addToCompare: { rank, parts, route, label, who, world, fcId }; the route is
+  // taken only when Compare has none yet.
+  const [compareState, setCompareState] = useState({ builds: [], route: [], mapId: null });
+  const compareKeys = compareState.builds.map((b) => `${b.rank}|${b.parts.join(',')}`);
+  const addToCompare = ({ route, ...build }) => setCompareState((c) => {
+    if (c.builds.length >= 3 || c.builds.some((b) => `${b.rank}|${b.parts.join(',')}` === `${build.rank}|${build.parts.join(',')}`)) return c;
+    return { ...c, builds: [...c.builds, build], route: c.route.length || !route || !route.length ? c.route : route.slice(0, 5) };
+  });
+  const compareLink = { keys: compareKeys, count: compareState.builds.length, add: addToCompare, open: () => setCurrentView('compare') };
   const [trendDetail, setTrendDetail] = useState(null);
 
   // Chart icons and cards elsewhere ask for a detail panel or the Trends page by event.
@@ -713,8 +724,9 @@ function App() {
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
         {currentView === 'routeFinder' && <RouteFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
-        {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
-        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} />}
+        {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} compare={compareLink} />}
+        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} compare={compareLink} />}
+        {currentView === 'compare' && <CompareView refreshKey={refreshKey} state={compareState} setState={setCompareState} onOpenPlanner={openBuildInPlanner} />}
 
         {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}
 

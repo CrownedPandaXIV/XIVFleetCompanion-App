@@ -570,6 +570,32 @@
     /* A Fight Club target the FC can't run yet (Subs, Route Optimization). */
     .fc-blocked-tag { font-size: 11px; font-weight: 600; color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-radius: 3px; padding: 0 5px; margin-left: 6px; cursor: help; white-space: nowrap; }
     .fc-blocked-alt { display: block; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Compare: builds as columns, the best figure in each row green. */
+    .finder-buttons { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .planner-compare { margin-top: 8px; }
+    .cmp-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+    .cmp-musts { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; }
+    .cmp-must { background: none; border: 0; padding: 0; }
+    .cmp-wrap { overflow-x: auto; }
+    .cmp-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .cmp-table th, .cmp-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); vertical-align: top; text-align: left; }
+    .cmp-table td.num { text-align: right; }
+    .cmp-table thead th, .cmp-table tbody th { vertical-align: top; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .cmp-table .cmp-label { width: 190px; color: var(--text-soft); font-weight: 400; font-size: 13px; }
+    .cmp-table tr.cmp-group th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); padding-top: 12px; border-bottom: 1px solid var(--border-strong); }
+    .cmp-table td.cmp-best { color: var(--good); font-weight: 700; background: color-mix(in srgb, var(--good) 10%, transparent); }
+    .cmp-table tr.cmp-foot td, .cmp-table tr.cmp-foot th { border-bottom: 0; padding-top: 10px; }
+    .cmp-head { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    .cmp-head-top { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 6px; }
+    .cmp-name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+    .cmp-who { font-size: 12px; }
+    .cmp-build { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .cmp-x { background: none; border: 0; color: var(--dim); font-size: 16px; padding: 0 4px; }
+    .cmp-x:hover { color: var(--danger); }
+    .cmp-edit { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cmp-stop { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+    .cmp-why { font-size: 12px; color: var(--dim); margin-left: 6px; }
+    .cmp-why.bad { color: var(--danger); font-weight: 600; }
     /* Route Finder: two tabs, the sector tiles, bars, and the Unlocks cards and map grids. */
     .rf-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
     .rf-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--dim); font-size: 14px; font-weight: 600; padding: 8px 14px; margin-bottom: -1px; }
@@ -883,6 +909,7 @@
   <script src="planner.js"></script>
   <script src="build-finder.js"></script>
   <script src="route-finder.js"></script>
+  <script src="compare.js"></script>
   <script src="summary.js"></script>
   <script src="inventory.js"></script>
   <script src="trends.js"></script>
