@@ -516,6 +516,11 @@
     @keyframes working-spin { to { transform: rotate(360deg); } }
     .is-busy { opacity: 0.4; transition: opacity 0.15s; }
     .part-rank-note { font-size: 12px; margin: 6px 0; }
+    /* A search box with its Clear link beside it. */
+    .search-row { display: flex; align-items: center; gap: 8px; }
+    .search-row input[type=search] { flex: 1; min-width: 0; }
+    .planner-picker-panel .search-row { margin-bottom: 6px; }
+    .planner-picker-panel .search-row input[type=search] { margin-bottom: 0; }
     /* Build Finder: what you want, the options, the builds (soft colour behind tags, from the look's own colours). */
     .finder { display: flex; flex-direction: column; gap: 14px; padding: 0 24px 12px; }
     .finder-band { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -594,20 +599,15 @@
     .lv-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
     .lv-strip .c1 { background: var(--accent); } .lv-strip .c2 { background: color-mix(in srgb, var(--accent) 60%, white); }
     .lv-strip .c3 { background: var(--good); } .lv-strip .c4 { background: color-mix(in srgb, var(--good) 60%, white); }
-    .lv-stages { display: flex; flex-direction: column; gap: 8px; }
-    .lv-stage { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 7px; padding: 9px 12px; }
-    .lv-stage.c2 { border-left-color: color-mix(in srgb, var(--accent) 60%, white); } .lv-stage.c3 { border-left-color: var(--good); } .lv-stage.c4 { border-left-color: color-mix(in srgb, var(--good) 60%, white); }
-    .lv-ranks { font-weight: 700; font-size: 15px; color: var(--text-bright); }
-    .lv-ranks small { display: block; font-weight: 400; font-size: 12px; color: var(--dim); }
-    .lv-mid { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-    .lv-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--dim); }
-    .lv-facts b { color: var(--text-bright); font-weight: 600; }
+    /* The Levelling Plan's stages table: a coloured edge per stage (as the strip), swap rows in amber across it. */
+    tr.lv-stage td:first-child { border-left: 4px solid var(--accent); }
+    tr.lv-stage.c2 td:first-child { border-left-color: color-mix(in srgb, var(--accent) 60%, white); } tr.lv-stage.c3 td:first-child { border-left-color: var(--good); } tr.lv-stage.c4 td:first-child { border-left-color: color-mix(in srgb, var(--good) 60%, white); }
+    .lv-ranks { font-weight: 700; color: var(--text-bright); white-space: nowrap; }
     /* A stage's parts, set apart from its route: a line before them, a "Parts" label, outlined letters. */
-    .lv-parts { display: inline-flex; align-items: center; gap: 4px; margin-left: 14px; padding-left: 12px; border-left: 1px solid var(--border-strong); vertical-align: middle; }
-    .lv-parts-label { font-size: 11px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; margin-right: 2px; }
+    .lv-parts { display: inline-flex; align-items: center; gap: 4px; }
     .finder-part.lv-part { background: transparent; color: var(--link); border: 1px solid color-mix(in srgb, var(--link) 55%, transparent); }
     .lv-better { font-size: 12px; color: var(--text-soft); }
-    .lv-swap { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 7px; padding: 8px 12px; font-size: 13px; }
+    tr.lv-swap td { background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 13px; }
     .lv-swap b { color: var(--warn); }
     .lv-fleet select { margin-left: 4px; }
     /* Compare: builds as columns, the best figure in each row green. */

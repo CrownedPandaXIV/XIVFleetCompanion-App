@@ -47,7 +47,10 @@ module.exports = async (t) => {
   await waitFor(`[...document.querySelectorAll('.rf-tile')].find((b) => b.querySelector('.rf-letter').innerText === 'O').classList.contains('out')
     && [...${rowsSel}].every((tr) => ![...tr.querySelectorAll('.rf-route .rf-letter')].some((l) => l.innerText === 'O'))`, 'routes without O', 20000);
   check(true, 'clicked again, it is left out');
-  await ev(`[...document.querySelectorAll('.rf-tile')].find((b) => b.querySelector('.rf-letter').innerText === 'O').click()`);
+  // Clear marks: no must or left-out sector.
+  await ev(`[...document.querySelectorAll('.rf button')].find((b) => b.innerText.trim() === 'Clear marks').click()`);
+  await waitFor(`!document.querySelector('.rf-tile.out') && !document.querySelector('.rf-tile.must') && !document.querySelector('.rf-marks')`, 'the marks cleared', 10000);
+  check(true, 'Clear marks takes the marks off every tile');
 
   // Best for gil.
   await ev(`[...document.querySelectorAll('.rf-seg button')].find((b) => b.innerText === 'Gil').click()`);

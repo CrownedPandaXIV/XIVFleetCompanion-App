@@ -202,6 +202,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
             <h2 className="finder-heading">Your sub</h2>
             <div className="rf-sub">
               <PlannerSubPicker subs={base.subs} chosen={chosen} onChoose={loadSub} />
+              {chosen && <button className="link-button" onClick={() => setChosen(null)} title="Stop starting from this sub; the build stays as it is">Clear sub</button>}
               {chosen && <span className="rf-subname">{chosen.subName}</span>}
               {chosen && <span className="dim">{[chosen.character, chosen.world, chosen.fc].filter(Boolean).join(' · ')}</span>}
               <span className="rf-pill">Rank {rank}</span>
@@ -284,6 +285,11 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
                 );
               })}
             </div>
+            {(must.length > 0 || leaveOut.length > 0) && (
+              <div className="rf-marks dim">{must.length > 0 && <span>Must go to <b>{must.map((id) => sectorOf.get(id).letter).join(', ')}</b>. </span>}
+                {leaveOut.length > 0 && <span>Left out: <b>{leaveOut.map((id) => sectorOf.get(id).letter).join(', ')}</b>. </span>}
+                <button className="link-button" onClick={() => { setMust([]); setLeaveOut([]); }}>Clear marks</button></div>
+            )}
             {(discoveredHere.length > 0 || chanceHere.length > 0) && (
               <div className="rf-strip">
                 {discoveredHere.length > 0 && <span><b>{discoveredHere.map((s) => s.letter).join(', ')}</b> can be explored next.</span>}

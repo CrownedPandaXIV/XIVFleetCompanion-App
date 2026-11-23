@@ -78,4 +78,20 @@ module.exports = async (t) => {
   await setField(`document.querySelector('.planner-fields input[type=number]')`, 50, 'HTMLInputElement');
   await waitFor(`!document.querySelector('.part-rank-note')`, 'the note gone at rank 50', 10000);
   check(true, 'at the rank it needs, the note goes');
+
+  // Clear route; Clear sub (the build stays); the picker's search Clear.
+  await ev(`[...document.querySelectorAll('.planner button')].find((b) => b.innerText.trim() === 'Clear route').click()`);
+  await waitFor(`document.querySelectorAll('.planner-chip').length === 0`, 'the route cleared', 10000);
+  check(true, 'Clear route empties the route');
+  await ev(`[...document.querySelectorAll('.planner .controls button')].find((b) => b.innerText.trim() === 'Clear sub').click()`);
+  await waitFor(`/Choose one of your subs/.test(document.querySelector('.planner-picker-button').innerText)`, 'no sub', 10000);
+  check(await ev(`Number(document.querySelector('.planner-fields input[type=number]').value) === 50`), 'Clear sub goes back to no sub, the build kept');
+  await ev(`document.querySelector('.planner-picker-button').click()`);
+  await ev(`(() => { const i = document.querySelector('.planner-picker-panel input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'zzznothing');
+    i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await waitFor(`document.body.innerText.includes('No sub matches')`, 'search with no match', 5000);
+  await ev(`[...document.querySelectorAll('.planner-picker-panel button')].find((b) => b.innerText.trim() === 'Clear').click()`);
+  await waitFor(`document.querySelectorAll('.planner-picker-sub').length > 0`, 'the search cleared', 5000);
+  check(true, 'Clear empties the sub search');
 };

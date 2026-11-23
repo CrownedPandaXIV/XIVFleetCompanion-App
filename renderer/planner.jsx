@@ -127,7 +127,10 @@ function PlannerSubPicker({ subs, chosen, onChoose }) {
       </button>
       {open && (
         <div className="planner-picker-panel">
-          <input type="search" autoFocus placeholder="Search character, world, account, FC or sub" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="search-row">
+            <input type="search" autoFocus placeholder="Search character, world, account, FC or sub" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {search && <button type="button" className="link-button" onClick={() => setSearch('')}>Clear</button>}
+          </div>
           <div className="planner-picker-list">
             {!shown.length && <div className="dim planner-picker-empty">No sub matches “{search}”.</div>}
             {accounts.map((a) => (
@@ -213,7 +216,10 @@ function FcPicker({ fcs, value, onChange }) {
       </button>
       {open && (
         <div className="planner-picker-panel fc-picker-panel">
-          <input type="search" autoFocus placeholder="Search Free Company, world or account" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="search-row">
+            <input type="search" autoFocus placeholder="Search Free Company, world or account" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {search && <button type="button" className="link-button" onClick={() => setSearch('')}>Clear</button>}
+          </div>
           <div className="planner-picker-list">
             {!groups.length && <div className="dim planner-picker-empty">No Free Company matches “{search}”.</div>}
             {groups.map((g) => (
@@ -378,6 +384,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
       <div className="controls">
         <label>Start from one of your subs</label>{' '}
         <PlannerSubPicker subs={base.subs} chosen={chosen} onChoose={loadSub} />
+        {chosen && <button className="link-button" onClick={() => setChosen(null)} title="Stop starting from this sub; the build and route stay as they are">Clear sub</button>}
         {chosen && <span className="dim planner-picker-note">Change anything below to try other builds; your sub isn't changed.</span>}
       </div>
 
@@ -440,6 +447,7 @@ function PlannerView({ refreshKey, openSub, onOpenSubUsed, compare }) {
               );
             })}
             {route.length > 1 && <button onClick={bestOrder} title="Put the sectors in the fastest order this sub's range allows">Best order</button>}
+            {route.length > 0 && <button className="link-button" onClick={() => setRoute([])}>Clear route</button>}
           </div>
           {plan && plan.route && plan.route.length > 0 && stats && (
             <div className="planner-facts">

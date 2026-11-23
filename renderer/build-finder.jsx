@@ -124,8 +124,11 @@ function FinderItemSearch({ base, onAdd }) {
   const found = [...byItem.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
   return (
     <div className="finder-search" ref={box}>
-      <input type="search" placeholder="Find an item, e.g. Cocobolo Lumber" value={text}
-        onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
+      <div className="search-row">
+        <input type="search" placeholder="Find an item, e.g. Cocobolo Lumber" value={text}
+          onChange={(e) => { setText(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
+        {text && <button type="button" className="link-button" onClick={() => { setText(''); setOpen(false); }}>Clear</button>}
+      </div>
       {open && text.trim().length >= 2 && (
         <div className="finder-search-panel">
           {!found.length && <div className="dim">No sector drops anything called “{text}”.</div>}
@@ -281,7 +284,8 @@ function BuildFinderView({ refreshKey, onOpenPlanner, compare }) {
   return (
     <div className="finder">
       <section className="finder-band">
-        <h2 className="finder-heading">What you want <span className="count">{goals.length} of 5 sectors</span></h2>
+        <h2 className="finder-heading">What you want <span className="count">{goals.length} of 5 sectors</span>
+          {goals.length > 0 && <button className="link-button finder-clear" onClick={() => setGoals([])}>Clear goals</button>}</h2>
         <FinderItemSearch base={base} onAdd={addFromSearch} />
         {switchTo && (
           <div className="finder-switch tone-warn">

@@ -219,6 +219,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
           {!full && <PlannerSubPicker subs={base.subs} chosen={null} onChoose={addSub} />}
           <button onClick={addTyped} disabled={full}>Type one in</button>
           <span className="dim">{full ? 'Take one out to add another.' : 'or use Add to compare on the Build Finder or Voyage Planner.'}</span>
+          {builds.length > 0 && <button className="link-button" onClick={() => { setBuilds([]); setEditing(null); }}>Remove all builds</button>}
         </div>
       </section>
 
@@ -269,6 +270,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
               );
             })}
             {route.length > 1 && builds.length > 0 && <button onClick={bestOrder} title="Put the sectors in the fastest order the build with the most range can fly">Best order</button>}
+            {route.length > 0 && <button className="link-button" onClick={() => setRoute([])}>Clear route</button>}
           </div>
         )}
         {mode === 'best' && (

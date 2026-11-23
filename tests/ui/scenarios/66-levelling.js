@@ -33,6 +33,11 @@ module.exports = async (t) => {
   check(strip[0] === strip[1] && strip[0] > 0, `a strip piece per stage (${strip.join(' / ')})`);
   const routes = await ev(`[...document.querySelectorAll('.lv-stage')].map((s) => [...s.querySelectorAll('.rf-route .rf-letter')].map((l) => l.innerText).join(''))`);
   check(routes.every((r) => r === 'O'), `only through sectors the FC has discovered (${routes.join(', ')})`);
+  // The stages are the shared table: a Columns menu, and headers that sort; the swap rows only in plan order.
+  const heads = await ev(`[...document.querySelectorAll('.lv-table thead th')].map((th) => th.innerText.trim().toLowerCase())`);
+  const picker = await ev(`!!document.querySelector('.lv .finder-columns button')`);
+  check(heads.join('|').startsWith('ranks|time|voyages|route|parts') && heads.includes('exp an hour') && picker,
+    `the stages are a table with the usual columns (${heads.join(', ')})`);
   const better = await ev(`document.querySelector('.lv-better') ? document.querySelector('.lv-better').innerText : ''`);
   check(/^J isn't discovered yet: with it, (O-J|J-O)\S* gives [\d,.]+% more an hour\.$/.test(better), `a stage says what an undiscovered sector would add (${better})`);
   const time = await ev(`document.querySelectorAll('.lv-sum .n')[2].innerText`);
@@ -44,6 +49,11 @@ module.exports = async (t) => {
   await setSelect(`document.querySelector('.lv select')`, last);
   await waitFor(`document.querySelectorAll('.lv-sum .v')[0].innerText.endsWith('→ ${last}') && ${settled}`, 'the further target', 20000);
   check((await voyages()) > before, `a further target takes more voyages (${await voyages()} instead of ${before})`);
+  // Reset target: back to the sub's next build.
+  await button('Reset target');
+  await waitFor(`!/→ ${last}$/.test(document.querySelectorAll('.lv-sum .v')[0].innerText) && ${settled}`, 'the target reset', 20000);
+  check((await voyages()) === before && !(await ev(`[...document.querySelectorAll('.lv button')].some((b) => b.innerText.trim() === 'Reset target')`)),
+    `Reset target goes back to the next build (${await voyages()} voyages)`);
 
   // Suggest part changes: a Standard parts only box, and either swaps or a line saying there are none.
   await button('Suggest changes on the way');
@@ -53,9 +63,8 @@ module.exports = async (t) => {
   await waitFor(`(document.querySelectorAll('.lv-swap').length > 0 || /No part swap to a Standard part makes this plan shorter/.test(document.querySelector('.lv').innerText)) && ${settled}`, 'Standard parts only', 30000);
   const swaps = await ev(`[...document.querySelectorAll('.lv-swap b')].map((b) => b.innerText)`);
   check(swaps.every((s) => !/Modified/.test(s)), `Standard parts only suggests no Modified part (${swaps.join('; ') || 'none'})`);
-  const partsShown = await ev(`[...document.querySelectorAll('.lv-stage')].map((s) => s.querySelector('.lv-parts')
-    ? s.querySelector('.lv-parts-label').textContent + ' ' + [...s.querySelectorAll('.lv-part')].map((p) => p.textContent).join(' ') : '')`);
-  check(swaps.length === 0 || partsShown.every((p) => /^Parts( [A-Z]\+?){4}$/.test(p)), `with swaps, each stage's parts sit apart from the route after "Parts" (${partsShown[0] || 'no swaps'})`);
+  const partsShown = await ev(`[...document.querySelectorAll('.lv-stage')].map((s) => [...s.querySelectorAll('.lv-part')].map((p) => p.textContent).join(' '))`);
+  check(partsShown.every((p) => /^([A-Z]\+? ){3}[A-Z]\+?$/.test(p)), `each stage's parts in their own column (${partsShown[0]})`);
   await button('Keep this build');
 
   // Use every sector: the full-map plan, as if every sector were discovered, takes no longer and has nothing left to discover.
@@ -79,6 +88,11 @@ module.exports = async (t) => {
   await ev(`[...document.querySelectorAll('.lv-fleet button')].find((b) => b.innerText === 'Stages').click()`);
   await waitFor(`document.querySelectorAll('.lv-stage').length > 0 && ${settled}`, 'one sub again', 30000);
   check(true, 'Stages opens that sub on its own');
+
+  // Clear sub: no sub chosen, the build and its plan kept.
+  await button('Clear sub');
+  await waitFor(`/Choose one of your subs/.test(document.querySelector('.lv .planner-picker-button').innerText) && document.querySelectorAll('.lv-stage').length > 0 && ${settled}`, 'no sub chosen', 20000);
+  check(true, 'Clear sub goes back to no sub, the plan kept');
 
   // Open in Planner.
   const stops = await ev(`document.querySelector('.lv-stage').querySelectorAll('.rf-route .rf-letter').length`);

@@ -16,50 +16,103 @@ const lvSlot = ['Hull', 'Stern', 'Bow', 'Bridge'];
 // When a sub's first voyage of the plan leaves: now, or when it's back if it's out.
 const lvStart = (sub) => Math.max(Date.now(), sub && sub.returnTime ? sub.returnTime * 1000 : 0);
 
-// One plan's stages, with the part swaps between them and what each stage could gain from a sector not discovered.
+// The stages table (the shared table: columns to size, move, sort and choose, remembered). Each row a stage: its ranks,
+// time, route (with the sectors its rank opened), parts, voyage figures, and what a sector not discovered yet would add.
+const LV_STAGE_COLUMN_DEFS = [
+  { key: 'ranks', label: 'Ranks', locked: true, td: (r) => <td className="lv-ranks">{r.fromRank} → {r.toRank}</td>, sort: (r) => r.fromRank },
+  { key: 'days', label: 'Time', td: (r) => <td className="num">{lvDays(r.hours)}</td>, sort: (r) => r.hours },
+  { key: 'voyages', label: 'Voyages', td: (r) => <td className="num">{plannerN(r.voyages)}</td>, sort: (r) => r.voyages },
+  { key: 'route', label: 'Route', td: (r, ctx) => (
+    <td><span className="rf-route">{r.route.map((id) => <RfLetter key={id} sector={ctx.sectorOf.get(id)} />)}</span>
+      {r.opened.map((id) => <span key={id} className="rf-tag chance">{ctx.sectorOf.get(id).letter} from rank {ctx.sectorOf.get(id).rankReq}</span>)}</td>),
+  sort: (r) => r.routeLetters },
+  { key: 'parts', label: 'Parts', td: (r) => <td><span className="lv-parts">{r.parts.map((p, j) => <span key={j} className="finder-part lv-part" title={partNameOf(p)}>{p}</span>)}</span></td>,
+    sort: (r) => r.parts.join('') },
+  { key: 'voyage', label: 'Voyage', td: (r) => <td className="num">{plannerHours(r.hours / r.voyages)}</td>, sort: (r) => r.hours / r.voyages },
+  { key: 'expVoyage', label: 'Exp a voyage', td: (r) => <td className="num">{plannerN(r.expPerVoyage)}</td>, sort: (r) => r.expPerVoyage },
+  { key: 'expHour', label: 'Exp an hour', td: (r) => <td className="num">{plannerN(r.expPerHour)}</td>, sort: (r) => r.expPerHour },
+  { key: 'tanks', label: 'Ceruleum', default: false, td: (r) => <td className="num">{plannerN(r.tanks)}</td>, sort: (r) => r.tanks },
+  { key: 'kits', label: 'Repair kits', default: false, td: (r) => <td className="num">{plannerN(r.kits)}</td>, sort: (r) => r.kits },
+  { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better ? (
+    <span className="lv-better">{r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? "isn't" : "aren't"} discovered yet:
+      with {r.better.missing.length === 1 ? 'it' : 'them'}, {r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives {plannerN((r.better.expPerHour / r.expPerHour - 1) * 100)}% more an hour.</span>
+  ) : <span className="dim">—</span>}</td> },
+  { key: 'planner', label: 'Voyage Planner', sortable: false, cell: (r, ctx) => (
+    <button className="finder-open" onClick={() => ctx.onOpenPlanner({ rank: r.fromRank, parts: r.parts, route: r.route })}>Open in Voyage Planner</button>) },
+];
+
+// One plan's stages, with each part swap as a full-width row before the first stage that uses it (in plan order; a
+// column sort lists the stages alone).
 function LvStages({ plan, sectorOf, onOpenPlanner }) {
-  // Each swap before the first stage that uses it (subs/levelling.js swapsByStage).
   const swapsAt = plan.swapsByStage || plan.stages.map(() => []);
+  const rows = plan.stages.map((st, i) => {
+    const before = plan.stages[i - 1];
+    // Sectors this stage adds that its rank opened (they need more than the stage before started at).
+    const opened = before ? st.route.filter((id) => !before.route.includes(id) && (sectorOf.get(id) || {}).rankReq > before.fromRank) : [];
+    return { ...st, i, opened, routeLetters: st.route.map((id) => (sectorOf.get(id) || {}).letter || '').join('') };
+  });
+  const sort = useColumnSort();
+  const cols = useTableColumns({ tableKey: 'levellingStages', ownDefs: LV_STAGE_COLUMN_DEFS, rows, idOf: () => null });
+  const ctx = { sectorOf, onOpenPlanner };
+  const sorted = sort.sortColumn ? applyColumnSort(rows, sort.sortColumn, sort.sortDirection, cols.accessors) : rows;
+  const span = cols.visibleDefs.length;
   return (
-    <div className="lv-stages">
-      {plan.stages.map((st, i) => {
-        const before = plan.stages[i - 1];
-        // Sectors this stage adds that its rank opened (they need more than the stage before started at).
-        const opened = before ? st.route.filter((id) => !before.route.includes(id) && (sectorOf.get(id) || {}).rankReq > before.fromRank) : [];
-        return (
-          <React.Fragment key={`${st.fromRank}-${i}`}>
-            {swapsAt[i].map((s) => (
-              <div key={`swap-${s.atRank}-${s.slot}`} className="lv-swap">
-                <b>At rank {s.showRank}: {lvSlot[s.slot]} → {partNameOf(s.to)}</b>
-                <span>{s.owned ? '(you have one)' : '(to get)'}</span>
-                <span className="dim">→</span>
-                <span>{plannerN(s.gain * 100)}% more experience an hour, {lvDays(s.savedHours)} sooner in all</span>
-              </div>
+    <React.Fragment>
+      <div className="controls finder-columns"><ColumnPicker cols={cols} /></div>
+      <div className="finder-table lv-table">
+        <table>
+          <thead><tr><ColumnHeadCells cols={cols} sortColumn={sort.sortColumn} sortDirection={sort.sortDirection} onSortClick={(k) => sort.handleSortClick(k)} /></tr></thead>
+          <tbody>
+            {sorted.map((r) => (
+              <React.Fragment key={`${r.fromRank}-${r.i}`}>
+                {!sort.sortColumn && swapsAt[r.i].map((s) => (
+                  <tr key={`swap-${s.atRank}-${s.slot}`} className="lv-swap"><td colSpan={span}>
+                    <b>At rank {s.showRank}: {lvSlot[s.slot]} → {partNameOf(s.to)}</b>
+                    <span>{s.owned ? ' (you have one)' : ' (to get)'}</span>
+                    <span className="dim"> → </span>
+                    <span>{plannerN(s.gain * 100)}% more experience an hour, {lvDays(s.savedHours)} sooner in all</span>
+                  </td></tr>
+                ))}
+                <tr className={`lv-stage ${LV_STAGE_CLASSES[r.i % 4]}`}><ColumnBodyCells cols={cols} row={r} ctx={ctx} /></tr>
+              </React.Fragment>
             ))}
-            <div className={`lv-stage ${LV_STAGE_CLASSES[i % 4]}`}>
-              <div className="lv-ranks">{st.fromRank} → {st.toRank}<small>{lvDays(st.hours)} · {st.voyages} voyage{st.voyages === 1 ? '' : 's'}</small></div>
-              <div className="lv-mid">
-                <span>
-                  <span className="rf-route">{st.route.map((id) => <RfLetter key={id} sector={sectorOf.get(id)} />)}</span>
-                  {opened.map((id) => <span key={id} className="rf-tag chance">{sectorOf.get(id).letter} from rank {sectorOf.get(id).rankReq}</span>)}
-                  {plan.swaps.length > 0 && <span className="lv-parts"><span className="lv-parts-label">Parts</span>{st.parts.map((p, j) => <span key={j} className="finder-part lv-part" title={partNameOf(p)}>{p}</span>)}</span>}
-                </span>
-                <span className="lv-facts">
-                  <span><b>{plannerHours(st.hours / st.voyages)}</b> a voyage</span>
-                  <span><b>{plannerN(st.expPerVoyage)}</b> exp a voyage</span>
-                  <span><b>{plannerN(st.expPerHour)}</b> exp an hour</span>
-                </span>
-                {st.better && (
-                  <span className="lv-better">{st.better.missing.map((id) => sectorOf.get(id).letter).join(', ')} {st.better.missing.length === 1 ? "isn't" : "aren't"} discovered yet:
-                    with {st.better.missing.length === 1 ? 'it' : 'them'}, {st.better.route.map((id) => sectorOf.get(id).letter).join('-')} gives {plannerN((st.better.expPerHour / st.expPerHour - 1) * 100)}% more an hour.</span>
-                )}
-              </div>
-              <button className="finder-open" onClick={() => onOpenPlanner({ rank: st.fromRank, parts: st.parts, route: st.route })}>Open in Voyage Planner</button>
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </div>
+          </tbody>
+        </table>
+      </div>
+      {sort.sortColumn && plan.swaps.length > 0 && (
+        <div className="dim">The part swaps show between the stages in plan order. <button className="link-button" onClick={() => sort.resetSort()}>Back to plan order</button></div>
+      )}
+    </React.Fragment>
+  );
+}
+
+// Every sub in a Free Company (the shared table): each sub's target, the route it starts on, voyages and when it gets
+// there, and Stages to see its plan.
+const lvReaches = (r) => (r.plan && r.plan.stages && r.plan.reached ? r.plan.hours : null);
+const LV_FLEET_COLUMN_DEFS = [
+  { key: 'sub', label: 'Sub', locked: true, td: (r) => <td><b>{r.subName}</b> <span className="dim">{r.character}</span></td>, sort: (r) => r.subName },
+  { key: 'target', label: 'Level to', td: (r, ctx) => <td>{r.top ? <span className="dim">top rank</span> : (
+    <span>{r.rank} → <select value={r.target} onChange={(e) => ctx.setTarget(r, Number(e.target.value))}>
+      {Array.from({ length: ctx.maxRank - r.rank }, (_, i) => r.rank + 1 + i).map((x) => <option key={x} value={x}>{x}</option>)}
+    </select></span>)}</td>, sort: (r) => r.target },
+  { key: 'route', label: 'Route now', td: (r, ctx) => <td>{r.plan && r.plan.stages && r.plan.stages[0]
+    ? <span className="rf-route">{r.plan.stages[0].route.map((id) => <RfLetter key={id} sector={ctx.sectorOf.get(id)} />)}</span> : <span className="dim">—</span>}</td>, sortable: false },
+  { key: 'voyages', label: 'Voyages', td: (r) => <td className="num">{r.plan && r.plan.stages ? plannerN(r.plan.voyages) : '—'}</td>, sort: (r) => (r.plan && r.plan.stages ? r.plan.voyages : null) },
+  { key: 'reaches', label: 'Reaches it', td: (r) => <td className="num">{!r.plan || !r.plan.stages ? '—' : r.plan.reached
+    ? `about ${lvDays(r.plan.hours)} · ${lvDate(lvStart(r) + r.plan.hours * 3600000)}` : <span className="tone-warn">stops at rank {r.plan.stuckAt}</span>}</td>, sort: lvReaches },
+  { key: 'stages', label: 'Stages', sortable: false, cell: (r, ctx) => (!r.top ? <button className="link-button" onClick={() => ctx.open(r)}>Stages</button> : null) },
+];
+
+function LvFleet({ rows, ctx }) {
+  const sort = useColumnSort();
+  const cols = useTableColumns({ tableKey: 'levellingFleet', ownDefs: LV_FLEET_COLUMN_DEFS, rows, idOf: () => null });
+  return (
+    <React.Fragment>
+      <div className="controls finder-columns"><ColumnPicker cols={cols} /></div>
+      <div className="finder-table">
+        <ColumnTable cols={cols} sort={sort} rows={rows} rowKey={(r) => r.key} className="lv-fleet" ctx={ctx} />
+      </div>
+    </React.Fragment>
   );
 }
 
@@ -192,6 +245,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
             <h2 className="finder-heading">Your sub</h2>
             <div className="rf-sub">
               <PlannerSubPicker subs={base.subs} chosen={chosen} onChoose={loadSub} />
+              {chosen && <button className="link-button" onClick={() => { setChosen(null); setTarget(null); }} title="Stop starting from this sub; the build stays as it is">Clear sub</button>}
               {chosen && <span className="rf-subname">{chosen.subName}</span>}
               {chosen && <span className="dim">{[chosen.character, chosen.world, chosen.fc].filter(Boolean).join(' · ')}</span>}
               <span className="rf-pill">Rank {rank}</span>
@@ -219,6 +273,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
                   ))}
                 </select>
               </label>
+              {target !== null && <button className="link-button" onClick={() => setTarget(null)}>Reset target</button>}
               <span className="finder-field">Sectors explored by {fcSelect}</span>
               {everyBox}
             </div>
@@ -247,36 +302,18 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
       {mode === 'fc' && (
         <section className="finder-band">
           <h2 className="finder-heading">Every sub in {fcSelect} <span className="count">each to its next build's rank (else the top rank)</span></h2>
-          <div className="finder-row">{everyBox}{fcNote}</div>
+          <div className="finder-row">{everyBox}{fcNote}
+            {Object.keys(targets).length > 0 && <button className="link-button" onClick={() => setTargets({})}>Reset targets</button>}</div>
           {choices}
           <Working busy={busy}>Working out the plans…</Working>
           {answer && answer.error && <div className="error">{answer.error}</div>}
           {!fcSubs.length && <div className="status">No subs in this Free Company.</div>}
           {fcSubs.length > 0 && (
-            <div className={`finder-table${busy ? ' is-busy' : ''}`}>
-              <table className="lv-fleet">
-                <thead><tr><th>Sub</th><th>Level to</th><th>Route now</th><th className="num">Voyages</th><th className="num">Reaches it</th><th /></tr></thead>
-                <tbody>
-                  {fcSubs.map((s) => {
-                    const p = plans ? plans.find((x) => x.key === keyOf(s)) : null;
-                    const top = s.rank >= base.maxRank;
-                    return (
-                      <tr key={keyOf(s)}>
-                        <td><b>{s.subName}</b> <span className="dim">{s.character}</span></td>
-                        <td>{top ? <span className="dim">top rank</span> : (
-                          <span>{s.rank} → <select value={targets[keyOf(s)] || defaultTarget(s, s.rank)} onChange={(e) => setTargets({ ...targets, [keyOf(s)]: Number(e.target.value) })}>
-                            {Array.from({ length: base.maxRank - s.rank }, (_, i) => s.rank + 1 + i).map((r) => <option key={r} value={r}>{r}</option>)}
-                          </select></span>
-                        )}</td>
-                        <td>{p && p.stages && p.stages[0] ? <span className="rf-route">{p.stages[0].route.map((id) => <RfLetter key={id} sector={sectorOf.get(id)} />)}</span> : <span className="dim">—</span>}</td>
-                        <td className="num">{p && p.stages ? plannerN(p.voyages) : '—'}</td>
-                        <td className="num">{!p || !p.stages ? '—' : p.reached ? `about ${lvDays(p.hours)} · ${lvDate(lvStart(s) + p.hours * 3600000)}` : <span className="tone-warn">stops at rank {p.stuckAt}</span>}</td>
-                        <td>{!top && <button className="link-button" onClick={() => { loadSub(s); setTarget(targets[keyOf(s)] || null); setMode('one'); }}>Stages</button>}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className={busy ? 'is-busy' : ''}>
+              <LvFleet rows={fcSubs.map((s) => ({ ...s, key: keyOf(s), plan: plans ? plans.find((x) => x.key === keyOf(s)) || null : null, top: s.rank >= base.maxRank,
+                target: targets[keyOf(s)] || defaultTarget(s, s.rank) }))}
+                ctx={{ sectorOf, maxRank: base.maxRank, setTarget: (s, r) => setTargets({ ...targets, [s.key]: r }),
+                  open: (s) => { loadSub(s); setTarget(targets[s.key] || null); setMode('one'); } }} />
             </div>
           )}
         </section>

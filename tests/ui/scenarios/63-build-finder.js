@@ -110,4 +110,19 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('.planner-chip').length === 2 && document.querySelectorAll('.planner-stat').length === 5`, 'the Planner with that build', 15000);
   const rank = await ev(`Number(document.querySelector('.planner-fields input[type=number]').value)`);
   check(rank === firstRank, `Open in Planner loads the build at its rank (${rank}) and both sectors`);
+
+  // Back on the Build Finder: the item search's Clear, then Clear goals.
+  await nav('Build Finder');
+  await waitFor(`!!document.querySelector('.finder-search input')`, 'the Build Finder again', 15000);
+  await ev(`(() => { const i = document.querySelector('.finder-search input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'zz');
+    i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await waitFor(`[...document.querySelectorAll('.finder-search button')].some((b) => b.innerText.trim() === 'Clear')`, 'the search Clear', 5000);
+  await ev(`[...document.querySelectorAll('.finder-search button')].find((b) => b.innerText.trim() === 'Clear').click()`);
+  check(await ev(`document.querySelector('.finder-search input').value === ''`), 'Clear empties the item search');
+  await ev(`[...document.querySelectorAll('.finder-row button')].find((b) => b.innerText.trim() === 'Add').click()`);
+  await waitFor(`/1 of 5 sectors/.test(document.querySelector('.finder').innerText)`, 'a sector added', 10000);
+  await ev(`[...document.querySelectorAll('.finder button')].find((b) => b.innerText.trim() === 'Clear goals').click()`);
+  await waitFor(`/0 of 5 sectors/.test(document.querySelector('.finder').innerText)`, 'the goals cleared', 10000);
+  check(true, 'Clear goals empties what you want');
 };

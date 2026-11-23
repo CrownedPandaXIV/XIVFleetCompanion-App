@@ -92,4 +92,16 @@ module.exports = async (t) => {
   await ev(`document.querySelectorAll('.cmp-foot .finder-open')[0].click()`);
   await waitFor(`document.querySelectorAll('.planner-chip').length === 2 && document.querySelectorAll('.planner-stat').length === 5`, 'the Planner with the route', 15000);
   check(true, 'Open in Planner loads that build and the route');
+
+  // Back on Compare Builds: Clear route, then Remove all builds.
+  await nav('Compare Builds');
+  await waitFor(`document.querySelectorAll('.cmp-table thead .cmp-head').length === 2`, 'Compare Builds again', 15000);
+  if (await ev(`[...document.querySelectorAll('.cmp button')].some((b) => b.innerText.trim() === 'Clear route')`)) {
+    await ev(`[...document.querySelectorAll('.cmp button')].find((b) => b.innerText.trim() === 'Clear route').click()`);
+    await waitFor(`document.querySelectorAll('.cmp .planner-chip').length === 0`, 'the route cleared', 10000);
+    check(true, 'Clear route empties the shared route');
+  }
+  await ev(`[...document.querySelectorAll('.cmp button')].find((b) => b.innerText.trim() === 'Remove all builds').click()`);
+  await waitFor(`!document.querySelector('.cmp-table') && /0 of 3/.test(document.querySelector('.cmp').innerText)`, 'no builds', 10000);
+  check(true, 'Remove all builds empties the comparison');
 };
