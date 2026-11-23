@@ -44,6 +44,13 @@ async function invoke(channel, ...args) {
 
 contextBridge.exposeInMainWorld('api', {
   getRoster: () => invoke('get-roster'),
+  getSubCalculator: () => invoke('get-sub-calculator'),
+  planSubVoyage: (request) => invoke('plan-sub-voyage', request),
+  findSubBuilds: (request) => invoke('find-sub-builds', request),
+  findSubRoutes: (request) => invoke('find-sub-routes', request),
+  getFcUnlocks: (fcId) => invoke('get-fc-unlocks', fcId),
+  compareSubBuilds: (request) => invoke('compare-sub-builds', request),
+  planSubLevelling: (request) => invoke('plan-sub-levelling', request),
   getDataFreshness: () => invoke('get-data-freshness'),
   updateSortOrder: (orderedCids) => invoke('update-sort-order', orderedCids),
   removeCharacter: (cid) => invoke('remove-character', cid),
@@ -122,6 +129,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('open-settings', listener);
   },
   getSubmarines: () => invoke('get-submarines'),
+  getSubNextBuilds: () => invoke('get-sub-next-builds'),
   getForecastAccuracy: () => invoke('get-forecast-accuracy'),
   getRepairKitCost: () => invoke('settings:get-repair-kit-cost'),
   saveRepairKitCost: (value) => invoke('settings:save-repair-kit-cost', value),

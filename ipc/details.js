@@ -15,7 +15,7 @@ const { SALVAGE_PRICES } = require('./inventory');
 const { loadSubmarines } = require('./subs');
 const { columnsByKey } = require('./shopping');
 const { liveUniversalis } = require('./universalis');
-const { SCOPES, scopePrices, cheapestListing, ownRetainerKeys } = require('../characters/universalis');
+const { SCOPES, scopePrices, rivalPrice, ownRetainerKeys } = require('../characters/universalis');
 
 // When some live prices are from an earlier check (Universalis did not answer this time): { problem, since }.
 function staleOf(live) {
@@ -246,11 +246,17 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
       const own = ownRetainerKeys((await client.query(
         `SELECT r.name, c.world FROM companion_retainer_lookup r JOIN ${latestCharacter} c ON c.cid = r.owner_cid`)).rows);
       const priceMaps = new Map();
+      // Prices the outlier checks changed: `${scope}|${itemId}` -> note (shown on the page).
+      const adjustedNotes = new Map();
       // HQ venture rewards are priced at the cheapest HQ listing (else either quality).
       const priceFor = (world, scope, hq = false) => {
         if (!live.get(world)) return null;
         const key = `${world}|${scope}|${hq}`;
-        if (!priceMaps.has(key)) priceMaps.set(key, scopePrices(live.get(world), scope, prices, own, { hq }));
+        if (!priceMaps.has(key)) {
+          const notes = new Map();
+          priceMaps.set(key, scopePrices(live.get(world), scope, prices, own, { hq, notes }));
+          for (const [id, note] of notes) adjustedNotes.set(`${scope}|${id}|${world}`, { scope, itemId: id, world, note });
+        }
         return priceMaps.get(key);
       };
       const lootMarket = marketLoot(voyages, { worldOf, priceFor, letterFor, windowDays });
@@ -291,7 +297,10 @@ async function loadLoot(client, { universalis = null, windowDays: days = null } 
         stale: staleOf(live),
         loot: Object.fromEntries(SCOPES.map((scope) => [scope, lootMarket[scope].totals])),
         ventures: ventureTotals,
+        adjusted: [...adjustedNotes.values()],
       };
+      const adjustedNames = await itemNames(client, [...new Set(market.adjusted.map((a) => a.itemId))]);
+      for (const a of market.adjusted) a.name = adjustedNames.get(a.itemId) || `Item ${a.itemId}`;
     } catch (err) {
       market = { error: err.message };
     }
@@ -370,15 +379,16 @@ async function loadMarket(client, { universalis = null } = {}) {
         account_label: o ? o.account_label : null,
       };
     });
-    // Live prices (Settings → Live Market Prices): the cheapest someone else sells each item for on the
-    // listing's world, data center and region, and which listings are undercut on their own world.
+    // Live prices (Settings → Live Market Prices): what someone else sells each item for on the listing's world, data
+    // center and region (the market price: lone low listings skipped, checked against recent sales), and which
+    // listings are undercut on their own world.
     let compared = null;
     if (universalis) {
       try {
         const prices = await universalis.marketFor(described.map((l) => l.world), described.map((l) => Number(l.item_id)));
         const worldOf = new Map(characters.map((c) => [c.cid, c.world]));
         const exclude = ownRetainerKeys(retainers.map((r) => ({ name: r.name, world: worldOf.get(r.owner_cid) })));
-        compared = compareListings(described, { market: prices, cheapest: cheapestListing, exclude });
+        compared = compareListings(described, { market: prices, cheapest: rivalPrice, exclude });
         live = {
           places: [...prices.values()].map((w) => w.names),
           stale: staleOf(prices),
@@ -409,4 +419,4 @@ ipcMain.handle('save-market-settings', async (event, input = {}) => {
   }, (err) => ({ success: false, error: err.message }));
 });
 
-module.exports = { loadLoot, loadMarket, VENTURE_TOTALS, ventureValues, topItems };
+module.exports = { loadLoot, loadMarket, VENTURE_TOTALS, ventureValues, topItems, itemNames, itemPrices };

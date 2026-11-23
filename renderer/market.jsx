@@ -1,7 +1,7 @@
 // Gil & Market page: gil held per account (characters and their retainers) and the retainers' market
 // listings that have sat unsold a long time (ipc/details.js, market.js). Listings need plugin 0.10.0
 // and database version 8. With live prices (Settings → Live Market Prices, universalis.js), each listing also shows
-// the cheapest someone else sells it for on its world, data center and region, and undercut listings are listed.
+// what someone else sells it for on its world, data center and region (the market price), and undercut listings are listed.
 
 const marketGil = (n) => Math.round(Number(n) || 0).toLocaleString();
 const marketAge = (days) => (days < 1 ? 'under a day' : `${Math.floor(days)} day${Math.floor(days) === 1 ? '' : 's'}`);
@@ -14,7 +14,8 @@ const MARKET_ACCOUNT_COLUMN_DEFS = [
   { key: 'retainer_gil', label: 'Retainer gil', cell: (a) => marketGil(a.retainerGil), sort: (a) => a.retainerGil },
   { key: 'total', label: 'Total', cell: (a) => marketGil(a.total), sort: (a) => a.total },
 ];
-// The cheapest someone else sells the same item and quality for (market.js compareListings).
+// What someone else sells the same item and quality for (market.js compareListings): amber, with a hover saying why,
+// where a lone low listing was skipped or recent sales were used.
 const MARKET_SCOPE_NAMES = { world: 'World', dc: 'DC', region: 'Region' };
 const MARKET_CHEAPEST_DEFS = ['world', 'dc', 'region'].map((scope) => ({
   key: `cheapest_${scope}`,
@@ -23,8 +24,8 @@ const MARKET_CHEAPEST_DEFS = ['world', 'dc', 'region'].map((scope) => ({
     const o = l.others && l.others[scope];
     const cheaper = o && o.price < Number(l.unit_price);
     return (
-      <td className={`market-cheapest market-${scope}${cheaper ? ' supply-warn' : ''}`} title={o && o.world ? `On ${o.world}` : ''}>
-        {o ? `${marketGil(o.price)}${o.world && scope !== 'world' ? ` (${o.world})` : ''}` : 'None'}
+      <td className={`market-cheapest market-${scope}${cheaper ? ' supply-warn' : ''}`} title={[o && o.world ? `On ${o.world}` : '', o && o.note ? o.note : ''].filter(Boolean).join('. ')}>
+        {o ? <span className={o.adjusted ? 'tone-warn' : ''}>{marketGil(o.price)}{o.world && scope !== 'world' ? ` (${o.world})` : ''}</span> : 'None'}
       </td>
     );
   },
@@ -128,8 +129,9 @@ function MarketView({ refreshKey, uses = { subs: true, retainers: true } }) {
         <React.Fragment>
           <h2 style={{ padding: '16px 24px 0' }}>Undercut Listings</h2>
           <div className="supplies-note">
-            Your listings that someone else sells cheaper on the same world (same item and quality), from Universalis, with the cheapest on
-            the data center and region. Biggest gap first.
+            Your listings that someone else sells cheaper on the same world (same item and quality), from Universalis, with the price on
+            the data center and region. A lone listing far below the others isn't counted, and prices are checked against the last week's
+            sales: an amber price says what was skipped. Biggest gap first.
           </div>
           {m.live.undercut.length === 0 && <div className="status market-undercut-none">None of your listings is undercut on its world.</div>}
           {m.live.undercut.length > 0 && (

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { DAY } = require('../subs/supply-runway');
 const {
-  totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, nextBuildRank,
+  totalExp, totalExpSeries, measuredRate, voyage, startFor, atCollection, rankDate, maxRank, topRank, nextBuildRank,
 } = require('../subs/rank-up');
 
 const now = Date.UTC(2026, 9, 20);
@@ -82,4 +82,13 @@ test('next build: the first rank above with a different build', () => {
   assert.deepStrictEqual(nextBuildRank(35, 125, buildAt), { rank: 40, build: ['S', 'S', 'U', 'C'] });
   assert.deepStrictEqual(nextBuildRank(40, 125, buildAt).rank, 90);
   assert.strictEqual(nextBuildRank(95, 125, buildAt), null);
+});
+
+test('topRank: the last rank with stats, though the game lists experience to the next on it', () => {
+  // As the game's table: 145 the cap with experience "to the next" listed, 146 and on empty rows.
+  const stats = new Map([[144, { speed: 98, range: 129 }], [145, { speed: 100, range: 130 }], [146, { speed: 0, range: 0 }], [150, { speed: 0, range: 0 }]]);
+  const exp = new Map([[144, 112765858], [145, 46234004], [146, 0]]);
+  assert.strictEqual(topRank(stats, exp), 145);
+  // No stats known: the first rank with no experience to the next.
+  assert.strictEqual(topRank(new Map(), new Map([[1, 10], [2, 10], [3, 0]])), 3);
 });

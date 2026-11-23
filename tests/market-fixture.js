@@ -1,6 +1,6 @@
 // Live market prices for made-up fleets, for the plugin's own Universalis code to be checked against (plugin 2.0's
 // Gil & Market page asks Universalis itself, as the app does, when Live Market Prices is on). Universalis is stood in
-// for by canned listings; the app's own code (characters/universalis.js, characters/market.js compareListings,
+// for by canned listings and recent sales; the app's own code (characters/universalis.js, characters/market.js compareListings,
 // subs/loot.js ventureMarketGil) works out each listing's cheapest rivals and whether it's undercut, and each
 // character's venture rewards at market prices. The canned listings, the inputs and the answers go to one file:
 //
@@ -8,7 +8,7 @@
 //
 // Without a file it only checks that every case works out. No database needed.
 const fs = require('fs');
-const { createUniversalis, cheapestListing, ownRetainerKeys, scopePrices, SCOPES } = require('../characters/universalis');
+const { createUniversalis, rivalPrice, ownRetainerKeys, scopePrices, SCOPES } = require('../characters/universalis');
 const { compareListings } = require('../characters/market');
 const { ventureMarketGil } = require('../subs/loot');
 
@@ -21,7 +21,7 @@ const WORLDS = [{ id: 4001, name: 'Maduin' }, { id: 4002, name: 'Golem' }, { id:
 
 // A stand-in for Universalis answering from `canned` (scope -> itemId -> listings): several items answer
 // { items: {...} }, one answers the item itself, none on the market board a 404.
-function fakeFetch(canned) {
+function fakeFetch(canned, sold = {}) {
   return async (url) => {
     const path = new URL(url).pathname;
     const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, json: async () => body });
@@ -33,7 +33,7 @@ function fakeFetch(canned) {
     const ids = m[2].split(',').map(Number);
     const found = ids.filter((id) => canned[scope] && canned[scope][id]);
     if (found.length === 0) return reply(404, {});
-    const item = (id) => ({ itemID: id, listings: canned[scope][id] });
+    const item = (id) => ({ itemID: id, listings: canned[scope][id], recentHistory: (sold[scope] && sold[scope][id]) || [] });
     return reply(200, ids.length === 1 ? item(ids[0]) : { items: Object.fromEntries(found.map((id) => [id, item(id)])) });
   };
 }
@@ -52,9 +52,11 @@ function fleet(seed) {
   const characters = worlds.flatMap((world, w) => [1, 2].map((k) => ({ cid: String(1000 + w * 10 + k), world })));
   const retainers = characters.flatMap((c, i) => [0, 1].map((r) => ({ name: `Ret${i}${r}`, world: c.world, owner: c.cid })));
   const canned = {};
+  const sold = {};
   const scopes = ['Maduin', 'Golem', 'Cuchulainn', 'Behemoth', 'Exodus', 'Faraway', 'Dynamis', 'Primal', 'North-America'];
   for (const scope of scopes) {
     canned[scope] = {};
+    sold[scope] = {};
     for (const id of ITEMS) {
       if (id === 22500 || chance(0.2)) continue; // salvage is never on the market board; others now and then not
       const listings = [];
@@ -68,7 +70,11 @@ function fleet(seed) {
           worldName: isWorld ? (chance(0.5) ? undefined : scope) : (own && chance(0.7) ? own.world : pick(['Maduin', 'Golem', 'Cuchulainn', 'Behemoth', 'Exodus'])),
         });
       }
+      // Now and then a lone low listing (one player's slip), to be skipped.
+      if (listings.length >= 2 && chance(0.25)) listings.push({ pricePerUnit: 1 + Math.floor(random() * 30), quantity: 1, hq: chance(0.4), retainerName: `Slip${Math.floor(random() * 9)}`, worldName: listings[0].worldName });
       canned[scope][id] = listings;
+      // The last week's sales (no time given, so they count as recent whenever the check runs).
+      if (chance(0.6)) sold[scope][id] = Array.from({ length: Math.floor(random() * 7) }, () => ({ pricePerUnit: 50 + Math.floor(random() * 9000), quantity: pick([1, 5, 99]), hq: chance(0.4) }));
     }
   }
   const listings = [];
@@ -82,7 +88,7 @@ function fleet(seed) {
     items: ITEMS.filter(() => chance(0.5)).map((id) => { const quantity = 1 + Math.floor(random() * 30); return { item_id: id, quantity, hq_quantity: Math.floor(random() * (quantity + 1)) }; }),
   }));
   const vendor = Object.fromEntries(ITEMS.map((id) => [id, id === 22500 ? 8000 : Math.floor(random() * 300)]));
-  return { canned, retainers, listings, ventures, vendor };
+  return { canned, sold, retainers, listings, ventures, vendor };
 }
 
 (async () => {
@@ -90,12 +96,12 @@ function fleet(seed) {
   const cases = [];
   for (const seed of [3, 77, 2026]) {
     const f = fleet(seed);
-    const universalis = createUniversalis({ fetchImpl: fakeFetch(f.canned), baseUrl: 'https://universalis.test' });
+    const universalis = createUniversalis({ fetchImpl: fakeFetch(f.canned, f.sold), baseUrl: 'https://universalis.test' });
     const exclude = ownRetainerKeys(f.retainers);
     const worlds = [...f.listings.map((l) => l.world), ...f.ventures.map((v) => v.world)];
     const ids = [...f.listings.map((l) => l.item_id), ...f.ventures.flatMap((v) => v.items.map((i) => i.item_id))];
     const market = await universalis.marketFor(worlds, ids);
-    const compared = compareListings(f.listings, { market, cheapest: cheapestListing, exclude }).map((l) => ({
+    const compared = compareListings(f.listings, { market, cheapest: rivalPrice, exclude }).map((l) => ({
       retainer_id: l.retainer_id, slot: l.slot, undercut: l.undercut, undercut_by: l.undercutBy,
       others: Object.fromEntries(SCOPES.map((s) => [s, l.others[s]])),
     }));
@@ -110,7 +116,7 @@ function fleet(seed) {
     });
     const names = [...market.entries()].map(([world, m]) => ({ world, names: m.names }));
     console.log(`seed ${seed}: ${compared.length} listings, ${compared.filter((l) => l.undercut).length} undercut, ${ventures.length} characters' ventures`);
-    cases.push({ name: `seed ${seed}`, dataCenters: DATA_CENTERS, worlds: WORLDS, canned: f.canned, retainers: f.retainers, listings: f.listings,
+    cases.push({ name: `seed ${seed}`, dataCenters: DATA_CENTERS, worlds: WORLDS, canned: f.canned, sold: f.sold, retainers: f.retainers, listings: f.listings,
       ventures: f.ventures, vendor: f.vendor, expected: { names, listings: compared, ventures } });
   }
   if (out) {

@@ -708,11 +708,12 @@ function LivePricesSection() {
             {status && <span className="save-status">{status}</span>}
           </div>
           <div className="alerts-help">
-            Universalis (universalis.app) collects market board prices from players. With this on, the app asks it for the cheapest
-            listing of each item on the character's home world, data center and region, and shows them next to the vendor prices: the
-            market value of loot and venture rewards on the Income page, which of your listings someone sells cheaper on the
-            Gil &amp; Market page, and what the parts and materials on the Parts page's Shopping List cost to buy (from the world, data
-            center or region you pick there). Only item numbers and world, data center or region names are sent. Prices are kept for 30 minutes. Items not sold on the market
+            Universalis (universalis.app) collects market board prices from players. With this on, the app asks it for the listings and
+            the last week's sales of each item on the character's home world, data center and region. The market price is the cheapest
+            listing, skipping a lone listing far below the others and checked against those sales. It's shown next to the vendor prices:
+            the market value of loot and venture rewards on the Income page, which of your listings someone sells cheaper on the
+            Gil &amp; Market page, the Sub Calculator Voyage Planner's loot, and what the parts and materials on the Parts page's Shopping List
+            cost to buy (from the world, data center or region you pick there). Only item numbers and world, data center or region names are sent. Prices are kept for 30 minutes. Items not sold on the market
             board (such as salvage) keep their vendor price.
           </div>
         </div>
@@ -976,33 +977,6 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
     setWarningsStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
   }
 
-  // --- Fleet Economics section ---
-  const [repairKitCost, setRepairKitCost] = useState('');
-  const [repairKitLoaded, setRepairKitLoaded] = useState(false);
-  const [repairKitStatus, setRepairKitStatus] = useState('');
-
-  const [repairKitSaved, setRepairKitSaved] = useState('');
-  const [repairKitError, setRepairKitError] = useState(null);
-
-  useEffect(() => {
-    window.api.getRepairKitCost().then((result) => {
-      if (result.success === false) setRepairKitError(result.error);
-      else {
-        const loaded = result.value !== null ? String(result.value) : '';
-        setRepairKitCost(loaded);
-        setRepairKitSaved(loaded);
-      }
-      setRepairKitLoaded(true);
-    });
-  }, []);
-
-  async function saveRepairKitCost() {
-    setRepairKitStatus('Saving...');
-    const result = await window.api.saveRepairKitCost(Number(repairKitCost));
-    if (result.success) setRepairKitSaved(repairKitCost);
-    setRepairKitStatus(result.success ? 'Saved.' : `Failed: ${result.error}`);
-  }
-
   // A section whose boxes were changed but not saved says so beside its Save (Close doesn't save them).
   const notSaved = (changed) => (changed ? <span className="unsaved-note">Not saved yet</span> : null);
   const loadProblem = (error) => (
@@ -1073,30 +1047,6 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
               <button onClick={saveRefreshInterval}>Save</button>
               {notSaved(refreshMinutes !== refreshSaved)}
               {refreshStatus && <span className="save-status">{refreshStatus}</span>}
-            </div>
-          )}
-        </section>
-
-        <section className="settings-section">
-          <h3>Fleet Economics</h3>
-          {!repairKitLoaded && <div className="status">Loading...</div>}
-          {repairKitError && loadProblem(repairKitError)}
-          {repairKitLoaded && !repairKitError && (
-            <div className="settings-row">
-              <label>
-                Repair Kit Cost{' '}
-                <input
-                  type="number"
-                  min="0"
-                  value={repairKitCost}
-                  onChange={(e) => setRepairKitCost(e.target.value)}
-                  style={{ width: '100px' }}
-                  placeholder="e.g. 2000"
-                />
-              </label>
-              <button onClick={saveRepairKitCost}>Save</button>
-              {notSaved(repairKitCost !== repairKitSaved)}
-              {repairKitStatus && <span className="save-status">{repairKitStatus}</span>}
             </div>
           )}
         </section>

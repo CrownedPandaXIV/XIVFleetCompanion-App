@@ -88,6 +88,16 @@ insert into ffxiv_submarinerank (id, speed_bonus, range_bonus, exp_to_next)
 select r::text, (r * 2)::text, (r)::text, (case when r < 90 then 10000 else 0 end)::text from generate_series(1,90) r;
 alter table ffxiv_submarinepart add column "class" text, add column slot text, add column speed text, add column range text;
 insert into ffxiv_submarinepart (id, "class", slot, speed, range) select (cl * 4 + sl)::text, cl::text, sl::text, '10', '5' from generate_series(1,10) cl, generate_series(0,3) sl;
+-- What the Sub Calculator's Planner reads besides: sector names, rank needed, survey distance and ceruleum; each rank's
+-- and part's surveillance, retrieval and favor; a part's rank and repair materials. Sectors 1 and 2 have XIVStats data.
+alter table ffxiv_submarineexploration add column destination text, add column rank_req text, add column survey_distance text, add column ceruleum_tank_req text;
+update ffxiv_submarineexploration set destination = case id when '1' then 'the Ivory Shoals (O)' when '2' then 'Deep-sea Site 1 (J)' when '3' then 'Nowhere (Z)' end,
+  rank_req = '1', survey_distance = '10', ceruleum_tank_req = '1' where id <> '0';
+alter table ffxiv_submarinerank add column surveillance_bonus text, add column retrieval_bonus text, add column favor_bonus text;
+update ffxiv_submarinerank set surveillance_bonus = id, retrieval_bonus = id, favor_bonus = id;
+alter table ffxiv_submarinepart add column surveillance text, add column retrieval text, add column favor text, add column rank text, add column repair_materials text;
+update ffxiv_submarinepart set surveillance = '20', retrieval = '25', favor = '15', rank = case when "class"::int >= 6 then '50' else '1' end, repair_materials = '2';
+-- Modified parts (classes 6 to 10) need rank 50, as in the game.
 
 -- Retainer look-ups used by the Retainers tab
 alter table ffxiv_classjob add column abbreviation text;

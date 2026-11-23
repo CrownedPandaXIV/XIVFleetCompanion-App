@@ -324,6 +324,12 @@ button that opens it, the app's version to copy, and **Open the log folder**: th
 the app did and any errors, and never has passwords in it. For the plugin, paste the **Copy results** of
 `/xivfleet check` too.
 
+## Thanks
+
+The Sub Calculator's loot and breakpoints come from [XIVStats](https://xivstats.com) (MIT licence), collected from
+players running the Tracky plugin, checked against [Pepper's FFXIV Ship Guide](https://docs.google.com/document/d/1t2cC8-VuSNU2JLrvFFvr1S0-7NirnJiJ3k41UJ56jqE/edit).
+See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ## License
 
 XIV Fleet Companion is free software under the [GNU Affero General Public License v3](LICENSE.md), the same as the
@@ -411,3 +417,11 @@ You don't have to remember to look: once a day the app asks GitHub whether any o
 last update (only their dates, a few kilobytes), and says so in a bar under the header. **Update now** there does the
 same check and update, backing up the old tables first; **Later** hides it on that PC until something newer changes.
 With the app open on several PCs, only one of them asks each day.
+
+### Sub Calculator data
+
+`subs/calculator-data.json` holds the Sub Calculator's loot and breakpoints, from XIVStats and Pepper's guide (see
+`subs/calculator-data.js` for its layout). The release and test-build workflows make it again before building, with
+`node .github/scripts/refresh-sub-data.js`, so each build ships the latest; when a source can't be read, the copy in the
+repository is used and the run shows a warning. Run the same command by hand to update the copy in the repository, then
+`node tests/db/plugin-database-fixture.js ../XIVFleetCompanion` to copy it into the plugin.

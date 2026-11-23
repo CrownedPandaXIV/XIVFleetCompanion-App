@@ -475,4 +475,4 @@ ipcMain.handle('delete-sub-build-rule', async (event, id) => {
   });
 });
 
-module.exports = { computePartsNeeded, partItemId, targetBuildAt, repairKitCostFrom, lookAheadDays, FIGHT_CLUB_COLUMNS };
+module.exports = { computePartsNeeded, partItemId, targetBuildAt, repairKitCostFrom, lookAheadDays, FIGHT_CLUB_COLUMNS, sparePartLookup, SLOT_KEYS };

@@ -95,6 +95,22 @@ function formatGilDay(value) {
 }
 
 // Gil a day in gold (large amounts as "5.86M"), a softer dash when unknown: as the plugin.
+// A Fight Club target the sub's Free Company can't run yet (a sector on it not discovered): "needs R", and the best
+// Fight Club route it can run now. Sectors open by chance from the one before (Route Finder → Unlocks).
+function FightClubBlocked({ blocked }) {
+  if (!blocked) return null;
+  const needs = blocked.needs.map((n) => n.letter).join(', ');
+  const why = blocked.needs.map((n) => `${n.letter} isn't discovered yet${n.from ? ` (it opens from ${n.from}, by chance)` : ''}`).join('; ');
+  const alt = blocked.alt ? ` Best your FC can run now: ${blocked.alt.route}, ${Number(blocked.alt.gilPerDay).toLocaleString()} gil a day.` : '';
+  const short = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(Math.round(n)));
+  return (
+    <React.Fragment>
+      <span className="fc-blocked-tag" title={`${why}.${alt}`}>needs {needs}</span>
+      {blocked.alt && <span className="fc-blocked-alt" title={alt.trim()}>now: {blocked.alt.route} · {short(Number(blocked.alt.gilPerDay))}/day</span>}
+    </React.Fragment>
+  );
+}
+
 function GilDay({ value }) {
   return value === '' || value === null || value === undefined ? <span className="dim">—</span> : <GilText gil={Number(value)} />;
 }
@@ -200,9 +216,12 @@ const SUB_COLUMN_DEFS = [
   { key: 'currentGilDay', label: 'Current gil/day', cell: (s) => <GilDay value={s.current_gil_day} />, sort: (r) => (typeof r.current_gil_day === 'number' ? r.current_gil_day : null) },
   // Green when it's on it, amber when it isn't (Route Optimization lists those).
   { key: 'targetRoute', label: 'Target route', cell: (s) => (s.target_route
-    ? <span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span>
+    ? <React.Fragment><span className={s.target_route === s.current_route ? 'tone-good' : 'tone-warn'} title={s.target_route === s.current_route ? undefined : 'Not on this route now: see Route Optimization.'}>{s.target_route}</span><FightClubBlocked blocked={s.target_blocked} /></React.Fragment>
     : <span className="dim">—</span>), sort: (r) => r.target_route || null },
   { key: 'targetGilDay', label: 'Target gil/day', cell: (s) => <GilDay value={s.target_gil_day} />, sort: (r) => (typeof r.target_gil_day === 'number' ? r.target_gil_day : null) },
+  { key: 'planner', label: 'Voyage Planner', cell: (s, ctx) => (ctx && ctx.onOpenPlanner
+    ? <button type="button" className="link-button" onClick={() => ctx.onOpenPlanner(s.cid, s.sub_name)} title="Open this sub's build and route in Sub Calculator → Voyage Planner.">Open in Voyage Planner</button>
+    : null) },
   { key: 'craft', label: 'Fight Club builds', cell: (s, ctx) => (
       <input type="checkbox" checked={s.craft_enabled} onChange={(e) => ctx.onToggleCraft(s.cid, s.sub_name, e.target.checked)}
         title="Ticked: from rank 85 this sub follows Fight Club's best build after repair kits (Parts, Route Optimization). Unticked: its Sub Rules." />
@@ -211,7 +230,7 @@ const SUB_COLUMN_DEFS = [
 // Master-list columns the Subs page already has of its own.
 const SUB_DUPLICATE_EXTRAS = ['x_world'];
 
-function SubTable({ characterLabel, subs, cols, onToggleCraft, onSortClick }) {
+function SubTable({ characterLabel, subs, cols, onToggleCraft, onOpenPlanner, onSortClick }) {
   return (
     <div className="account-group">
       <h2>{characterLabel} <span className="count">({subs.length})</span></h2>
@@ -221,7 +240,7 @@ function SubTable({ characterLabel, subs, cols, onToggleCraft, onSortClick }) {
         </thead>
         <tbody>
           {subs.map((sub) => (
-            <tr key={sub.sub_name}><ColumnBodyCells cols={cols} row={sub} ctx={{ onToggleCraft }} /></tr>
+            <tr key={sub.sub_name}><ColumnBodyCells cols={cols} row={sub} ctx={{ onToggleCraft, onOpenPlanner }} /></tr>
           ))}
         </tbody>
       </table>
@@ -229,7 +248,7 @@ function SubTable({ characterLabel, subs, cols, onToggleCraft, onSortClick }) {
   );
 }
 
-function FlatSubTable({ rows, cols, sortColumn, sortDirection, onSortClick, onToggleCraft }) {
+function FlatSubTable({ rows, cols, sortColumn, sortDirection, onSortClick, onToggleCraft, onOpenPlanner }) {
   return (
     <table>
       <thead>
@@ -237,7 +256,7 @@ function FlatSubTable({ rows, cols, sortColumn, sortDirection, onSortClick, onTo
       </thead>
       <tbody>
         {rows.map((sub) => (
-          <tr key={`${sub.cid}-${sub.sub_name}`}><ColumnBodyCells cols={cols} row={sub} ctx={{ onToggleCraft }} /></tr>
+          <tr key={`${sub.cid}-${sub.sub_name}`}><ColumnBodyCells cols={cols} row={sub} ctx={{ onToggleCraft, onOpenPlanner }} /></tr>
         ))}
       </tbody>
     </table>
@@ -280,7 +299,7 @@ function ForecastAccuracy({ refreshKey }) {
   return <span className="save-status forecast-accuracy" title={title}>Next rank forecasts: {text}</span>;
 }
 
-function SubmarinesView({ refreshKey }) {
+function SubmarinesView({ refreshKey, onOpenPlanner }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [groupByAccountEnabled, setGroupByAccountEnabled] = useState(true);
@@ -372,6 +391,7 @@ function SubmarinesView({ refreshKey }) {
           sortDirection={subSort.sortDirection}
           onSortClick={subSortOnClick}
           onToggleCraft={handleToggleCraft}
+          onOpenPlanner={onOpenPlanner}
         />
       )}
 
@@ -380,14 +400,14 @@ function SubmarinesView({ refreshKey }) {
           <div key={accountGroup.label}>
             <h1 style={{ fontSize: '17px', padding: '16px 24px 4px' }}>{accountGroup.label}</h1>
             {groupSubsByCharacter(accountGroup.rows).map(([characterLabel, subs]) => (
-              <SubTable key={characterLabel} characterLabel={characterLabel} subs={subs} cols={subCols} onToggleCraft={handleToggleCraft} onSortClick={subSortOnClick} />
+              <SubTable key={characterLabel} characterLabel={characterLabel} subs={subs} cols={subCols} onToggleCraft={handleToggleCraft} onOpenPlanner={onOpenPlanner} onSortClick={subSortOnClick} />
             ))}
           </div>
         ))}
 
       {!subSort.sortColumn && !groupByAccountEnabled &&
         groupSubsByCharacter(subRows).map(([characterLabel, subs]) => (
-          <SubTable key={characterLabel} characterLabel={characterLabel} subs={subs} cols={subCols} onToggleCraft={handleToggleCraft} onSortClick={subSortOnClick} />
+          <SubTable key={characterLabel} characterLabel={characterLabel} subs={subs} cols={subCols} onToggleCraft={handleToggleCraft} onOpenPlanner={onOpenPlanner} onSortClick={subSortOnClick} />
         ))}
     </div>
   );

@@ -463,6 +463,251 @@
     /* Supplies */
     .supplies-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
     .supplies-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 24px 12px; }
+    .planner-row { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 24px 12px; }
+    .planner-row > .planner-panel { flex: 1 1 380px; margin: 0; padding: 12px 16px; box-sizing: border-box; min-width: 0; }
+    .planner-summary { padding: 0 24px 12px; }
+    .planner-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
+    .planner-fields label { display: flex; flex-direction: column; gap: 3px; color: var(--dim); font-size: 12px; }
+    .planner-fields select, .planner-fields input { width: 100%; box-sizing: border-box; }
+    .planner-add { display: flex; gap: 6px; }
+    .planner-add select { flex: 1; min-width: 0; }
+    .planner-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+    .planner-stat { border: 1px solid var(--hover); border-radius: 4px; padding: 6px 4px; text-align: center; }
+    .planner-stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+    .planner-stat span { font-size: 11px; color: var(--dim); }
+    .planner-route { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; min-height: 28px; }
+    .planner-chip { border: 1px solid var(--hover); border-radius: 14px; padding: 2px 4px 2px 10px; }
+    .planner-chip button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 4px; }
+    .planner-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; font-size: 12px; }
+    .planner-facts span { color: var(--dim); display: block; }
+    .planner-facts b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .planner-pill { font-weight: 600; }
+    .planner-foot { padding: 4px 24px 24px; font-size: 12px; }
+    .planner .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; }
+    .planner-prices { font-size: 13px; }
+    .planner-scope { display: inline-flex; }
+    .planner-scope button { border-radius: 0; padding: 3px 10px; font-size: 12px; }
+    .planner-scope button:first-child { border-radius: 4px 0 0 4px; }
+    .planner-scope button:last-child { border-radius: 0 4px 4px 0; }
+    .planner-scope button.active { background: var(--accent); border-color: var(--accent); color: var(--text-bright); }
+    .planner-picker { display: inline-block; }
+    .planner-picker-button { min-width: 260px; text-align: left; }
+    .planner-picker-note { font-size: 12px; }
+    .planner-picker-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 24px; width: min(760px, calc(100% - 48px)); background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px; box-sizing: border-box; }
+    .planner-picker-panel input[type=search] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+    .planner-picker-list { max-height: 60vh; overflow-y: auto; }
+    .planner-picker-empty { padding: 8px; }
+    .planner-picker-list button { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 6px; border-radius: 4px; font: inherit; }
+    .planner-picker-list button:hover { background: var(--hover); }
+    .planner-picker-account { font-weight: 600; margin-top: 4px; }
+    .planner-picker-character { padding-left: 14px; }
+    .planner-picker-character-name { font-weight: 500; }
+    .planner-picker-list button.planner-picker-sub { display: grid; grid-template-columns: 1.3fr 0.6fr 0.6fr 1fr 1.4fr; gap: 8px; padding-left: 22px; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .planner-picker-list button.planner-picker-sub.chosen { outline: 1px solid var(--link); }
+    .planner-picker-sub-name { font-weight: 500; }
+    .fc-picker { position: relative; vertical-align: middle; }
+    .fc-picker-button { min-width: 220px; }
+    .planner-picker-panel.fc-picker-panel { left: 0; width: 460px; max-width: 80vw; }
+    .planner-picker-list button.fc-picker-row { display: flex; justify-content: space-between; gap: 12px; padding-left: 22px; }
+    .planner-picker-list button.fc-picker-row.chosen { outline: 1px solid var(--link); }
+    /* A page working out its answer: a line saying so, and the old answer dimmed until the new one is in. */
+    .working { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--text-bright); font-weight: 600; }
+    .working-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--link) 30%, transparent); border-top-color: var(--link); animation: working-spin 0.8s linear infinite; }
+    @keyframes working-spin { to { transform: rotate(360deg); } }
+    .is-busy { opacity: 0.4; transition: opacity 0.15s; }
+    .part-rank-note { font-size: 12px; margin: 6px 0; }
+    /* A search box with its Clear link beside it. */
+    .search-row { display: flex; align-items: center; gap: 8px; }
+    .search-row input[type=search] { flex: 1; min-width: 0; }
+    .planner-picker-panel .search-row { margin-bottom: 6px; }
+    .planner-picker-panel .search-row input[type=search] { margin-bottom: 0; }
+    /* Build Finder: what you want, the options, the builds (soft colour behind tags, from the look's own colours). */
+    .finder { display: flex; flex-direction: column; gap: 14px; padding: 0 24px 12px; }
+    .finder-band { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .finder-heading { margin: 0; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-soft); }
+    .finder-heading .count { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--dim); margin-left: 8px; }
+    .finder-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+    .finder-field { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; }
+    .finder-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .finder-goal { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; display: flex; flex-direction: column; gap: 9px; }
+    .finder-goal-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .finder-goal-head .link-button { margin-left: 4px; }
+    .finder-letter { font-weight: 600; background: var(--hover); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 6px; }
+    .finder-goal-name { font-weight: 600; }
+    .finder-tier { font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 3px; background: var(--hover); color: var(--text-soft); }
+    .finder-options { padding: 0 2px; }
+    .finder-needs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .finder-need { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 11px; border-radius: 6px; background: var(--hover); border: 1px solid var(--border-strong); }
+    .finder-need .k { font-size: 11px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+    .finder-need .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .finder-need .why { font-size: 11px; color: var(--dim); }
+    .finder-need.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: transparent; }
+    .finder-need.warn .v { color: var(--warn); }
+    .finder-tally { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--dim); }
+    .finder-tally b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .finder-tally .good b { color: var(--good); }
+    .finder-tally .warn b { color: var(--warn); }
+    .finder-tally .bad b { color: var(--danger); }
+    .finder-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--dim); align-items: center; }
+    .finder-parts { display: inline-flex; gap: 4px; }
+    .finder-part { font-size: 12px; font-weight: 600; min-width: 28px; text-align: center; padding: 1px 5px; border-radius: 4px; background: var(--hover); }
+    .finder-part.own { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+    .finder-part.get { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+    .finder-maybe { display: inline-block; font-size: 11px; font-weight: 600; color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); border-radius: 3px; padding: 0 5px; margin-left: 8px; cursor: help; }
+    .finder-spare { color: var(--good); font-size: 12px; margin-left: 4px; }
+    .finder-spare.zero { color: var(--warn); }
+    .finder-out-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-radius: 3px; padding: 0 5px; }
+    .finder-columns { padding: 0; }
+    .finder-table { overflow-x: auto; min-width: 0; }
+    .finder-table table { font-variant-numeric: tabular-nums; }
+    tr.finder-group td { color: var(--text-soft); font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--border-strong); background: transparent; }
+    tr.finder-group td .sub { font-weight: 400; color: var(--dim); margin-left: 8px; }
+    tr.finder-out td { color: var(--dim); }
+    .finder-open { padding: 2px 9px; font-size: 12px; }
+    .finder-more { text-align: center; font-size: 12px; }
+    .finder-search { position: relative; }
+    .finder-search input { width: min(420px, 100%); box-sizing: border-box; }
+    .finder-search-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; max-height: 60vh; overflow-y: auto; background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+    .finder-search-name { font-weight: 600; margin-bottom: 4px; }
+    .finder-search-row { display: grid; grid-template-columns: 1.1fr 2fr 0.7fr 0.4fr 0.6fr 1.3fr 1.2fr auto; gap: 8px; align-items: center; font-size: 12px; padding: 3px 0; border-top: 1px solid var(--border); }
+    .finder-search-row button { padding: 1px 10px; font-size: 12px; }
+    .finder-search-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .finder-amount.poor { color: var(--dim); }
+    .finder-amount.normal { color: var(--text-soft); }
+    .finder-amount.optimal { color: var(--good); }
+    .finder-switch { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+    .finder-filter { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    .finder-slot { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .finder-slot-button { padding: 2px 10px; font-size: 12px; }
+    .finder-slot-button.set { border-color: var(--accent); color: var(--text-bright); }
+    .finder-slot-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 210px; background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+    /* The Planner's notes under a tier, retrieval or double dip wrap inside their column instead of running into the next. */
+    .planner-cell-note { white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+    /* A Fight Club target the FC can't run yet (Subs, Route Optimization). */
+    .fc-blocked-tag { font-size: 11px; font-weight: 600; color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-radius: 3px; padding: 0 5px; margin-left: 6px; cursor: help; white-space: nowrap; }
+    .fc-blocked-alt { display: block; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .finder-any { background: var(--accent); color: var(--text-bright); border: 0; border-radius: 4px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
+    /* Levelling Plan: four boxes, a strip of stages, a card per stage, part swaps in amber. */
+    .lv-sums { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+    .lv-sum { background: var(--hover); border: 1px solid var(--border-strong); border-radius: 7px; padding: 9px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .lv-sum .k { font-size: 11px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+    .lv-sum .v { font-size: 20px; font-weight: 700; color: var(--text-bright); }
+    .lv-sum .n { font-size: 12px; color: var(--dim); }
+    .lv-strip { display: flex; height: 24px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    .lv-strip span { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #10131a; white-space: nowrap; overflow: hidden; border-right: 2px solid var(--panel); min-width: 0; }
+    .lv-strip span:last-child { border-right: 0; }
+    .lv-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+    .lv-strip .c1 { background: var(--accent); } .lv-strip .c2 { background: color-mix(in srgb, var(--accent) 60%, white); }
+    .lv-strip .c3 { background: var(--good); } .lv-strip .c4 { background: color-mix(in srgb, var(--good) 60%, white); }
+    /* The Levelling Plan's stages table: a coloured edge per stage (as the strip), swap rows in amber across it. */
+    tr.lv-stage td:first-child { border-left: 4px solid var(--accent); }
+    tr.lv-stage.c2 td:first-child { border-left-color: color-mix(in srgb, var(--accent) 60%, white); } tr.lv-stage.c3 td:first-child { border-left-color: var(--good); } tr.lv-stage.c4 td:first-child { border-left-color: color-mix(in srgb, var(--good) 60%, white); }
+    .lv-ranks { font-weight: 700; color: var(--text-bright); white-space: nowrap; }
+    /* A stage's parts, set apart from its route: a line before them, a "Parts" label, outlined letters. */
+    .lv-parts { display: inline-flex; align-items: center; gap: 4px; }
+    .finder-part.lv-part { background: transparent; color: var(--link); border: 1px solid color-mix(in srgb, var(--link) 55%, transparent); }
+    .lv-better { font-size: 12px; color: var(--text-soft); }
+    tr.lv-swap td { background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 13px; }
+    .lv-swap b { color: var(--warn); }
+    .lv-fleet select { margin-left: 4px; }
+    /* Compare: builds as columns, the best figure in each row green. */
+    .finder-buttons { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .planner-compare { margin-top: 8px; }
+    .cmp-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+    .cmp-musts { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; }
+    .cmp-must { background: none; border: 0; padding: 0; }
+    .cmp-wrap { overflow-x: auto; }
+    .cmp-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .cmp-table th, .cmp-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); vertical-align: top; text-align: left; }
+    .cmp-table td.num { text-align: right; }
+    .cmp-table thead th, .cmp-table tbody th { vertical-align: top; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .cmp-table .cmp-label { width: 190px; color: var(--text-soft); font-weight: 400; font-size: 13px; }
+    .cmp-table tr.cmp-group th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); padding-top: 12px; border-bottom: 1px solid var(--border-strong); }
+    .cmp-table td.cmp-best { color: var(--good); font-weight: 700; background: color-mix(in srgb, var(--good) 10%, transparent); }
+    .cmp-table tr.cmp-foot td, .cmp-table tr.cmp-foot th { border-bottom: 0; padding-top: 10px; }
+    .cmp-head { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    .cmp-head-top { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 6px; }
+    .cmp-name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+    .cmp-who { font-size: 12px; }
+    .cmp-build { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .cmp-x { background: none; border: 0; color: var(--dim); font-size: 16px; padding: 0 4px; }
+    .cmp-x:hover { color: var(--danger); }
+    .cmp-edit { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cmp-stop { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+    .cmp-why { font-size: 12px; color: var(--dim); margin-left: 6px; }
+    .cmp-why.bad { color: var(--danger); font-weight: 600; }
+    /* Route Finder: two tabs, the sector tiles, bars, and the Unlocks cards and map grids. */
+    .rf-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+    .rf-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--dim); font-size: 14px; font-weight: 600; padding: 8px 14px; margin-bottom: -1px; }
+    .rf-tabs button.on { color: var(--text-bright); border-bottom-color: var(--accent); }
+    .rf-sub { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    .rf-subname { font-weight: 600; font-size: 15px; }
+    .rf-pill { font-weight: 600; font-size: 12px; background: var(--hover); border: 1px solid var(--border-strong); border-radius: 12px; padding: 1px 10px; }
+    .rf-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+    .rf-seg button { border: 0; border-right: 1px solid var(--border-strong); border-radius: 0; padding: 4px 11px; font-size: 13px; background: var(--hover); color: var(--text-soft); }
+    .rf-seg button:last-child { border-right: 0; }
+    .rf-seg button.on { background: var(--accent); color: var(--text-bright); font-weight: 600; }
+    .rf-note { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; }
+    .rf-letter { display: inline-block; font-size: 12px; font-weight: 600; min-width: 24px; text-align: center; padding: 0 4px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--hover); }
+    .rf-letter.g { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); border-color: transparent; }
+    .rf-letter.a { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); border-color: transparent; }
+    .rf-letter.c { color: var(--accent); border: 1px dashed var(--accent); background: transparent; }
+    .rf-letter.l { color: var(--faint); }
+    .rf-letter.must { box-shadow: 0 0 0 1px var(--accent); color: var(--accent); }
+    .rf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .rf-tile { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--hover); min-width: 0; }
+    .rf-tile .top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .rf-tile .nm { font-size: 12px; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rf-tile .st { font-size: 11px; color: var(--dim); }
+    .rf-tile.discovered { border-color: var(--warn); }
+    .rf-tile.discovered .st { color: var(--warn); }
+    .rf-tile.off { opacity: 0.5; cursor: default; }
+    .rf-tile.must { box-shadow: inset 0 0 0 2px var(--accent); }
+    .rf-tile.must .st { color: var(--accent); font-weight: 600; }
+    .rf-tile.out { background: transparent; border-style: dashed; }
+    .rf-tile.out .nm { text-decoration: line-through; color: var(--dim); }
+    .rf-strip { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 7px; padding: 8px 12px; font-size: 13px; }
+    .rf-strip b { color: var(--warn); }
+    .rf-route { display: inline-flex; gap: 3px; }
+    .rf-tag { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 3px; padding: 0 5px; margin-left: 6px; white-space: nowrap; }
+    .rf-tag.new { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+    .rf-tag.chance { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); cursor: help; }
+    .rf-tag.best { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+    .rf-barcell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .rf-bar { display: inline-block; width: 80px; height: 6px; border-radius: 3px; background: var(--hover); overflow: hidden; flex: none; }
+    .rf-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+    .rf-bar.dim i { background: var(--dim); }
+    .rf-lead { font-weight: 600; color: var(--text-bright); }
+    .rf-tiers { display: inline-flex; gap: 3px; }
+    .rf-tier { font-size: 10px; font-weight: 700; min-width: 22px; text-align: center; border-radius: 3px; padding: 1px 0; }
+    .rf-tier.sure { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+    .rf-tier.maybe { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+    .rf-tier.t1 { color: var(--dim); background: var(--hover); }
+    .rf-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .rf-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+    .rf-card h3 { margin: 0; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .rf-card h3 .count { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--dim); margin-left: 6px; }
+    .rf-card.sure h3 { color: var(--warn); }
+    .rf-card.chance h3 { color: var(--accent); }
+    .rf-card.map h3 { color: var(--text-soft); }
+    .rf-card-sub { font-size: 12px; margin-top: -4px; }
+    .rf-step { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+    .rf-step .what { flex: 1; min-width: 0; }
+    .rf-step .what small { display: block; color: var(--dim); font-size: 12px; }
+    .rf-path { display: flex; flex-direction: column; gap: 6px; }
+    .rf-map { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 9px; }
+    .rf-map-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+    .rf-map-name { font-weight: 600; font-size: 15px; }
+    .rf-prog { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); font-size: 12px; }
+    .rf-prog .rf-bar { width: 140px; }
+    .rf-prog .rf-bar i { background: var(--good); }
+    .rf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+    .rf-sq { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 3px 7px; font-size: 12px; background: var(--hover); min-width: 0; }
+    .rf-sq .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); }
+    .rf-sq.discovered { border-color: var(--warn); }
+    .rf-sq.chance { border: 1px dashed var(--accent); background: transparent; }
+    .rf-sq.locked { opacity: 0.45; background: transparent; }
+    .finder-slot-quick { display: flex; flex-wrap: wrap; gap: 4px 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
     .supply-card { flex: 1 1 0; min-width: 200px; box-sizing: border-box; padding: 14px 16px; }
     .supply-card-label { color: var(--dim); font-size: 13px; }
     .supply-card-value { font-size: 17px; font-weight: 600; margin-top: 4px; }
@@ -701,6 +946,11 @@
   <script src="salvage.js"></script>
   <script src="fc-directory.js"></script>
   <script src="routes.js"></script>
+  <script src="planner.js"></script>
+  <script src="build-finder.js"></script>
+  <script src="route-finder.js"></script>
+  <script src="compare.js"></script>
+  <script src="levelling.js"></script>
   <script src="summary.js"></script>
   <script src="inventory.js"></script>
   <script src="trends.js"></script>

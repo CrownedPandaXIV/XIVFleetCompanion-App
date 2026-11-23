@@ -12,6 +12,11 @@ const VIEWS = [
   { key: 'parts', label: 'Parts', group: 'Submarines' },
   { key: 'supplies', label: 'Supplies', group: 'Submarines' },
   { key: 'salvage', label: 'Salvage', group: 'Submarines' },
+  { key: 'planner', label: 'Voyage Planner', group: 'Sub Calculator' },
+  { key: 'routeFinder', label: 'Route Finder', group: 'Sub Calculator' },
+  { key: 'buildFinder', label: 'Build Finder', group: 'Sub Calculator' },
+  { key: 'compare', label: 'Compare Builds', group: 'Sub Calculator' },
+  { key: 'levelling', label: 'Levelling Plan', group: 'Sub Calculator' },
   { key: 'roster', label: 'Character Roster', group: 'Characters' },
   { key: 'retainers', label: 'Retainers', group: 'Characters' },
   { key: 'fcDirectory', label: 'Free Companies', group: 'Characters' },
@@ -427,6 +432,21 @@ function App() {
     }).catch(() => {});
   }, []);
   const [trendsPreset, setTrendsPreset] = useState(null);
+  // "Open in Voyage Planner" on the Subs and Route Optimization pages: the sub to load, then the Voyage Planner page.
+  const [plannerSub, setPlannerSub] = useState(null);
+  const openInPlanner = (cid, subName) => { setPlannerSub({ cid, subName, at: Date.now() }); setCurrentView('planner'); };
+  // From the Build Finder: a build and route (not one of your subs).
+  const openBuildInPlanner = (build) => { setPlannerSub({ build, at: Date.now() }); setCurrentView('planner'); };
+  // Sub Calculator → Compare: its builds (up to 3) and route, kept while you move between pages, so Add to compare on
+  // the Build Finder and Voyage Planner lands there. addToCompare: { rank, parts, route, label, who, world, fcId }; the route is
+  // taken only when Compare has none yet.
+  const [compareState, setCompareState] = useState({ builds: [], route: [], mapId: null });
+  const compareKeys = compareState.builds.map((b) => `${b.rank}|${b.parts.join(',')}`);
+  const addToCompare = ({ route, ...build }) => setCompareState((c) => {
+    if (c.builds.length >= 3 || c.builds.some((b) => `${b.rank}|${b.parts.join(',')}` === `${build.rank}|${build.parts.join(',')}`)) return c;
+    return { ...c, builds: [...c.builds, build], route: c.route.length || !route || !route.length ? c.route : route.slice(0, 5) };
+  });
+  const compareLink = { keys: compareKeys, count: compareState.builds.length, add: addToCompare, open: () => setCurrentView('compare') };
   const [trendDetail, setTrendDetail] = useState(null);
 
   // Chart icons and cards elsewhere ask for a detail panel or the Trends page by event.
@@ -699,13 +719,18 @@ function App() {
           </div>
         )}
 
-        {currentView === 'subs' && <SubmarinesView refreshKey={refreshKey} />}
+        {currentView === 'subs' && <SubmarinesView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}
 
         {currentView === 'parts' && <PartsView refreshKey={refreshKey} />}
 
         {currentView === 'salvage' && <SalvageView refreshKey={refreshKey} />}
+        {currentView === 'routeFinder' && <RouteFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
+        {currentView === 'buildFinder' && <BuildFinderView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} compare={compareLink} />}
+        {currentView === 'planner' && <PlannerView refreshKey={refreshKey} openSub={plannerSub} onOpenSubUsed={() => setPlannerSub(null)} compare={compareLink} />}
+        {currentView === 'levelling' && <LevellingView refreshKey={refreshKey} onOpenPlanner={openBuildInPlanner} />}
+        {currentView === 'compare' && <CompareView refreshKey={refreshKey} state={compareState} setState={setCompareState} onOpenPlanner={openBuildInPlanner} />}
 
-        {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} />}
+        {currentView === 'routeOpt' && <RouteOptimizationView refreshKey={refreshKey} onOpenPlanner={openInPlanner} />}
 
         {currentView === 'summary' && <SummaryView uses={playStyle.uses} onNavigate={setCurrentView} onOpenTrend={(metric) => { setTrendsPreset({ metric, at: Date.now() }); setCurrentView('trends'); }} refreshKey={refreshKey} onOpenSettings={() => setShowSettings('general')} />}
 

@@ -57,6 +57,7 @@ require('./ipc/trends');
 require('./ipc/game-data');
 require('./ipc/settings');
 require('./ipc/subs');
+require('./ipc/calculator');
 require('./ipc/roster');
 require('./ipc/fight-club');
 require('./ipc/parts');

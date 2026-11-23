@@ -173,22 +173,34 @@ function decodeRoute(pointsBuffer, pointLetterById) {
     .join('-');
 }
 
-// Speed/Range: base-at-rank (ffxiv_submarinerank) plus each installed
-// part's bonus (ffxiv_submarinepart, via the confirmed class/slot
-// mapping). Returns '' (not 0) if the rank's base data or any part's
-// data is missing, since a partial total would look valid but be
-// wrong.
+// A sub's five stats, in the game's order.
+const STATS = ['surveillance', 'retrieval', 'speed', 'range', 'favor'];
+
+// One stat: the rank's bonus (ffxiv_submarinerank) plus each installed part's (ffxiv_submarinepart, via the
+// confirmed class/slot mapping). Returns '' (not 0) if the rank's or any part's figure is missing, since a partial
+// total would look valid but be wrong.
 function computeStat(rank, partLetters, statKey, rankStatsById, partStatsByClassSlot) {
   const base = rankStatsById.get(rank);
-  if (!base || base[statKey] === null) return '';
+  if (!base || base[statKey] === null || base[statKey] === undefined) return '';
   let total = base[statKey];
   for (let i = 0; i < 4; i++) {
     const classId = LETTER_TO_PART_CLASS_ID[partLetters[i]];
     const partStats = partStatsByClassSlot.get(`${classId}|${i}`);
-    if (!partStats) return '';
+    if (!partStats || partStats[statKey] === undefined) return '';
     total += partStats[statKey];
   }
   return total;
+}
+
+// All five stats of a build: { surveillance, retrieval, speed, range, favor }, or null when any can't be worked out.
+function buildStats(rank, partLetters, rankStatsById, partStatsByClassSlot) {
+  const out = {};
+  for (const s of STATS) {
+    const v = computeStat(rank, partLetters, s, rankStatsById, partStatsByClassSlot);
+    if (v === '') return null;
+    out[s] = v;
+  }
+  return out;
 }
 
 // Parses a Fight Club "Rec Build (NOTES)" cell like "128: WSUC++" (uniform
@@ -229,8 +241,13 @@ module.exports = {
   parseRankBuild,
   computeTargetRoute,
   bestFightClubOption,
+  fightClubOptions,
+  bestOf,
+  formatRouteWithDashes,
   nextFightClubBuild,
   computeCurrentGilPerDay,
   decodeRoute,
   computeStat,
+  buildStats,
+  STATS,
 };

@@ -81,7 +81,7 @@ function marketColumnDefs(field, unit) {
       const m = r.market && r.market[scope];
       // As the plugin: a day's value in green, a voyage's gil in gold.
       const value = !m ? <span className="dim">—</span> : field === 'perDay' ? <span className="tone-good">{incomeGil(m[field])}</span> : <GilText gil={Math.round(m[field])} />;
-      return <td className={`income-market market-${scope} num`} title={`At the cheapest listing on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis); items not on the market board at what a vendor pays.`}>{value}</td>;
+      return <td className={`income-market market-${scope} num`} title={`At the market price on the ${scope === 'world' ? "character's world" : scope === 'dc' ? 'data center' : 'region'} (Universalis: the cheapest listing, a lone low one skipped, checked against recent sales); items not on the market board at what a vendor pays.`}>{value}</td>;
     },
     sort: (r) => (r.market && r.market[scope] ? r.market[scope][field] : null),
   }));
@@ -97,6 +97,19 @@ function MarketStaleNote({ stale }) {
   return <div className="warning market-stale-note">Some live prices are from {at}: {stale.problem} They update at the next refresh.</div>;
 }
 
+// Prices the outlier checks changed (a lone low listing skipped, or recent sales used), in amber, each on hover.
+const MARKET_ADJUSTED_SCOPES = { world: 'world', dc: 'data center', region: 'region' };
+function MarketAdjustedNote({ adjusted }) {
+  if (!adjusted || !adjusted.length) return null;
+  const items = [...new Set(adjusted.map((a) => a.name))];
+  const detail = adjusted.map((a) => `${a.name} (${a.world}, ${MARKET_ADJUSTED_SCOPES[a.scope] || a.scope}): ${a.note}`).join('\n');
+  return (
+    <div className="supplies-note market-adjusted-note tone-warn" title={detail}>
+      {items.length} item price{items.length === 1 ? ' was' : 's were'} adjusted for odd listings: {items.slice(0, 5).join(', ')}{items.length > 5 ? ` and ${items.length - 5} more` : ''} (hover for why).
+    </div>
+  );
+}
+
 // Where the live prices came from, or why there are none.
 function MarketNote({ market }) {
   if (!market) return null;
@@ -104,7 +117,9 @@ function MarketNote({ market }) {
   const places = (market.places || []).map((p) => [p.world, p.dc, p.region].filter(Boolean).join(' / ')).join('; ');
   return (
     <React.Fragment>
-      <div className="supplies-note market-note">Live prices from Universalis: cheapest listings on {places || 'your worlds'}. Items not sold on the market board count at what a vendor pays.</div>
+      <div className="supplies-note market-note">Live prices from Universalis on {places || 'your worlds'}: the cheapest listing, skipping a lone listing far below the
+        others and checked against the last week's sales. Items not sold on the market board count at what a vendor pays.</div>
+      <MarketAdjustedNote adjusted={market.adjusted} />
       <MarketStaleNote stale={market.stale} />
     </React.Fragment>
   );
@@ -298,7 +313,7 @@ function IncomeView({ refreshKey, uses = { subs: true, retainers: true } }) {
       <div className="supplies-note">
         Salvage: every piece that came into a character's bags or retainers over the last {data.windowDays} days, at its
         vendor price (selling or moving it is not counted). Repairs: repair kits used
-        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit cost in Settings to count them)'}.
+        {data.kitCost ? <> at <span className="gil">{data.kitCost.toLocaleString()} gil</span> each</> : ' (set the repair kit price on the Supplies page to count them)'}.
         Expected: the subs' Current gil/day from the Subs page, for the routes they are on now.
         {t.notEnough ? ` ${t.notEnough} character${t.notEnough === 1 ? ' has' : 's have'} less than a day of salvage history.` : ''}
         {data.withoutSubs ? ` ${data.withoutSubs} character${data.withoutSubs === 1 ? '' : 's'} with no subs built ${data.withoutSubs === 1 ? 'is' : 'are'} left out.` : ''}

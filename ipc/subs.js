@@ -5,7 +5,9 @@ const { loadSharedCharacters } = require('../characters/shared-sync');
 const { withClient, snapshotFragments } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const forecastVoyages = require('../subs/voyage-forecast');
-const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat } = require('../subs/submarine-builds');
+const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPerDay, decodeRoute, computeStat, STATS, fightClubOptions, bestOf, formatRouteWithDashes } = require('../subs/submarine-builds');
+const { fightClubCheck } = require('../subs/route-finder');
+const calculatorData = require('../subs/calculator-data');
 const rankUp = require('../subs/rank-up');
 const accuracy = require('../subs/forecast-accuracy');
 const { columnsByKey } = require('./shopping');
@@ -56,7 +58,20 @@ async function loadSubmarines(client) {
 
   const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
-  const topRank = Math.max(0, ...[...rankStatsById.keys()].filter((r) => rankStatsById.get(r).speed !== null));
+  const topRank = rankUp.topRank(rankStatsById, (await loadRankUpGameData(client)).expToNext);
+  // Fight Club's routes against the sectors each FC has discovered (read in its workshop by the plugin): each map's
+  // letters, each FC's reading, and the sector each opens from (XIVStats).
+  const options = fightClubOptions(fightClubRows, repairKitCost);
+  const lettersByMap = new Map();
+  for (const [id, letter] of pointLetterById) {
+    const m = mapOfPoint.get(id);
+    if (!m) continue;
+    if (!lettersByMap.has(m.id)) lettersByMap.set(m.id, { id: m.id, byLetter: new Map() });
+    lettersByMap.get(m.id).byLetter.set(letter, id);
+  }
+  const maps = [...lettersByMap.values()];
+  const reads = await fcSectorReads(client);
+  const openerOf = new Map(calculatorData.load().sectors.map((d) => [d.id, Number(d.unlockedFrom) || 0]));
 
   const rows = result.rows.map((row) => {
     const partLetters = [row.part1, row.part2, row.part3, row.part4].map(partLetter);
@@ -91,6 +106,7 @@ async function loadSubmarines(client) {
       current_map: routeMap(row.points, mapOfPoint),
       target_route: target.route,
       target_gil_day: target.gilPerDay,
+      target_blocked: blockedTarget(fightClubCheck({ options, rank, maps, read: reads.get(String(row.fc_id)) || null, bestOf }), pointLetterById, openerOf, validRouteLetters),
       current_gil_day: currentGilDay,
       speed: computeStat(rank, partLetters, 'speed', rankStatsById, partStatsByClassSlot),
       range: computeStat(rank, partLetters, 'range', rankStatsById, partStatsByClassSlot),
@@ -107,27 +123,48 @@ async function loadSubmarines(client) {
   return rows;
 }
 
-// Speed and range per rank (ffxiv_submarinerank) and per part (ffxiv_submarinepart), for computeStat.
+// The five stats per rank (ffxiv_submarinerank's bonuses) and per part (ffxiv_submarinepart), for computeStat and
+// buildStats. A stat whose column the game data doesn't have is left out, so it reads as unknown rather than 0.
 async function loadStatTables(client) {
-  const rankStatsResult = await client.query(`SELECT id, speed_bonus, range_bonus FROM ffxiv_submarinerank`);
-  const rankStatsById = new Map();
-  for (const row of rankStatsResult.rows) {
-    const rank = Number(row.id);
-    rankStatsById.set(rank, {
-      speed: row.speed_bonus === null || row.speed_bonus === '' ? null : Number(row.speed_bonus),
-      range: row.range_bonus === null || row.range_bonus === '' ? null : Number(row.range_bonus),
-    });
-  }
+  const rankCols = await columnsByKey(client, 'ffxiv_submarinerank');
+  const partCols = await columnsByKey(client, 'ffxiv_submarinepart');
+  const rankStat = STATS.map((s) => [s, rankCols.get(`${s}bonus`)]).filter(([, c]) => c);
+  const partStat = STATS.map((s) => [s, partCols.get(s)]).filter(([, c]) => c);
+  const quote = (c) => `"${c.replace(/"/g, '""')}"`;
+  const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 
-  const partStatsResult = await client.query(`SELECT class, slot, speed, range FROM ffxiv_submarinepart`);
+  const rankStatsById = new Map();
+  const ranks = await client.query(`SELECT id${rankStat.map(([s, c]) => `, ${quote(c)} AS ${s}`).join('')} FROM ffxiv_submarinerank`);
+  for (const row of ranks.rows) rankStatsById.set(Number(row.id), Object.fromEntries(rankStat.map(([s]) => [s, num(row[s])])));
+
   const partStatsByClassSlot = new Map();
-  for (const row of partStatsResult.rows) {
-    partStatsByClassSlot.set(`${row.class}|${row.slot}`, {
-      speed: Number(row.speed) || 0,
-      range: Number(row.range) || 0,
-    });
-  }
+  const parts = await client.query(`SELECT class, slot${partStat.map(([s, c]) => `, ${quote(c)} AS ${s}`).join('')} FROM ffxiv_submarinepart`);
+  for (const row of parts.rows) partStatsByClassSlot.set(`${row.class}|${row.slot}`, Object.fromEntries(partStat.map(([s]) => [s, Number(row[s]) || 0])));
   return { rankStatsById, partStatsByClassSlot };
+}
+
+// Each Free Company's sectors as the plugin last read them in its workshop (database update 18): Map fcId -> Map
+// sectorId -> { unlocked, explored }. Empty before update 18 or any reading.
+async function fcSectorReads(client) {
+  const out = new Map();
+  try {
+    for (const r of (await client.query('SELECT fc_id, sector_id, unlocked, explored FROM companion_fc_sub_sector')).rows) {
+      const fc = String(r.fc_id);
+      if (!out.has(fc)) out.set(fc, new Map());
+      out.get(fc).set(Number(r.sector_id), { unlocked: r.unlocked === true || Number(r.unlocked) === 1, explored: r.explored === true || Number(r.explored) === 1 });
+    }
+  } catch { /* no table yet */ }
+  return out;
+}
+
+// A sub's Fight Club target its FC can't run yet (route-finder.js fightClubCheck), for the Subs and Route Optimization
+// pages: { needs: [{ letter, from }] (from: the letter it opens from, or null), alt: { route, gilPerDay } | null }, or null.
+function blockedTarget(check, letterOf, openerOf, validRouteLetters) {
+  if (!check.missing.length) return null;
+  return {
+    needs: check.missing.map((id) => ({ letter: letterOf.get(id) || String(id), from: openerOf.get(id) ? letterOf.get(openerOf.get(id)) || null : null })),
+    alt: check.alt ? { route: formatRouteWithDashes(check.alt.row.route, validRouteLetters), gilPerDay: Math.round(check.alt.net) } : null,
+  };
 }
 
 // Which map (sea) each sector is on, from game data: sector id -> { id, name } (the game's own map
@@ -218,7 +255,7 @@ async function addRankUps(client, subs) {
   const rules = (await client.query('SELECT rank, cid_override, sub_filter, hull, stern, bow, bridge FROM sub_build_rules ORDER BY id')).rows;
   const fightClubRows = (await client.query(`SELECT ${FIGHT_CLUB_COLUMNS} FROM fight_club_routes ORDER BY id`)).rows;
   const repairKitCost = await repairKitCostFrom(client);
-  const top = rankUp.maxRank(game.expToNext);
+  const top = rankUp.topRank(stats.rankStatsById, game.expToNext);
 
   // Recorded rank and experience per slot (plugin 0.7.0), over the window plus the value before it.
   const now = Date.now();
@@ -412,6 +449,12 @@ ipcMain.handle('get-submarines', async () => {
   });
 });
 
+// Each sub's next build rank (as the Subs page works it out), for the Levelling Plan's default target; nothing saved.
+ipcMain.handle('get-sub-next-builds', async () => withClient(async (client) => {
+  const rows = await loadSubmarinesWithRankUps(client);
+  return { success: true, rows: rows.filter((s) => s.rank_up && s.rank_up.nextBuild).map((s) => ({ cid: String(s.cid), subName: s.sub_name, rank: s.rank_up.nextBuild.rank })) };
+}, (err) => ({ success: false, error: err.message })));
+
 ipcMain.handle('get-forecast-accuracy', async () => {
   return withClient(async (client) => {
     return { success: true, accuracy: await loadForecastAccuracy(client) };
@@ -488,4 +531,4 @@ ipcMain.handle('set-craft-enabled', async (event, { cid, subName, enabled } = {}
   });
 });
 
-module.exports = { loadSubmarines, loadSubmarinesWithRankUps, saveForecastsNow, loadForecastAccuracy };
+module.exports = { loadSubmarines, loadSubmarinesWithRankUps, saveForecastsNow, loadForecastAccuracy, loadStatTables, loadRankUpGameData };

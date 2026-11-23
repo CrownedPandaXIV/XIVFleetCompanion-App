@@ -31,7 +31,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Subs', nav: 'Subs',
-      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'fight club builds'],
+      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'voyage planner', 'fight club builds'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },
@@ -54,7 +54,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Route Optimization', nav: 'Route Optimization',
-      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain'],
+      default: ['character', 'sub', 'current route', 'current gil/day', 'target route', 'target gil/day', 'gil/day gain', 'voyage planner'],
       move: ['gil/day gain', 'sub'], remove: 'Sub', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
     },
     {
@@ -71,6 +71,17 @@ module.exports = async (t) => {
       name: 'Inventory (FC)', nav: 'Inventory', prepare: async () => { await pressWhenThere('FC'); await sleep(400); await pickFirst('Search FCs'); },
       default: ['fc', 'tab', 'item', 'quantity'],
       move: ['quantity', 'fc'], remove: 'Tab',
+    },
+    {
+      // The Planner's first table (What this build reaches), once a synced sub is loaded from the sub picker.
+      name: 'Voyage Planner (what this build reaches)', nav: 'Voyage Planner', prepare: async () => {
+        await waitFor(`document.querySelector('.planner-picker-button') && !document.querySelector('.planner-picker-button').disabled`, 'the sub picker', 20000);
+        await ev(`document.querySelector('.planner-picker-button').click()`);
+        await waitFor(`document.querySelectorAll('.planner-picker-sub').length > 0`, 'the subs to choose', 10000);
+        await ev(`document.querySelector('.planner-picker-sub').click()`);
+      },
+      default: ['sector', 'loot tier', 'retrieval', 'double dip', 't2 / t3 at', 'normal / optimal at', 'favor at', 'bonus exp'],
+      move: ['bonus exp', 'retrieval'], remove: 'Favor at',
     },
   ];
 

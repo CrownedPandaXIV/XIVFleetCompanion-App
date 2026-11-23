@@ -16,7 +16,7 @@ module.exports = async (t) => {
   await waitFor(`document.querySelectorAll('.sidebar-button').length>0`, 'the app to load', 60000);
   // The sidebar in groups, as the plugin's.
   const groups = await ev(`[...document.querySelectorAll('.sidebar-group')].map((g) => g.querySelector('.sidebar-group-title').innerText + ': ' + [...g.querySelectorAll('.sidebar-button')].map((b) => b.innerText).join(', '))`);
-  check(groups.join(' | ').toLowerCase() === 'overview: summary, trends | submarines: subs, route optimization, parts, supplies, salvage | characters: character roster, retainers, free companies, inventory | gil: income, gil & market | system: pcs',
+  check(groups.join(' | ').toLowerCase() === 'overview: summary, trends | submarines: subs, route optimization, parts, supplies, salvage | sub calculator: voyage planner, route finder, build finder, compare builds, levelling plan | characters: character roster, retainers, free companies, inventory | gil: income, gil & market | system: pcs',
     'the sidebar in groups: ' + groups.join(' | '));
   await openSettings();
   const options = await ev(`[...document.querySelectorAll('.look-choice option')].map((o) => o.innerText)`);
