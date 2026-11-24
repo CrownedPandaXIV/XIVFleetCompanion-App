@@ -178,6 +178,8 @@ app.whenReady().then(() => {
     require('./setup/elevated').runFromCommandLine();
     return;
   }
+  // Before the window, so its first page already has the newer Sub Calculator data when one was downloaded.
+  require('./sub-data-update').startSubDataUpdates(app.getPath('userData'));
   createWindow();
   startUpdates();
   removeOldAlerts();
