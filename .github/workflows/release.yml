@@ -76,7 +76,7 @@ jobs:
         cache: npm
 
     # The Sub Calculator's data ships as committed: the copy the tests ran on and the plugin has too. Newer XIVStats
-    # and Pepper data comes in as a change of its own (sub-data.yml says when there is some).
+    # and Pepper data is published each day by sub-data.yml, and the app downloads it (sub-data-update.js).
 
     # No token here: installing and building run other people's code (every package's install scripts), which must not
     # reach the one that publishes updates.

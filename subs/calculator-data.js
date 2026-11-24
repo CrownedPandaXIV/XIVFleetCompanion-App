@@ -1,7 +1,10 @@
 // The Sub Calculator's outside data (subs/calculator-data.json): per sector, the loot each tier can give and the
 // breakpoints, from XIVStats (MIT licence, collected from players running the Tracky plugin) with Pepper's FFXIV Ship
 // Guide's breakpoints beside them. Sector names, ranks, positions and parts come from the game's own files, not this.
-// .github/scripts/refresh-sub-data.js makes the file; it is made again at each release. No Electron here.
+// .github/scripts/refresh-sub-data.js makes the file. The copy shipped is the one in the repository; each day
+// .github/workflows/sub-data.yml makes it afresh and, when it changed and passes .github/scripts/check-sub-data.js,
+// publishes it in the Releases repository, where the app (sub-data-update.js) downloads it to its own folder. The newer
+// of the two is used (by about.made). No Electron here.
 //
 // The file:
 //   about:   { xivstats: { updated, commit }, pepper: { sheet, fetched } | null, made }
@@ -47,13 +50,49 @@ function problems(data) {
   return out;
 }
 
+// When the data was made (ms), 0 when it doesn't say.
+const madeAt = (data) => {
+  const t = Date.parse(data && data.about && data.about.made);
+  return Number.isFinite(t) ? t : 0;
+};
+// Whether `data` is fine to use and newer than `than`.
+const usableOver = (data, than) => problems(data).length === 0 && madeAt(data) > madeAt(than);
+
+let downloadedFile = null;
 let cached = null;
-// The data shipped with the app (read once).
-function load(file = FILE) {
-  if (file === FILE && cached) return cached;
-  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (file === FILE) cached = data;
-  return data;
+let shipped = null;
+
+// Where the downloaded copy is kept (the app's own folder); set once at start.
+function useFolder(dir) {
+  downloadedFile = path.join(dir, 'calculator-data.json');
+  cached = null;
 }
 
-module.exports = { FILE, BREAKPOINTS, problems, load };
+// The data to use: the downloaded copy when it is fine and newer than the shipped one, else the shipped one (read once).
+// A file named: that file.
+function load(file = FILE) {
+  if (file !== FILE) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (cached) return cached;
+  shipped = shipped || JSON.parse(fs.readFileSync(FILE, 'utf8'));
+  cached = shipped;
+  if (downloadedFile) {
+    try {
+      const got = JSON.parse(fs.readFileSync(downloadedFile, 'utf8'));
+      if (usableOver(got, shipped)) cached = got;
+    } catch { /* none downloaded yet, or not readable: the shipped data */ }
+  }
+  return cached;
+}
+
+// A downloaded copy (parsed): kept and used from now on when it is fine and newer than the data in use. Returns
+// whether it was. The file is written whole first, then swapped in, so a cut-off write never leaves half a file.
+function adopt(data) {
+  if (!downloadedFile || !usableOver(data, load())) return false;
+  const temp = `${downloadedFile}.new`;
+  fs.writeFileSync(temp, JSON.stringify(data));
+  fs.renameSync(temp, downloadedFile);
+  cached = data;
+  return true;
+}
+
+module.exports = { FILE, BREAKPOINTS, problems, load, useFolder, adopt, madeAt };

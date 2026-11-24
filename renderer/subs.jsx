@@ -199,6 +199,17 @@ function NextBuildCell({ sub }) {
   );
 }
 
+// Repair in: how many more voyages the part closest to 0% can go on (on the current route, after the voyage it is on
+// now), from the plugin's last workshop reading. Amber at 1, red when it needs repairing before it can go again.
+const REPAIR_SLOTS = ['Hull', 'Stern', 'Bow', 'Bridge'];
+function RepairDueCell({ due }) {
+  if (!due) return <span className="dim" title="No workshop reading of this sub's parts yet (the plugin reads them while a character is in the Free Company's workshop).">—</span>;
+  const when = new Date(due.readAt * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const title = `${REPAIR_SLOTS[due.slot]} at ${due.condition.toFixed(1)}% when read on ${when}; voyages on the current route after the one it is on now.`;
+  if (due.voyages === 0) return <span className="tone-danger" title={title}>Repair now</span>;
+  return <span className={due.voyages <= 1 ? 'tone-warn' : undefined} title={title}>{due.voyages} voyage{due.voyages === 1 ? '' : 's'}</span>;
+}
+
 // The Subs page's own columns. Character and World are "context" columns: shown automatically when the tab is
 // sorted (one flat table), and available to add in the per-character view.
 const SUB_COLUMN_DEFS = [
@@ -210,6 +221,7 @@ const SUB_COLUMN_DEFS = [
   { key: 'nextRank', label: 'Next rank', cell: (s) => <NextRankCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextRankAt) || null },
   { key: 'nextBuild', label: 'Next build', cell: (s) => <NextBuildCell sub={s} />, sort: (r) => (r.rank_up && r.rank_up.nextBuild && r.rank_up.nextBuild.at) || null },
   { key: 'currentSetup', label: 'Build', cell: (s) => <BuildText build={s.current_setup} />, sort: (r) => r.current_setup },
+  { key: 'repair', label: 'Repair in', cell: (s) => <RepairDueCell due={s.repair_due} />, sort: (r) => (r.repair_due ? r.repair_due.voyages : null) },
   { key: 'speed', label: 'Speed', cell: (s) => (s.speed === '' ? '—' : s.speed), sort: (r) => (r.speed === '' ? null : r.speed) },
   { key: 'range', label: 'Range', cell: (s) => (s.range === '' ? '—' : s.range), sort: (r) => (r.range === '' ? null : r.range) },
   { key: 'currentRoute', label: 'Current route', cell: (s) => <RouteCell sub={s} />, sort: (r) => (r.current_route ? `${r.current_map ? r.current_map.id : 0}|${r.current_route}` : null) },

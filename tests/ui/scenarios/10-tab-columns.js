@@ -31,7 +31,7 @@ module.exports = async (t) => {
     },
     {
       name: 'Subs', nav: 'Subs',
-      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'voyage planner', 'fight club builds'],
+      default: ['sub', 'status', 'rank', 'next rank', 'next build', 'build', 'repair in', 'speed', 'range', 'current route', 'current gil/day', 'target route', 'target gil/day', 'voyage planner', 'fight club builds'],
       move: ['rank', 'status'], remove: 'Range', extra: { label: 'Account', pattern: /^acct[0-2]$/ },
       afterSort: { header: 'rank', expectFirst: ['character', 'sub'] },
     },

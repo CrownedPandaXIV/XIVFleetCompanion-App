@@ -1,18 +1,26 @@
 name: Sub Calculator data
 
-# Each week (and by hand): whether XIVStats or Pepper's guide has newer Sub Calculator data than the committed copy.
-# It changes nothing: when there is some, a warning says so, and the new data comes in as a change of its own
-# (node .github/scripts/refresh-sub-data.js, then the tests, then the plugin's copy), so what ships is always tested.
+# Each day (and by hand): makes the Sub Calculator's data afresh from XIVStats and Pepper's guide, and when it differs
+# from the copy published in XIVFleetCompanion-Releases (sub-data/calculator-data-v1.json) and passes the checks
+# (.github/scripts/check-sub-data.js), publishes it there. The app (sub-data-update.js) and the plugin
+# (SubCalculatorData.Update) download that copy once a day, or when they next open after a day missed, and use it when
+# it is newer than the copy they shipped with. Nothing is published when a source can't be read or the checks fail.
+# Publishing needs the RELEASES_TOKEN secret (as release.yml): a fine-grained token allowed only "Contents: read and
+# write" on XIVFleetCompanion-Releases.
 on:
   schedule:
-    - cron: '17 4 * * 1'
+    - cron: '17 5 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: sub-data
+  cancel-in-progress: false
+
 jobs:
-  check:
+  publish:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v5
@@ -21,14 +29,41 @@ jobs:
     - uses: actions/setup-node@v5
       with:
         node-version: 22
-    - name: Read the sources again
+    - name: Make the data afresh
       shell: bash
       run: |
-        cp subs/calculator-data.json /tmp/committed.json
-        node .github/scripts/refresh-sub-data.js
-        if cmp -s subs/calculator-data.json /tmp/committed.json; then
-          echo "The committed Sub Calculator data is up to date."
+        cp subs/calculator-data.json "$RUNNER_TEMP/new.json"
+        node .github/scripts/refresh-sub-data.js "$RUNNER_TEMP/new.json"
+    - name: Read the published copy
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        if gh api repos/CrownedPandaXIV/XIVFleetCompanion-Releases/contents/sub-data/calculator-data-v1.json > "$RUNNER_TEMP/meta.json" 2> "$RUNNER_TEMP/read-error.txt"; then
+          jq -r .sha "$RUNNER_TEMP/meta.json" > "$RUNNER_TEMP/sha.txt"
+          gh api repos/CrownedPandaXIV/XIVFleetCompanion-Releases/contents/sub-data/calculator-data-v1.json -H 'Accept: application/vnd.github.raw' > "$RUNNER_TEMP/published.json"
+        elif grep -q 'HTTP 404' "$RUNNER_TEMP/read-error.txt"; then
+          echo "None published yet."
         else
-          echo "::warning title=Sub Calculator data::Newer data is out. Refresh it with node .github/scripts/refresh-sub-data.js, run the tests and copy it to the plugin."
-          git --no-pager diff --stat -- subs/calculator-data.json
+          echo "::error::Couldn't read the published copy: $(cat "$RUNNER_TEMP/read-error.txt")"; exit 1
         fi
+    - name: Check it
+      id: check
+      shell: bash
+      run: node .github/scripts/check-sub-data.js "$RUNNER_TEMP/new.json" "$RUNNER_TEMP/published.json"
+    - name: Publish it
+      if: steps.check.outputs.publish == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        node -e '
+          const fs = require("fs");
+          const [file, shaFile, out] = process.argv.slice(1);
+          const data = JSON.parse(fs.readFileSync(file, "utf8"));
+          const body = { message: `Sub Calculator data (XIVStats updated ${data.about.xivstats.updated})`,
+            content: fs.readFileSync(file).toString("base64") };
+          if (fs.existsSync(shaFile)) body.sha = fs.readFileSync(shaFile, "utf8").trim();
+          fs.writeFileSync(out, JSON.stringify(body));
+        ' "$RUNNER_TEMP/new.json" "$RUNNER_TEMP/sha.txt" "$RUNNER_TEMP/body.json"
+        gh api -X PUT repos/CrownedPandaXIV/XIVFleetCompanion-Releases/contents/sub-data/calculator-data-v1.json --input "$RUNNER_TEMP/body.json" --jq .commit.sha

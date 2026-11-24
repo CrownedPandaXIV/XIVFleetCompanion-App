@@ -92,6 +92,9 @@ function sectorResult(dataSector, stats) {
 // only one a build is sure of), T2 loot +25%, T3 loot +50%, HQ materials +25% and a double dip +25% (luck), the
 // double dip's second roll able to earn the tier's bonus again; at most +100% of the sector's experience.
 // { sure, best } in percent: sure counts only what the build is sure to get; best everything it could reach.
+// A sector's experience with a bonus of `bonus` per cent, in whole points as the game gives it.
+const sectorExp = (expReward, bonus) => Math.floor(expReward * (100 + bonus) / 100);
+
 function bonusExp(result) {
   const reached = (s) => s === 'yes' || s === 'maybe';
   const tierBonus = result.tier === 3 ? 50 : result.tier === 2 ? 25 : 0;
@@ -184,7 +187,7 @@ function plan({ route, stats, partClasses, game, data, prices = new Map(), repai
   const kitsPerVoyage = wear.every(Boolean) ? wear.reduce((sum, w) => sum + w.kitsPerVoyage, 0) : null;
   const perDay = v.hours > 0 ? 24 / v.hours : 0;
   // Experience with bonuses: what the build is sure of, and the most it could get (a sector without data: none).
-  const withBonus = (key) => perSector.reduce((sum, p) => sum + p.sector.expReward * (1 + (p.bonus ? p.bonus[key] : 0) / 100), 0);
+  const withBonus = (key) => perSector.reduce((sum, p) => sum + sectorExp(p.sector.expReward, p.bonus ? p.bonus[key] : 0), 0);
 
   return {
     sectors: perSector, start, range, hours: v.hours, exp: v.exp, expSure: withBonus('sure'), expBest: withBonus('best'),
@@ -202,4 +205,4 @@ function startFor(sectorId, startingPoints) {
   return found;
 }
 
-module.exports = { FULL_CONDITION, rangeUsed, bestOrder, breakpoint, meets, sectorResult, bonusExp, sectorLoot, sectorDamage, plan, startFor };
+module.exports = { FULL_CONDITION, rangeUsed, bestOrder, breakpoint, meets, sectorResult, bonusExp, sectorExp, sectorLoot, sectorDamage, plan, startFor };

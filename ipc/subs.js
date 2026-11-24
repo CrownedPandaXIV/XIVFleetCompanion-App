@@ -9,6 +9,7 @@ const { partLetter, computeTargetRoute, nextFightClubBuild, computeCurrentGilPer
 const { fightClubCheck } = require('../subs/route-finder');
 const calculatorData = require('../subs/calculator-data');
 const rankUp = require('../subs/rank-up');
+const repairDue = require('../subs/repair-due');
 const accuracy = require('../subs/forecast-accuracy');
 const { columnsByKey } = require('./shopping');
 const { targetBuildAt, repairKitCostFrom, FIGHT_CLUB_COLUMNS } = require('./parts');
@@ -72,6 +73,7 @@ async function loadSubmarines(client) {
   const maps = [...lettersByMap.values()];
   const reads = await fcSectorReads(client);
   const openerOf = new Map(calculatorData.load().sectors.map((d) => [d.id, Number(d.unlockedFrom) || 0]));
+  const wear = await loadWear(client);
 
   const rows = result.rows.map((row) => {
     const partLetters = [row.part1, row.part2, row.part3, row.part4].map(partLetter);
@@ -116,12 +118,64 @@ async function loadSubmarines(client) {
       slot: row.slot,
       current_exp: currentExp,
       next_level_exp: nextLevelExp,
-      points: row.points
+      points: row.points,
+      // When a part needs repairing, from the plugin's workshop readings: { voyages, slot, condition, readAt } or null.
+      repair_due: repairDueOf(row, wear)
     };
   });
 
   return rows;
 }
+
+// What Repair in is worked out from: each sub's part readings (the last two weeks', oldest first, by "cid|sub name"),
+// whether the game wears a part when it is sent or on return (from those readings), each part's rank ("class|slot")
+// and each sector's rank needed. Empty when the plugin hasn't read any yet (or the database has no such table).
+const WEAR_WINDOW_SECONDS = 14 * 24 * 60 * 60;
+const seconds = (t) => (t instanceof Date ? t.getTime() / 1000 : t ? new Date(t).getTime() / 1000 : 0);
+async function loadWear(client) {
+  const out = { readings: new Map(), atSend: null, partRank: new Map(), sectorRank: new Map() };
+  try {
+    const { rows } = await client.query(`
+      SELECT cid, sub_name, part_slot, read_at, return_at, item_id, condition FROM companion_sub_part_condition
+      WHERE cid IS NOT NULL AND sub_name IS NOT NULL AND read_at >= $1 ORDER BY read_at`, [new Date(Date.now() - WEAR_WINDOW_SECONDS * 1000)]);
+    for (const r of rows) {
+      const key = `${r.cid}|${r.sub_name}`;
+      if (!out.readings.has(key)) out.readings.set(key, [[], [], [], []]);
+      const slot = Number(r.part_slot);
+      if (slot >= 0 && slot < 4) {
+        out.readings.get(key)[slot].push({ readAt: seconds(r.read_at), returnAt: seconds(r.return_at), itemId: Number(r.item_id), condition: Number(r.condition) });
+      }
+    }
+  } catch { return out; }
+  if (!out.readings.size) return out;
+  out.atSend = repairDue.wearAtSend([...out.readings.values()].flat());
+  const partCols = await columnsByKey(client, 'ffxiv_submarinepart');
+  if (partCols.has('rank')) {
+    const { rows } = await client.query(`SELECT class, slot, ${quote(partCols.get('rank'))} AS rank FROM ffxiv_submarinepart`);
+    for (const r of rows) out.partRank.set(`${Number(r.class)}|${Number(r.slot)}`, Number(r.rank) || 0);
+  }
+  const cols = await columnsByKey(client, 'ffxiv_submarineexploration');
+  if (cols.has('rankreq')) {
+    const { rows } = await client.query(`SELECT id, ${quote(cols.get('rankreq'))} AS rank FROM ffxiv_submarineexploration`);
+    for (const r of rows) out.sectorRank.set(Number(r.id), Number(r.rank) || 0);
+  }
+  return out;
+}
+
+function repairDueOf(row, wear) {
+  const readings = wear.readings.get(`${row.cid}|${row.sub_name}`);
+  if (!readings) return null;
+  const route = Array.from(row.points || []).filter((b) => b > 0).map((id) => wear.sectorRank.get(Number(id)));
+  if (!route.length || route.some((r) => r === undefined)) return null;
+  const items = [row.part1, row.part2, row.part3, row.part4].map(Number);
+  const parts = items.map((itemId, slot) => {
+    const cls = CLASS_NUMBER[partLetter(itemId)];
+    const rank = cls ? wear.partRank.get(`${cls}|${slot}`) : undefined;
+    return rank === undefined ? null : { readings: readings[slot], itemId, rank };
+  });
+  return repairDue.repairDue({ parts, route, returnTime: Number(row.return_time) || 0, atSend: wear.atSend });
+}
+const CLASS_NUMBER = { W: 1, U: 2, S: 3, C: 4, Y: 5, 'W+': 6, 'U+': 7, 'S+': 8, 'C+': 9, 'Y+': 10 };
 
 // The five stats per rank (ffxiv_submarinerank's bonuses) and per part (ffxiv_submarinepart), for computeStat and
 // buildStats. A stat whose column the game data doesn't have is left out, so it reads as unknown rather than 0.

@@ -73,7 +73,7 @@ function sectorValue(sector, dataSector, stats, prices) {
     items.set(l.itemId, (items.get(l.itemId) || 0) + l.perVoyage);
     gil += l.perVoyage * (prices.get(l.itemId) || 0);
   }
-  return { exp: sector.expReward * (1 + calc.bonusExp(result).sure / 100), gil, items, tier: result.tier, tierSure: result.tierSure };
+  return { exp: calc.sectorExp(sector.expReward, calc.bonusExp(result).sure), gil, items, tier: result.tier, tierSure: result.tierSure };
 }
 
 // The routes. sectors: the map's sectors the sub may go to ({ id, x, y, z, surveyMinutes, surveyDistance, expReward });

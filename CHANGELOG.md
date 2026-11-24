@@ -3,6 +3,21 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.0 - 2026-11-24
+
+### New
+- **Sub Calculator data, daily:** newer loot and breakpoint data (XIVStats, Pepper's guide) is now checked every day and
+  published once it passes the checks. The app downloads it once a day, or when it next opens after a day missed, and
+  uses it when it's newer than the copy it came with, so a patch's new data no longer waits for an app update. Nothing
+  changes when it can't be reached.
+- **Subs → Repair in:** how many more voyages each sub can go on its current route before a part needs repairing, from
+  the plugin's last workshop reading of its parts. "Repair now" in red, 1 voyage in amber; the part and its condition on
+  hover.
+
+### Changed
+- **Experience** with a bonus is now in whole points per sector, as the game gives it (Voyage Planner, Route Finder,
+  Compare Builds, Levelling Plan).
+
 ## 1.12.1 - 2026-11-23
 
 Fixes to the Sub Calculator and the market price, from a full check of 1.12.0.
