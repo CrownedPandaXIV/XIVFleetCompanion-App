@@ -10,6 +10,7 @@ const { followMove } = require('./database-move');
 const gameData = require('./game-data');
 const fleetStore = require('./fleet-store');
 const { SqliteClient } = require('./sqlite-client');
+const guard = require('./connection-guard');
 
 // Give up on connecting after this long instead of the operating system's ~20 seconds, so a
 // refresh while the database cannot be reached fails quickly. keepAlive notices a connection that
@@ -27,11 +28,23 @@ const CONNECT_TIMEOUT_MS = 8000;
 // read ECONNRESET" crash dialog. Attaching a no-op listener here just
 // logs it instead, letting the existing try/catch/finally in each
 // handler continue to handle the error gracefully as before.
-function createPgClient(config) {
-  const client = new Client({ connectionTimeoutMillis: CONNECT_TIMEOUT_MS, keepAlive: true, ...config });
+// Every connection is named "XIV Fleet Companion app" (db/connection-guard.js). `perCall`: one of this file's own
+// connections for a single call (withClient and the like), which the database closes if it is ever left idle for
+// 10 minutes, and which is written to the log if it is still open after 2; never one that may wait on purpose
+// (a move, a backup, setup).
+function createPgClient(config, { perCall = false } = {}) {
+  const client = new Client({ connectionTimeoutMillis: CONNECT_TIMEOUT_MS, keepAlive: true, ...guard.clientConfig(config, { idleLimit: perCall }) });
   client.on('error', (err) => {
     console.error('Postgres client connection error (non-fatal):', err.message);
   });
+  if (perCall) {
+    guard.watch(client, { stack: new Error().stack });
+    const connect = client.connect.bind(client);
+    client.connect = async () => {
+      await connect();
+      await guard.afterConnect(client, { idleLimit: true });
+    };
+  }
   return client;
 }
 
@@ -78,7 +91,7 @@ const connection = createConnectionTracker({
     let client = null;
     try {
       config = loadPostgresConfig();
-      client = createPgClient(config);
+      client = createPgClient(config, { perCall: true });
       await client.connect();
       await client.query('SELECT 1');
     } catch (err) {
@@ -162,8 +175,13 @@ function openFleetFile() {
 // A connected client for wherever the fleet is (the caller ends it).
 async function openClient() {
   if (fleetLocation() === 'file') return openFleetFile();
-  const client = createPgClient(loadPostgresConfig());
-  await client.connect();
+  const client = createPgClient(loadPostgresConfig(), { perCall: true });
+  try {
+    await client.connect();
+  } catch (err) {
+    await client.end().catch(() => {});
+    throw err;
+  }
   return client;
 }
 
@@ -248,7 +266,7 @@ async function withClient(work, onError, hops = 0) {
   } catch (err) {
     return onError(err, { dialect: 'pg', query: async () => ({ rows: [], rowCount: 0 }) });
   }
-  const client = createPgClient(config);
+  const client = createPgClient(config, { perCall: true });
   try {
     await client.connect();
     await checkDatabase(client, config);
@@ -290,7 +308,7 @@ function setMoveState(state) {
 }
 
 async function tryConnect(config) {
-  const client = createPgClient({ ...config, connectionTimeoutMillis: 5000 });
+  const client = createPgClient({ ...config, connectionTimeoutMillis: 5000 }, { perCall: true });
   try {
     await client.connect();
     await client.query('SELECT 1');
@@ -331,7 +349,7 @@ async function followIfMoved(client, config, { force = false } = {}) {
 async function followMoveNow() {
   let config;
   try { config = loadPostgresConfig(); } catch { return false; }
-  const client = createPgClient(config);
+  const client = createPgClient(config, { perCall: true });
   try {
     await client.connect();
     return await followIfMoved(client, config, { force: true });

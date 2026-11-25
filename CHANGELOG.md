@@ -3,6 +3,20 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.1 - 2026-11-25
+
+### Fixed
+- **The app could use up the database's connections.** Some of its connections were left open, a few every 10 minutes,
+  until the database (100 at most) had none left: the plugins on other PCs then couldn't
+  sync or read ("remaining connection slots are reserved"). Now the database itself closes any of the app's
+  connections left idle for 10 minutes (PostgreSQL 14 and later), so they can't pile up whatever the cause.
+- **Trends:** when one of a chart's connections failed, the ones that opened a moment later were left open. They're
+  closed now.
+
+### Changed
+- The app's connections are named "XIV Fleet Companion app" in the database's list of connections, and one still open
+  after 2 minutes is written to the app's log with the page call that opened it, to find what leaves them open.
+
 ## 1.13.0 - 2026-11-24
 
 ### New

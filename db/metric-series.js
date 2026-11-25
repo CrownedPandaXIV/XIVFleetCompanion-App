@@ -185,22 +185,23 @@ function planSlices(p) {
 
 // Runs a validated request and returns the shaped result. `newClient` must resolve to a
 // connected client with query() and end(); one is opened per slice and always closed.
+// Every slice is waited for, even when one fails, so a connection that opens after another slice failed is closed
+// too (before 1.13.1 it was left open, holding one of the database's connection slots until the app closed).
 async function runSeries(newClient, p) {
   const slices = planSlices(p);
   const clients = [];
-  try {
-    const parts = await Promise.all(
-      slices.map(async ([lo, hi]) => {
-        const client = await newClient();
-        clients.push(client);
-        const result = await client.query(client.dialect === 'sqlite' ? SERIES_FILE_SQL : SERIES_SQL, seriesQueryArgs(p, lo, hi));
-        return result.rows;
-      })
-    );
-    return shapeSeriesResult(parts.flat(), p);
-  } finally {
-    await Promise.all(clients.map((c) => Promise.resolve(c.end()).catch(() => {})));
-  }
+  const settled = await Promise.allSettled(
+    slices.map(async ([lo, hi]) => {
+      const client = await newClient();
+      clients.push(client);
+      const result = await client.query(client.dialect === 'sqlite' ? SERIES_FILE_SQL : SERIES_SQL, seriesQueryArgs(p, lo, hi));
+      return result.rows;
+    })
+  );
+  await Promise.all(clients.map((c) => Promise.resolve(c.end()).catch(() => {})));
+  const failed = settled.find((r) => r.status === 'rejected');
+  if (failed) throw failed.reason;
+  return shapeSeriesResult(settled.flatMap((r) => r.value), p);
 }
 
 // Turns the database rows into { timestamps, series } for the interface. A point with no
