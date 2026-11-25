@@ -54,3 +54,19 @@ test('a downloaded copy older than the shipped one (after an update) is left unu
   calculatorData.useFolder(dir);
   assert.strictEqual(calculatorData.madeAt(calculatorData.load()), calculatorData.madeAt(shipped));
 });
+
+test('Settings → Data: the copy in use, where it came from and the last check; Check now asks straight away', async () => {
+  const { startSubDataUpdates, subDataStatus, checkSubDataNow } = require('../sub-data-update');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sub-data-'));
+  let answer = madeIn(later + DAY);
+  startSubDataUpdates(dir, { get: async () => answer, log: { log() {} } });
+  const before = subDataStatus();
+  assert.deepStrictEqual([before.made, before.downloaded, before.checkedAt], [shipped.about.made, false, null]);
+  const after = await checkSubDataNow();
+  assert.deepStrictEqual([calculatorData.madeAt({ about: { made: after.made } }), after.downloaded, after.adopted, after.error], [later + DAY, true, true, null]);
+  assert.ok(after.checkedAt > 0);
+  answer = Promise.reject(new Error('HTTP 503'));
+  answer.catch(() => {});
+  const failed = await checkSubDataNow();
+  assert.deepStrictEqual([failed.downloaded, failed.adopted, failed.error], [true, false, 'HTTP 503']);
+});

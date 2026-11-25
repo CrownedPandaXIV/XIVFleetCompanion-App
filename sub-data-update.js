@@ -38,24 +38,42 @@ async function fetchJson(url) {
   return res.json();
 }
 
+// Set by startSubDataUpdates: the state file, and a check now (Settings → Data → Check now) that waits for one already
+// running instead of starting another.
+let started = null;
+
 // Started once the window is up: the folder is the app's own (userData).
 function startSubDataUpdates(folder, { get = fetchJson, log = console } = {}) {
   calculatorData.useFolder(folder);
   const stateFile = path.join(folder, 'sub-data-check.json');
-  let running = false;
-  const tick = async () => {
-    if (running || !due(readState(stateFile).checkedAt, Date.now())) return;
-    running = true;
-    try {
-      const done = await checkNow({ get, stateFile });
-      if (done.adopted) log.log(`Sub Calculator data updated (made ${calculatorData.load().about.made}).`);
-      else if (done.error) log.log(`Sub Calculator data: no newer copy fetched (${done.error}).`);
-    } finally {
-      running = false;
+  let running = null;
+  const run = () => {
+    if (!running) {
+      running = checkNow({ get, stateFile }).then((done) => {
+        if (done.adopted) log.log(`Sub Calculator data updated (made ${calculatorData.load().about.made}).`);
+        else if (done.error) log.log(`Sub Calculator data: no newer copy fetched (${done.error}).`);
+        return done;
+      }).finally(() => { running = null; });
     }
+    return running;
   };
+  const tick = () => (running || !due(readState(stateFile).checkedAt, Date.now()) ? null : run());
+  started = { stateFile, run };
   setTimeout(tick, FIRST_CHECK_AFTER).unref();
   setInterval(tick, CHECK_EVERY).unref();
 }
 
-module.exports = { URL, DAY, due, checkNow, startSubDataUpdates };
+// For Settings → Data: the data in use (calculatorData.inUse) and the last check { checkedAt, adopted, error } (or
+// nulls before the first).
+function subDataStatus() {
+  const last = started ? readState(started.stateFile) : {};
+  return { ...calculatorData.inUse(), checkedAt: last.checkedAt || null, adopted: !!last.adopted, error: last.error || null };
+}
+
+// Settings → Data → Check now: one check, then the status.
+async function checkSubDataNow() {
+  if (started) await started.run();
+  return subDataStatus();
+}
+
+module.exports = { URL, DAY, due, checkNow, startSubDataUpdates, subDataStatus, checkSubDataNow };

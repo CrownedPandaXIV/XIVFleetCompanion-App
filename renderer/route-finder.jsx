@@ -311,7 +311,7 @@ function RouteFinderView({ refreshKey, onOpenPlanner }) {
                   : <span><b>{plannerN(found.total)}</b> route{found.total === 1 ? '' : 's'} fit{maxHours ? ` in ${maxHours}h` : ''} and in range</span>}
                 {must.length > 0 && <span>with <b>{must.map((id) => sectorOf.get(id).letter).join(', ')}</b></span>}
                 {found.newOnes > 0 && <span className="warn"><b>{plannerN(found.newOnes)}</b> {found.total === null ? 'of these ' : ''}explore or could open something new</span>}
-                <span>{found.pricing && found.pricing.source === 'market' ? `gil at market prices (${found.pricing.place})` : 'gil at vendor prices'}</span>
+                <span>{found.pricing && found.pricing.source === 'market' ? `gil at market prices (${found.pricing.place})` : 'gil at vendor prices'}<LivePricesNote market={found.pricing} /></span>
               </div>
             )}
             {routes.length > 0 && (

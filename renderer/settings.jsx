@@ -722,6 +722,84 @@ function LivePricesSection() {
   );
 }
 
+// Settings → Data → Sub Calculator Data (sub-data-update.js): which copy of the Sub Calculator's data is in use (the
+// one this version shipped with, or a newer one downloaded by the daily check), and Check now.
+function SubDataSection() {
+  const [answer, setAnswer] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const failed = (err) => ({ success: false, error: err.message });
+  useEffect(() => { window.api.getSubDataStatus().then(setAnswer, (err) => setAnswer(failed(err))); }, []);
+  const check = () => {
+    setBusy(true);
+    window.api.checkSubDataNow().then(setAnswer, (err) => setAnswer(failed(err))).finally(() => setBusy(false));
+  };
+  const s = answer && answer.success ? answer.status : null;
+  const when = (t) => new Date(t).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return (
+    <section className="settings-section sub-data-section">
+      <h3>Sub Calculator Data</h3>
+      <div className="alerts-help">
+        The loot and breakpoints the Sub Calculator works from (XIVStats and Pepper's ship guide). A newer copy is checked
+        for once a day and used when there is one.
+      </div>
+      {!answer && <div className="status">Loading...</div>}
+      {answer && !answer.success && <div className="setup-test-status setup-problem">{answer.error}</div>}
+      {s && (
+        <div className="sub-data-made">
+          From {s.made ? when(s.made) : 'an unknown date'} ({s.downloaded ? 'downloaded' : 'shipped with this version'}).
+          {s.checkedAt && <span className="dim"> Last checked {when(s.checkedAt)}{s.error ? `: couldn't get the newer copy (${s.error})` : s.adopted ? ': a newer copy was found' : ': nothing newer'}.</span>}
+        </div>
+      )}
+      <div className="settings-row">
+        <button className="sub-data-check" onClick={check} disabled={busy}>{busy ? 'Checking...' : 'Check now'}</button>
+      </div>
+    </section>
+  );
+}
+
+// Settings → Database → Connections in use (db/connections-in-use.js): the database's connection slots taken, by
+// this app, the plugins and anything else, and from which PC. When they run out, the plugins can't sync.
+function ConnectionsSection() {
+  const [answer, setAnswer] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => {
+    setBusy(true);
+    window.api.getConnectionsInUse().then(setAnswer, (err) => setAnswer({ success: false, error: err.message })).finally(() => setBusy(false));
+  };
+  useEffect(load, []);
+  const c = answer && answer.success ? answer.connections : null;
+  const parts = (x) => [x.app && `${x.app} app`, x.plugins && `${x.plugins} plugin${x.plugins === 1 ? '' : 's'}`, x.other && `${x.other} other`].filter(Boolean).join(', ');
+  return (
+    <section className="settings-section connections-section">
+      <h3>Connections in Use</h3>
+      <div className="alerts-help">
+        Each PC's app and plugin takes some of the database's connection slots. When they run out, the plugins can't sync.
+        Other: anything else connected, such as pgAdmin.
+      </div>
+      {!answer && <div className="status">Loading...</div>}
+      {answer && !answer.success && <div className="setup-test-status setup-problem">Couldn't read the connections: {answer.error}</div>}
+      {c && (
+        <>
+          <div className={`connections-total${c.warn ? ' tone-warn' : ''}`}>
+            {c.inUse} of {c.limit} in use ({parts(c)}){c.warn ? '. Nearly full: close what you aren\'t using, or restart the app on a PC holding many.' : '.'}
+          </div>
+          <table className="connections-pcs">
+            <thead><tr><th>PC</th><th>App</th><th>Plugins</th><th>Other</th><th>Total</th></tr></thead>
+            <tbody>
+              {c.pcs.map((pc) => (
+                <tr key={pc.key}><td>{pc.label}</td><td>{pc.app}</td><td>{pc.plugins}</td><td>{pc.other}</td><td>{pc.total}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      <div className="settings-row">
+        <button className="connections-refresh" onClick={load} disabled={busy}>{busy ? 'Checking...' : 'Check again'}</button>
+      </div>
+    </section>
+  );
+}
+
 // Settings → Database → Speed check: the database side is measured by the app (db/speed-check.js), then each
 // tab's data is loaded here, one tab at a time, and timed as the tab itself would load it.
 const SPEED_TABS = [
@@ -1136,6 +1214,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         <NewDatabaseSection onCreated={loadPgConfig} connected={pgConnected} />
         {pgConnected && <MoveDatabaseSection onMoved={loadPgConfig} />}
         <LeftoversSection />
+        {pgConnected && <ConnectionsSection />}
         {pgConnected && <SpeedCheckSection />}
             </>
           )}
@@ -1162,6 +1241,7 @@ function SettingsModal({ onClose, initialTab = null, appMode = 'fleet' }) {
         </section>
 
         {onFile ? <FileGameDataSection /> : <GameDataSection />}
+        <SubDataSection />
             </>
           )}
         </div>

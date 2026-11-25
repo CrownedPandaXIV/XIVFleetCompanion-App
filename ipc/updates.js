@@ -16,6 +16,12 @@ ipcMain.handle('updates:status', () => ({ version: app.getVersion(), status: upd
 ipcMain.handle('updates:check', () => ({ version: app.getVersion(), status: { ...checkNow(), testing: testingOn() } }));
 ipcMain.handle('updates:set-testing', (event, on) => ({ version: app.getVersion(), status: { ...setTesting(on === true), testing: testingOn() } }));
 
+// Settings → Data → Sub Calculator Data (sub-data-update.js): the data in use and its daily check; Check now.
+const { subDataStatus, checkSubDataNow } = require('../sub-data-update');
+const asked = (work) => Promise.resolve().then(work).then((status) => ({ success: true, status }), (err) => ({ success: false, error: err.message }));
+ipcMain.handle('sub-data:status', () => asked(subDataStatus));
+ipcMain.handle('sub-data:check', () => asked(checkSubDataNow));
+
 // The newest version this PC has been shown, kept in the app's settings folder.
 const seenFile = () => path.join(app.getPath('userData'), 'whats-new.json');
 function readSeen() {
