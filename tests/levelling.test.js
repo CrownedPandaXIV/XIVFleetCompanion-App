@@ -168,3 +168,18 @@ test('opening sectors: the plan goes out of its way to open a better one when th
   assert.deepStrictEqual(plan.stages.map((s) => [s.route.join('-'), s.voyages]).slice(0, 2), [['1', 4], ['2', plan.stages[1].voyages]]);
   assert.ok(plan.hours < stay.hours);
 });
+
+test('a sector the plan opens itself later says by when, not what it would add', () => {
+  const read = new Map([[1, { unlocked: true }]]);
+  const every = { bestAt: () => ({ route: [1, 9], expPerHour: 100 }) };
+  const plan = { stages: [
+    { fromRank: 5, toRank: 6, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [] },
+    { fromRank: 6, toRank: 8, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [9] },
+  ] };
+  lv.markBetter(plan, every, read);
+  assert.strictEqual(plan.stages[0].better.opensBy, 8);
+  // One it never opens: what it would add, as before.
+  const never = { stages: [{ fromRank: 5, toRank: 6, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [] }] };
+  lv.markBetter(never, every, read);
+  assert.strictEqual(never.stages[0].better.opensBy, null);
+});

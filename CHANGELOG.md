@@ -16,6 +16,10 @@ All notable changes to the app are recorded here. Versions follow
   of its way to open a better sector says so ("to open J"). Before, an FC that had found only A and B was planned on A-B
   forever.
 - **Hovering a sector letter shows its name, map and rank**, on every page that shows them.
+- **Levelling Plan, easier to read:** "Not discovered yet" says when the plan opens a sector itself ("H opens on the way,
+  by rank 97") instead of what it would add; a stage that doesn't reach the next rank shows its one rank ("96", not
+  "96 → 96"); and the day strip labels only the stages with room, with the days under it where the stages end and
+  never crowded (every stage's ranks and days on hover).
 
 ## 1.13.3 - 2026-11-25
 

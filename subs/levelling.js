@@ -312,6 +312,9 @@ function searches({ game, data, prices, repairKitCost, read, maxHours }) {
 // searches() through the reading): stage.better = { atRank, route, expPerHour, gain, missing: [ids] } (the first rank
 // it happens at) or null.
 function markBetter(plan, every, read, own) {
+  // The sectors the plan opens itself, and the rank it's done by (the end of the stage that opens it).
+  const opensBy = new Map();
+  for (const st of plan.stages) for (const id of st.discovers || []) if (!opensBy.has(id)) opensBy.set(id, st.toRank);
   for (const st of plan.stages) {
     st.better = null;
     if (!every) continue;
@@ -323,7 +326,9 @@ function markBetter(plan, every, read, own) {
       if (!missing.length) continue;
       const now = own ? own.bestAt(r, st.parts, st.openAt || null) : null;
       const base = now ? now.expPerHour : st.expPerHour;
-      if (better.expPerHour >= base * 1.01) { st.better = { atRank: r, route: better.route, expPerHour: better.expPerHour, gain: better.expPerHour / base - 1, missing }; break; }
+      // When the plan opens all of them itself later on, the rank it's done by (the page says so instead of what they'd add).
+      const by = missing.every((id) => opensBy.has(id)) ? Math.max(...missing.map((id) => opensBy.get(id))) : null;
+      if (better.expPerHour >= base * 1.01) { st.better = { atRank: r, route: better.route, expPerHour: better.expPerHour, gain: better.expPerHour / base - 1, missing, opensBy: by }; break; }
     }
   }
   return plan;

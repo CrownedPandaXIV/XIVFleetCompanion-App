@@ -35,7 +35,8 @@ const lvDiscoversTitle = (r, ctx) => `Expected to open on this stage: ${r.discov
 // The stages table (the shared table: columns to size, move, sort and choose, remembered). Each row a stage: its ranks,
 // time, route (with the sectors its rank opened), parts, voyage figures, and what a sector not discovered yet would add.
 const LV_STAGE_COLUMN_DEFS = [
-  { key: 'ranks', label: 'Ranks', locked: true, td: (r) => <td className="lv-ranks">{r.fromRank} → {r.toRank}</td>, sort: (r) => r.fromRank },
+  // A stage that doesn't reach the next rank (a few voyages to open a sector) shows its one rank.
+  { key: 'ranks', label: 'Ranks', locked: true, td: (r) => <td className="lv-ranks">{r.toRank > r.fromRank ? `${r.fromRank} → ${r.toRank}` : r.fromRank}</td>, sort: (r) => r.fromRank },
   { key: 'days', label: 'Time', td: (r) => <td className="num">{lvDays(r.hours)}</td>, sort: (r) => r.hours },
   { key: 'voyages', label: 'Voyages', td: (r) => <td className="num">{plannerN(r.voyages)}</td>, sort: (r) => r.voyages },
   { key: 'route', label: 'Route', td: (r, ctx) => (
@@ -51,7 +52,10 @@ const LV_STAGE_COLUMN_DEFS = [
   { key: 'expHour', label: 'Exp an hour', td: (r) => <td className="num">{plannerN(r.expPerHour)}</td>, sort: (r) => r.expPerHour },
   { key: 'tanks', label: 'Ceruleum', default: false, td: (r) => <td className="num">{plannerN(r.tanks)}</td>, sort: (r) => r.tanks },
   { key: 'kits', label: 'Repair kits', default: false, td: (r) => <td className="num">{plannerN(r.kits)}</td>, sort: (r) => r.kits },
-  { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better ? (
+  { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better && r.better.opensBy ? (
+    <span className="lv-better dim" title={`With ${r.better.missing.length === 1 ? 'it' : 'them'}, ${r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives ${plannerN(r.better.gain * 100)}% more an hour.`}>
+      {r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? 'opens' : 'open'} on the way, by rank {r.better.opensBy}.</span>
+  ) : r.better ? (
     <span className="lv-better">{r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? "isn't" : "aren't"} discovered yet:
       with {r.better.missing.length === 1 ? 'it' : 'them'}, {r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives {plannerN(r.better.gain * 100)}% more an hour{r.better.atRank > r.fromRank ? ` from rank ${r.better.atRank}` : ''}.</span>
   ) : <span className="dim">—</span>}</td> },
@@ -135,12 +139,23 @@ function LvFleet({ rows, ctx }) {
 }
 
 // The four boxes and the strip of stages.
+// A stage's piece of the strip: its ranks ("96–97", or "96" when it doesn't rank up).
+const lvStripLabel = (st) => (st.toRank > st.fromRank ? `${st.fromRank}–${st.toRank}` : `${st.fromRank}`);
 function LvSummary({ plan, start }) {
   const days = plan.hours / 24;
-  const strip = plan.stages.map((st, i) => ({ i, st, grow: Math.max(st.hours, 1) }));
+  const total = plan.stages.reduce((n, st) => n + Math.max(st.hours, 1), 0);
+  // A piece shows its ranks only when it has room for them (about 0.65% of the strip a character); the rest on hover.
+  const strip = plan.stages.map((st, i) => ({ i, st, grow: Math.max(st.hours, 1), label: Math.max(st.hours, 1) / total >= (lvStripLabel(st).length + 1) * 0.0065 ? lvStripLabel(st) : '' }));
+  // The days under the strip, each where its stage ends, with no two closer than 7% of the strip.
   let at = 0;
-  const marks = [0];
-  for (const st of plan.stages) { at += st.hours; marks.push(at); }
+  const marks = [{ pct: 0, text: 'start' }];
+  for (const st of plan.stages) {
+    at += Math.max(st.hours, 1);
+    const pct = (at / total) * 100;
+    const last = marks[marks.length - 1];
+    const mark = { pct, text: `day ${Math.round(at / 24)}` };
+    if (at === total) { if (pct - last.pct < 7 && marks.length > 1) marks.pop(); marks.push(mark); } else if (pct - last.pct >= 7 && total - at >= total * 0.07) marks.push(mark);
+  }
   return (
     <React.Fragment>
       <div className="lv-sums">
@@ -151,8 +166,8 @@ function LvSummary({ plan, start }) {
       </div>
       {plan.stages.length > 0 && days > 0 && (
         <div>
-          <div className="lv-strip">{strip.map(({ i, st, grow }) => <span key={i} className={LV_STAGE_CLASSES[i % 4]} style={{ flex: grow }} title={`Ranks ${st.fromRank}–${st.toRank}: ${lvDays(st.hours)}`}>{st.fromRank}–{st.toRank}</span>)}</div>
-          <div className="lv-scale">{marks.map((h, i) => <span key={i}>{i === 0 ? 'start' : `day ${Math.round(h / 24)}`}</span>)}</div>
+          <div className="lv-strip">{strip.map(({ i, st, grow, label }) => <span key={i} className={LV_STAGE_CLASSES[i % 4]} style={{ flex: grow }} title={`${st.toRank > st.fromRank ? `Ranks ${st.fromRank}–${st.toRank}` : `Rank ${st.fromRank}`}: ${lvDays(st.hours)}${st.toOpen ? ' (to open a sector)' : ''}`}>{label}</span>)}</div>
+          <div className="lv-scale">{marks.map((m, i) => <span key={i} style={{ left: `${m.pct}%` }} className={i === 0 ? 'first' : m.pct >= 99.99 ? 'last' : ''}>{m.text}</span>)}</div>
         </div>
       )}
     </React.Fragment>

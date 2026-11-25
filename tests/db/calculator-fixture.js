@@ -243,7 +243,7 @@ const levellingAnswers = levellingCases.map((c) => {
     keepHours: r6(plan.keepHours), lookahead: plan.lookahead === null ? null : plan.lookahead === Infinity ? 'inf' : plan.lookahead, unlockChance: unlock ? unlock.chance : null, swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),
     stages: plan.stages.map((st) => ({ fromRank: st.fromRank, toRank: st.toRank, route: st.route, parts: st.parts, voyages: st.voyages, hours: r6(st.hours),
       expPerVoyage: r6(st.expPerVoyage), expPerHour: r6(st.expPerHour), tanks: st.tanks, kits: r6(st.kits), discovers: st.discovers || [], toOpen: st.toOpen || null,
-      better: st.better ? { atRank: st.better.atRank, route: st.better.route, expPerHour: r6(st.better.expPerHour), gain: r6(st.better.gain), missing: st.better.missing } : null })) };
+      better: st.better ? { atRank: st.better.atRank, route: st.better.route, expPerHour: r6(st.better.expPerHour), gain: r6(st.better.gain), missing: st.better.missing, opensBy: st.better.opensBy } : null })) };
 });
 
 console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Levelling: ${levellingAnswers.map((a) => `${a.voyages} voyages, ${a.stages.length} stages, ${a.swaps.length} swaps${a.reached ? '' : ` (stuck at ${a.stuckAt})`}`).join(' | ')}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);
