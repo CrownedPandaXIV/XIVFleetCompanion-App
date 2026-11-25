@@ -17,6 +17,10 @@ All notable changes to the app are recorded here. Versions follow
   in small grey text when live prices didn't arrive this time (vendor prices shown) or some are from an earlier check;
   the reason is on hover. The other pages with live prices already said so.
 
+### Fixed
+- **"Choose one of your subs…" opened at the bottom of the page** on the Levelling Plan and Route Finder (once a sub's
+  results were showing), and could on Compare Builds and Build Finder. It now opens right under its button everywhere.
+
 ## 1.13.2 - 2026-11-25
 
 ### Fixed

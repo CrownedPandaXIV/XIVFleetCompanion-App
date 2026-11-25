@@ -494,10 +494,12 @@
     .planner-scope button:first-child { border-radius: 4px 0 0 4px; }
     .planner-scope button:last-child { border-radius: 0 4px 4px 0; }
     .planner-scope button.active { background: var(--accent); border-color: var(--accent); color: var(--text-bright); }
-    .planner-picker { display: inline-block; }
+    .planner-picker { display: inline-block; position: relative; }
     .planner-picker-button { min-width: 260px; text-align: left; }
     .planner-picker-note { font-size: 12px; }
-    .planner-picker-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 24px; width: min(760px, calc(100% - 48px)); background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px; box-sizing: border-box; }
+    /* Under its own button on every page (before 1.13.3 it was placed by whichever container was positioned, so on the
+       Levelling Plan and Route Finder it opened at the bottom of the page). */
+    .planner-picker-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: min(760px, calc(100vw - 340px)); background: var(--modal); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px; box-sizing: border-box; }
     .planner-picker-panel input[type=search] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
     .planner-picker-list { max-height: 60vh; overflow-y: auto; }
     .planner-picker-empty { padding: 8px; }
