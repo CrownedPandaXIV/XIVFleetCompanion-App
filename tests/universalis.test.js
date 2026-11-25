@@ -280,3 +280,37 @@ test('recent sales come with the listings, and scopePrices notes a price it chan
   assert.strictEqual(prices.get(5), 1000);
   assert.match(notes.get(5), /Ignored 1 listing at 10 gil/);
 });
+
+// 1.13.2: a request that ignores its abort and never ends (the Summary's loot held its database connection for good).
+test('a request that never ends, even when aborted, is given up, and a page waiting on Universalis always goes on', async () => {
+  const { createUniversalis: make } = require('../characters/universalis');
+  const warned = [];
+  const never = () => new Promise(() => {});
+  const u = make({ fetchImpl: never, timeoutMs: 50, hardExtraMs: 50, callLimitMs: 400, log: { warn: (m) => warned.push(m) } });
+  const t = Date.now();
+  await assert.rejects(u.listingsIn('Maduin', [5057]), /no answer in 0 seconds; still waiting for an answer/);
+  assert.ok(Date.now() - t < 400);
+  // Everything queued behind stuck requests still settles: twelve batches at once, four running at a time.
+  const many = Array.from({ length: 600 }, (_, i) => 1000 + i);
+  await assert.rejects(u.marketFor(['Maduin'], many), /Universalis/);
+  assert.ok(Date.now() - t < 2000);
+  assert.ok(warned.length > 0);
+});
+
+test('a page waiting longer than the limit in all goes on without market prices, and the log says why', async () => {
+  const { createUniversalis: make } = require('../characters/universalis');
+  const warned = [];
+  const slow = () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, status: 200, json: async () => ({ items: {} }) }), 300));
+  const u = make({ fetchImpl: slow, timeoutMs: 10000, callLimitMs: 100, log: { warn: (m) => warned.push(m) } });
+  await assert.rejects(u.listingsIn('Maduin', [5057]), /took too long to answer \(listings, over 0 seconds; 1 request\(s\) running, 0 waiting\)/);
+  assert.match(warned[0], /took too long/);
+});
+
+test('the same request asked again while still on its way is shared, not queued again (1.13.2)', async () => {
+  const { createUniversalis: make } = require('../characters/universalis');
+  let asked = 0;
+  const fetchImpl = () => { asked++; return new Promise((resolve) => setTimeout(() => resolve({ ok: true, status: 200, json: async () => ({ items: {} }) }), 50)); };
+  const u = make({ fetchImpl });
+  await Promise.all([u.listingsIn('Maduin', [5057, 5058]), u.listingsIn('Maduin', [5057, 5058]), u.listingsIn('Maduin', [5057, 5058])]);
+  assert.strictEqual(asked, 1);
+});

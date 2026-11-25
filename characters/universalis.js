@@ -25,6 +25,11 @@ const OUTLIER_SHARE = 0.5;
 const AGREEING_LISTINGS = 3; // listings near the cheapest that make it the market price, whatever the sales were
 // How long one request may take, answer included, before it counts as no answer (the plugin's too).
 const TIMEOUT_MS = 20 * 1000;
+// A request still unsettled this long after its own time is up is given up anyway (1.13.2): its abort didn't end it.
+const HARD_EXTRA_MS = 5 * 1000;
+// Longest one page's market prices may take in all, queueing included; then the page goes on without them (vendor
+// prices). A call that never ended held the page's database connection open for good (1.13.0, the Summary's loot).
+const CALL_LIMIT_MS = 60 * 1000;
 const SCOPES = ['world', 'dc', 'region'];
 
 const REGION_LABELS = { 'North-America': 'NA', Europe: 'EU', Japan: 'JP', Oceania: 'OCE', 中国: 'CN', 한국: 'KR' };
@@ -175,7 +180,21 @@ function marketPrice(listings, history, { hq, exclude, world, now = Date.now() }
 // marketPrice for compareListings' `cheapest` (its options carry the sales as `history`).
 const rivalPrice = (listings, options = {}) => marketPrice(listings, options.history, options);
 
-function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now(), timeoutMs = TIMEOUT_MS } = {}) {
+// Settles with `work`, or fails after `ms` (and says so in the log) when it hasn't: nothing waits on Universalis for good.
+function settleWithin(work, ms, problem, log) {
+  let timer;
+  const late = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(problem());
+      log.warn(err.message);
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
+
+function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = process.env.FLEET_UNIVERSALIS_URL || DEFAULT_URL, now = () => Date.now(), timeoutMs = TIMEOUT_MS,
+  hardExtraMs = HARD_EXTRA_MS, callLimitMs = CALL_LIMIT_MS, log = console } = {}) {
   const cache = new Map(); // `${scope}|${id}` -> { at, listings, history }
   let places = null;
 
@@ -183,6 +202,12 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
   // (one untradeable item, such as salvage, asked for on its own).
   // A request that gets no answer in timeoutMs is given up, so a page doesn't wait on it for minutes.
   async function getJson(path, { missingOk = false } = {}) {
+    let stage = 'waiting for an answer';
+    return settleWithin(askJson(path, { missingOk }, (s) => { stage = s; }), timeoutMs + hardExtraMs,
+      () => `Universalis could not be reached (no answer in ${Math.round(timeoutMs / 1000)} seconds; still ${stage} after ${Math.round((timeoutMs + hardExtraMs) / 1000)}, given up).`, log);
+  }
+
+  async function askJson(path, { missingOk = false } = {}, setStage = () => {}) {
     const signal = AbortSignal.timeout(timeoutMs);
     const unreachable = (err) => new Error(`Universalis could not be reached (${signal.aborted ? `no answer in ${Math.round(timeoutMs / 1000)} seconds` : err.message}).`);
     let res;
@@ -194,6 +219,7 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     if (res.status === 404 && missingOk) return null;
     if (res.status === 429) throw new Error('Universalis is busy (too many requests). Try again in a minute.');
     if (!res.ok) throw new Error(`Universalis answered ${res.status}.`);
+    setStage('reading its answer');
     try {
       return await res.json();
     } catch (err) {
@@ -218,6 +244,15 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     if (places) return places;
     placesAskAgainAt = Date.now() + 30 * 60 * 1000;
     return worldPlaces(KNOWN_DATA_CENTERS);
+  }
+
+  // The same request asked for again while it is still on its way (a page refreshed, two pages open) waits for that one
+  // instead of queueing another: Universalis can take 20 seconds a request, and before 1.13.2 each refresh added its
+  // own copies behind the last ones, so the queue only grew and the pages waiting on it never finished.
+  const inFlight = new Map();
+  function shared(key, ask) {
+    if (!inFlight.has(key)) inFlight.set(key, ask().finally(() => inFlight.delete(key)));
+    return inFlight.get(key);
   }
 
   // Requests to Universalis at once (it allows several): the rest wait their turn.
@@ -252,7 +287,7 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
       let items;
       let sold;
       try {
-        const json = await limited(() => getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=${SALES}&entriesWithin=${SALES_WITHIN_S}`, { missingOk: true }));
+        const json = await shared(`${scope}|${batch.join(',')}`, () => limited(() => getJson(`/api/v2/${encodeURIComponent(scope)}/${batch.join(',')}?listings=${LISTINGS}&entries=${SALES}&entriesWithin=${SALES_WITHIN_S}`, { missingOk: true })));
         items = parseItems(json);
         sold = parseHistory(json);
       } catch (err) {
@@ -327,7 +362,10 @@ function createUniversalis({ fetchImpl = (...a) => fetch(...a), baseUrl = proces
     return { listings, history, stale: stale.problem ? { problem: stale.problem, since: stale.since } : null };
   }
 
-  return { marketFor, placesOf, listingsIn };
+  // Each call settles within callLimitMs, queueing behind other pages' requests included.
+  const limit = (name, fn) => (...args) => settleWithin(fn(...args), callLimitMs,
+    () => `Universalis took too long to answer (${name}, over ${Math.round(callLimitMs / 1000)} seconds; ${running} request(s) running, ${waiting.length} waiting). Vendor prices are used for now.`, log);
+  return { marketFor: limit('market prices', marketFor), placesOf: limit('worlds', placesOf), listingsIn: limit('listings', listingsIn) };
 }
 
 // Gil for each item at its market price in one scope (marketPrice), falling back to `vendor` (Map) for items

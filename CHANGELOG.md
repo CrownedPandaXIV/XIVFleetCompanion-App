@@ -3,6 +3,17 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.2 - 2026-11-25
+
+### Fixed
+- **The leak itself:** with Live Market Prices on, the Summary page's loot figures could wait on Universalis for good,
+  holding a database connection open each time the page refreshed (once a minute). The app's log from 1.13.1 named it.
+  Now a request to Universalis that hasn't ended 5 seconds past its 20-second limit is given up, and a page waits at
+  most 60 seconds in all for market prices; it then shows vendor prices, and the log says what was still waiting.
+- **What caused it:** Universalis was answering slowly (up to 20 seconds a request, some not at all), and each refresh
+  queued its own copies of the same requests (about 60) behind the last refresh's, so the queue only grew. A request
+  still on its way is now shared with whoever asks for it again instead of being queued twice.
+
 ## 1.13.1 - 2026-11-25
 
 ### Fixed
