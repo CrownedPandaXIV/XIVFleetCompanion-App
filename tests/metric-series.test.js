@@ -106,3 +106,12 @@ test('runSeries merges slices, closes every client, and closes them on failure t
   await assert.rejects(ms.runSeries(async () => { opened++; return failing; }, v.params), /boom/);
   assert.equal(opened, closed);
 });
+
+test('runSeries closes a connection that opens after another slice failed (1.13.1: it was left open)', async () => {
+  const v = ms.validateSeriesRequest({ ...base, points: 100 });
+  let opened = 0, closed = 0, call = 0;
+  const late = () => new Promise((resolve) => setTimeout(() => { opened++; resolve({ query: async () => ({ rows: [] }), end: async () => { closed++; } }); }, 30));
+  await assert.rejects(ms.runSeries(async () => (call++ === 0 ? Promise.reject(new Error('no slots')) : late()), v.params), /no slots/);
+  assert.ok(opened > 0);
+  assert.equal(closed, opened);
+});

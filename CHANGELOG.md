@@ -3,6 +3,31 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.2 - 2026-11-25
+
+### Fixed
+- **The leak itself:** with Live Market Prices on, the Summary page's loot figures could wait on Universalis for good,
+  holding a database connection open each time the page refreshed (once a minute). The app's log from 1.13.1 named it.
+  Now a request to Universalis that hasn't ended 5 seconds past its 20-second limit is given up, and a page waits at
+  most 60 seconds in all for market prices; it then shows vendor prices, and the log says what was still waiting.
+- **What caused it:** Universalis was answering slowly (up to 20 seconds a request, some not at all), and each refresh
+  queued its own copies of the same requests (about 60) behind the last refresh's, so the queue only grew. A request
+  still on its way is now shared with whoever asks for it again instead of being queued twice.
+
+## 1.13.1 - 2026-11-25
+
+### Fixed
+- **The app could use up the database's connections.** Some of its connections were left open, a few every 10 minutes,
+  until the database (100 at most) had none left: the plugins on other PCs then couldn't
+  sync or read ("remaining connection slots are reserved"). Now the database itself closes any of the app's
+  connections left idle for 10 minutes (PostgreSQL 14 and later), so they can't pile up whatever the cause.
+- **Trends:** when one of a chart's connections failed, the ones that opened a moment later were left open. They're
+  closed now.
+
+### Changed
+- The app's connections are named "XIV Fleet Companion app" in the database's list of connections, and one still open
+  after 2 minutes is written to the app's log with the page call that opened it, to find what leaves them open.
+
 ## 1.13.0 - 2026-11-24
 
 ### New
