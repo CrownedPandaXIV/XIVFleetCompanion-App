@@ -26,6 +26,27 @@ module.exports = async (t) => {
   await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
   await waitFor(`/read at the workshop/.test(document.querySelector('.lv').innerText) && document.querySelectorAll('.lv-stage').length > 0 && ${settled}`, 'the read sectors', 30000);
   await t.shot('levelling');
+  // A refresh that changes nothing the plan uses keeps the plan (no working again); one that changes the chosen sub's
+  // experience plans again from its new experience.
+  await ev(`(() => { window.__lvWorked = false; window.__lvObs = new MutationObserver(() => { if (document.querySelector('.lv .working')) window.__lvWorked = true; });
+    window.__lvObs.observe(document.querySelector('.lv'), { subtree: true, childList: true, attributes: true }); return true; })()`);
+  const expText = () => ev(`document.querySelectorAll('.lv-sum .n')[0].innerText`);
+  const expBefore = await expText();
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
+  await new Promise((r) => setTimeout(r, 4000));
+  check(!(await ev(`window.__lvWorked`)), 'a refresh that changes nothing keeps the plan');
+  await t.query(`UPDATE companion_submarine_snapshot SET current_exp = current_exp + 500 WHERE level = ${level}`);
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
+  await waitFor(`document.querySelectorAll('.lv-sum .n')[0].innerText !== ${JSON.stringify(expBefore)} && ${settled}`, 'the plan from the new experience', 30000);
+  check(await ev(`window.__lvWorked`), `a refresh with new experience plans again (${await expText()} instead of ${expBefore})`);
+  await ev(`window.__lvObs.disconnect()`);
+  await t.query(`UPDATE companion_submarine_snapshot SET current_exp = current_exp - 500 WHERE level = ${level}`);
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
+  await waitFor(`document.querySelectorAll('.lv-sum .n')[0].innerText === ${JSON.stringify(expBefore)} && ${settled}`, 'the plan back as it was', 30000);
+  // The chance a voyage opens a sector, shown with the FC's own sectors; a sector's hover names its map and rank.
+  t.check(await ev(`document.querySelector('.lv .lv-chance input') && document.querySelector('.lv .lv-chance input').value === '25'`), 'the chance to open a sector shows, 25% to start with');
+  const hover = await ev(`document.querySelector('.lv .lv-table .rf-letter').title`);
+  t.check(/ · Deep-sea Site · rank \d+$/.test(hover), `a sector's hover names its map and rank (${hover})`);
 
   const ranks = await ev(`document.querySelectorAll('.lv-sum .v')[0].innerText`);
   check(new RegExp(`^${level} → \\d+$`).test(ranks), `the plan runs from the sub's rank (${ranks})`);

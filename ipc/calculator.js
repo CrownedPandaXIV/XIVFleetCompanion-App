@@ -114,7 +114,7 @@ async function loadCalculator(client) {
         })
         .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)) : [];
       // from: the sector it opens from (XIVStats; 0: open from the start), for the Route Finder's unlocks.
-      return { id: s.id, map: s.map, letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items, from: d ? Number(d.unlockedFrom) || 0 : null };
+      return { id: s.id, map: s.map, mapName: (game.maps.find((m) => m.id === s.map) || {}).name || '', letter: s.letter, name: s.name, rankReq: s.rankReq, hasData: !!d, items, from: d ? Number(d.unlockedFrom) || 0 : null };
     }),
     partLetters: PART_LETTERS.map((letter) => ({ letter, name: partName(letter) })),
     // The rank each part needs ("letter|slot" -> rank), for the note when a build has a part its rank can't fit yet.
@@ -425,8 +425,9 @@ async function levellingFor(client, request = {}) {
     const owned = request.suggest && s.cid ? await ownedParts(client, s.cid).catch(() => new Set()) : new Set();
     asked.push({ key: s.key, rank, exp: Number(s.exp) || 0, target, parts, owned: [...owned] });
   }
+  // unlockChance: the chance a voyage through a sector opens each sector it leads to (0.25 unless the page says).
   const job = { game, data: cache.data, prices: cache.prices, repairKitCost: cache.repairKitCost, read, maxHours,
-    suggest: !!request.suggest, standardOnly: !!request.standardOnly, subs: asked };
+    suggest: !!request.suggest, standardOnly: !!request.standardOnly, unlockChance: Number(request.unlockChance) || levelling.UNLOCK_CHANCE, subs: asked };
   const worked = await runIn('levelling', job);
   if (worked.stopped) return { success: false, stopped: true, error: 'A newer plan was asked for.' };
   if (worked.error) return { success: false, error: worked.error };

@@ -221,6 +221,10 @@ const levellingCases = [
   { rank: 100, exp: 0, target: 125, parts: ['Y+', 'Y+', 'Y+', 'Y+'], read: false, maxHours: 48, suggest: true, standardOnly: false },
   // Parts too slow for any route in 12h at first: stuck, so the one-part swap that lets it fly.
   { rank: 80, exp: 0, target: 100, parts: ['W', 'W', 'W', 'W'], read: false, maxHours: 13, suggest: true, standardOnly: false },
+  // Sectors opening as the plan goes (1.13.4): at Pepper's 25%, and at 100%, from low ranks; and the swaps with no cap.
+  { rank: 30, exp: 0, target: 90, parts: ['W+', 'C+', 'W+', 'C+'], read: true, maxHours: null, suggest: true, standardOnly: false, unlockChance: 0.25 },
+  { rank: 35, exp: 0, target: 80, parts: ['W+', 'C+', 'W+', 'C+'], read: true, maxHours: 36, suggest: false, standardOnly: false, unlockChance: 1 },
+  { rank: 40, exp: 0, target: 120, parts: ['S', 'U', 'W', 'C'], read: false, maxHours: null, suggest: true, standardOnly: false },
 ];
 const lvSearch = new Map();
 const lvSearchFor = (withRead, maxHours) => {
@@ -230,14 +234,16 @@ const lvSearchFor = (withRead, maxHours) => {
 };
 const levellingAnswers = levellingCases.map((c) => {
   const search = lvSearchFor(c.read, c.maxHours);
+  const unlock = c.read ? lv.unlockFor({ game: { ...lvGame, expToNext }, read, search, every: lvSearchFor(false, c.maxHours),
+    chance: c.unlockChance || lv.UNLOCK_CHANCE, rank: c.rank, exp: c.exp, target: c.target, parts: c.parts }) : null;
   const plan = lv.levellingPlan({ rank: c.rank, exp: c.exp, target: c.target, expToNext, parts: c.parts, bestAt: search.bestAt, score: search.score,
-    suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned), partRank: lv.partRanks(game.parts) });
+    suggest: c.suggest, standardOnly: c.standardOnly, owned: new Set(lvOwned), partRank: lv.partRanks(game.parts), unlock });
   if (c.read) lv.markBetter(plan, lvSearchFor(false, c.maxHours), read, search);
   return { ...c, voyages: plan.voyages, hours: r6(plan.hours), tanks: plan.tanks, kits: r6(plan.kits), expNeeded: plan.expNeeded, reached: plan.reached, stuckAt: plan.stuckAt,
-    keepHours: r6(plan.keepHours), swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),
+    keepHours: r6(plan.keepHours), lookahead: plan.lookahead === null ? null : plan.lookahead === Infinity ? 'inf' : plan.lookahead, unlockChance: unlock ? unlock.chance : null, swaps: plan.swaps.map((x) => ({ atRank: x.atRank, slot: x.slot, from: x.from, to: x.to, owned: x.owned, gain: r6(x.gain), savedHours: r6(x.savedHours) })),
     stages: plan.stages.map((st) => ({ fromRank: st.fromRank, toRank: st.toRank, route: st.route, parts: st.parts, voyages: st.voyages, hours: r6(st.hours),
-      expPerVoyage: r6(st.expPerVoyage), expPerHour: r6(st.expPerHour), tanks: st.tanks, kits: r6(st.kits),
-      better: st.better ? { atRank: st.better.atRank, route: st.better.route, expPerHour: r6(st.better.expPerHour), gain: r6(st.better.gain), missing: st.better.missing } : null })) };
+      expPerVoyage: r6(st.expPerVoyage), expPerHour: r6(st.expPerHour), tanks: st.tanks, kits: r6(st.kits), discovers: st.discovers || [], toOpen: st.toOpen || null,
+      better: st.better ? { atRank: st.better.atRank, route: st.better.route, expPerHour: r6(st.better.expPerHour), gain: r6(st.better.gain), missing: st.better.missing, opensBy: st.better.opensBy } : null })) };
 });
 
 console.log(`${answers.length} cases worked out (${answers.reduce((n, a) => n + a.loot.length, 0)} loot lines); Build Finder: ${finderAnswers.map((f) => f.total).join(', ')} builds; Route Finder: ${routeAnswers.map((r) => r.total).join(', ')} routes; Fight Club: ${JSON.stringify(fightClubAnswers)}; Levelling: ${levellingAnswers.map((a) => `${a.voyages} voyages, ${a.stages.length} stages, ${a.swaps.length} swaps${a.reached ? '' : ` (stuck at ${a.stuckAt})`}`).join(' | ')}; Compare: ${compareAnswers.map((a) => a.columns.map((col) => (col.flies ? col.route.join('-') : `x${col.short}`)).join(' / ')).join(' | ')}`);

@@ -604,7 +604,9 @@
     .lv-strip { display: flex; height: 24px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
     .lv-strip span { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #10131a; white-space: nowrap; overflow: hidden; border-right: 2px solid var(--panel); min-width: 0; }
     .lv-strip span:last-child { border-right: 0; }
-    .lv-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+    .lv-scale { position: relative; height: 16px; font-size: 11px; color: var(--dim); }
+    .lv-scale span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+    .lv-scale span.first { transform: none; } .lv-scale span.last { transform: translateX(-100%); }
     .lv-strip .c1 { background: var(--accent); } .lv-strip .c2 { background: color-mix(in srgb, var(--accent) 60%, white); }
     .lv-strip .c3 { background: var(--good); } .lv-strip .c4 { background: color-mix(in srgb, var(--good) 60%, white); }
     /* The Levelling Plan's stages table: a coloured edge per stage (as the strip), swap rows in amber across it. */

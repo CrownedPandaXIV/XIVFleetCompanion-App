@@ -3,6 +3,29 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.4 - 2026-11-25
+
+### Changed
+- **Levelling Plan: the fewest days.** Part swaps are now judged by how much sooner the whole plan reaches the target,
+  both on the route being run and on the best route the new part allows (a part that opens a better route was missed
+  before), with no cap on how many. A rank 96 Whale-Shark-Unkiu-Coelacanth sub to rank 145 went from 145 days with no
+  swaps suggested to 106. Several parts can change at the same rank.
+- **Levelling Plan with a Free Company's sectors: sectors open on the way.** Each voyage through a sector has a chance
+  to open each sector it leads to (25% to start with, from Pepper's guide; change it on the page), and the plan counts
+  on the expected number of voyages. Stages say what they're expected to open ("opens C, D"), and a stage that goes out
+  of its way to open a better sector says so ("to open J"). Before, an FC that had found only A and B was planned on A-B
+  forever.
+- **Hovering a sector letter shows its name, map and rank**, on every page that shows them.
+- **Levelling Plan, easier to read:** "Not discovered yet" says when the plan opens a sector itself ("H opens on the way,
+  by rank 97") instead of what it would add; a stage that doesn't reach the next rank shows its one rank ("96", not
+  "96 → 96"); and the day strip labels only the stages with room, with the days under it where the stages end and
+  never crowded (every stage's ranks and days on hover).
+
+### Fixed
+- **The Levelling Plan worked its plan out again at every auto-refresh**, even when nothing had changed. It now plans
+  again only when something the plan uses changed: a sub's rank, experience or parts, or the Free Company's sectors. A
+  chosen sub now follows its new rank, experience and parts after a refresh (unless they were changed on the page).
+
 ## 1.13.3 - 2026-11-25
 
 ### New

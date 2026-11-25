@@ -16,15 +16,34 @@ const lvSlot = ['Hull', 'Stern', 'Bow', 'Bridge'];
 // When a sub's first voyage of the plan leaves: now, or when it's back if it's out.
 const lvStart = (sub) => Math.max(Date.now(), sub && sub.returnTime ? sub.returnTime * 1000 : 0);
 
+// A sector's letter (its name and map are on the hover).
+const lvLetter = (ctx, id) => { const x = ctx.sectorOf.get(id); return x ? x.letter : '?'; };
+const lvChance = (ctx) => Math.round((ctx.unlockChance || 0.25) * 100);
+// How many voyages through a sector the plan counts on before what it leads to opens.
+const lvVisits = (ctx) => Math.ceil(1 / (ctx.unlockChance || 0.25) - 1e-9);
+const lvToOpenTitle = (t, ctx) => {
+  const via = ctx.sectorOf.get(t.via);
+  const next = ctx.sectorOf.get(t.next);
+  const goal = ctx.sectorOf.get(t.target);
+  return `This stage goes through ${via ? `${via.letter} (${rfSectorTitle(via)})` : 'a sector'} to open ${next ? `${next.letter} (${rfSectorTitle(next)})` : 'the next one'}`
+    + `${goal && t.target !== t.next ? `, on the way to ${goal.letter} (${goal.mapName})` : ''}. Each voyage through it has a ${lvChance(ctx)}% chance;`
+    + ` the plan counts on about ${lvVisits(ctx)} voyages.`;
+};
+const lvDiscoversTitle = (r, ctx) => `Expected to open on this stage: ${r.discovers.map((id) => { const x = ctx.sectorOf.get(id); return x ? `${x.letter} (${rfSectorTitle(x)})` : id; }).join('; ')}.`
+  + ` Each voyage through the sector before one has a ${lvChance(ctx)}% chance to open it; the plan counts on about ${lvVisits(ctx)} voyages. It may open sooner or later.`;
+
 // The stages table (the shared table: columns to size, move, sort and choose, remembered). Each row a stage: its ranks,
 // time, route (with the sectors its rank opened), parts, voyage figures, and what a sector not discovered yet would add.
 const LV_STAGE_COLUMN_DEFS = [
-  { key: 'ranks', label: 'Ranks', locked: true, td: (r) => <td className="lv-ranks">{r.fromRank} → {r.toRank}</td>, sort: (r) => r.fromRank },
+  // A stage that doesn't reach the next rank (a few voyages to open a sector) shows its one rank.
+  { key: 'ranks', label: 'Ranks', locked: true, td: (r) => <td className="lv-ranks">{r.toRank > r.fromRank ? `${r.fromRank} → ${r.toRank}` : r.fromRank}</td>, sort: (r) => r.fromRank },
   { key: 'days', label: 'Time', td: (r) => <td className="num">{lvDays(r.hours)}</td>, sort: (r) => r.hours },
   { key: 'voyages', label: 'Voyages', td: (r) => <td className="num">{plannerN(r.voyages)}</td>, sort: (r) => r.voyages },
   { key: 'route', label: 'Route', td: (r, ctx) => (
     <td><span className="rf-route">{r.route.map((id) => <RfLetter key={id} sector={ctx.sectorOf.get(id)} />)}</span>
-      {r.opened.map((id) => <span key={id} className="rf-tag chance">{ctx.sectorOf.get(id).letter} from rank {ctx.sectorOf.get(id).rankReq}</span>)}</td>),
+      {r.toOpen && <span className="rf-tag new lv-to-open" title={lvToOpenTitle(r.toOpen, ctx)}>to open {lvLetter(ctx, r.toOpen.next)}</span>}
+      {(r.discovers || []).length > 0 && <span className="rf-tag best lv-discovers" title={lvDiscoversTitle(r, ctx)}>opens {r.discovers.map((id) => lvLetter(ctx, id)).join(', ')}</span>}
+      {r.opened.map((id) => <span key={id} className="rf-tag chance" title={rfSectorTitle(ctx.sectorOf.get(id))}>{ctx.sectorOf.get(id).letter} from rank {ctx.sectorOf.get(id).rankReq}</span>)}</td>),
   sort: (r) => r.routeLetters },
   { key: 'parts', label: 'Parts', td: (r) => <td><span className="lv-parts">{r.parts.map((p, j) => <span key={j} className="finder-part lv-part" title={partNameOf(p)}>{p}</span>)}</span></td>,
     sort: (r) => r.parts.join('') },
@@ -33,7 +52,10 @@ const LV_STAGE_COLUMN_DEFS = [
   { key: 'expHour', label: 'Exp an hour', td: (r) => <td className="num">{plannerN(r.expPerHour)}</td>, sort: (r) => r.expPerHour },
   { key: 'tanks', label: 'Ceruleum', default: false, td: (r) => <td className="num">{plannerN(r.tanks)}</td>, sort: (r) => r.tanks },
   { key: 'kits', label: 'Repair kits', default: false, td: (r) => <td className="num">{plannerN(r.kits)}</td>, sort: (r) => r.kits },
-  { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better ? (
+  { key: 'better', label: 'Not discovered yet', sortable: false, td: (r, ctx) => <td>{r.better && r.better.opensBy ? (
+    <span className="lv-better dim" title={`With ${r.better.missing.length === 1 ? 'it' : 'them'}, ${r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives ${plannerN(r.better.gain * 100)}% more an hour.`}>
+      {r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? 'opens' : 'open'} on the way, by rank {r.better.opensBy}.</span>
+  ) : r.better ? (
     <span className="lv-better">{r.better.missing.map((id) => ctx.sectorOf.get(id).letter).join(', ')} {r.better.missing.length === 1 ? "isn't" : "aren't"} discovered yet:
       with {r.better.missing.length === 1 ? 'it' : 'them'}, {r.better.route.map((id) => ctx.sectorOf.get(id).letter).join('-')} gives {plannerN(r.better.gain * 100)}% more an hour{r.better.atRank > r.fromRank ? ` from rank ${r.better.atRank}` : ''}.</span>
   ) : <span className="dim">—</span>}</td> },
@@ -53,7 +75,7 @@ function LvStages({ plan, sectorOf, onOpenPlanner }) {
   });
   const sort = useColumnSort();
   const cols = useTableColumns({ tableKey: 'levellingStages', ownDefs: LV_STAGE_COLUMN_DEFS, rows, idOf: () => null });
-  const ctx = { sectorOf, onOpenPlanner };
+  const ctx = { sectorOf, onOpenPlanner, unlockChance: plan.unlockChance };
   const sorted = sort.sortColumn ? applyColumnSort(rows, sort.sortColumn, sort.sortDirection, cols.accessors) : rows;
   const span = cols.visibleDefs.length;
   return (
@@ -117,12 +139,23 @@ function LvFleet({ rows, ctx }) {
 }
 
 // The four boxes and the strip of stages.
+// A stage's piece of the strip: its ranks ("96–97", or "96" when it doesn't rank up).
+const lvStripLabel = (st) => (st.toRank > st.fromRank ? `${st.fromRank}–${st.toRank}` : `${st.fromRank}`);
 function LvSummary({ plan, start }) {
   const days = plan.hours / 24;
-  const strip = plan.stages.map((st, i) => ({ i, st, grow: Math.max(st.hours, 1) }));
+  const total = plan.stages.reduce((n, st) => n + Math.max(st.hours, 1), 0);
+  // A piece shows its ranks only when it has room for them (about 0.65% of the strip a character); the rest on hover.
+  const strip = plan.stages.map((st, i) => ({ i, st, grow: Math.max(st.hours, 1), label: Math.max(st.hours, 1) / total >= (lvStripLabel(st).length + 1) * 0.0065 ? lvStripLabel(st) : '' }));
+  // The days under the strip, each where its stage ends, with no two closer than 7% of the strip.
   let at = 0;
-  const marks = [0];
-  for (const st of plan.stages) { at += st.hours; marks.push(at); }
+  const marks = [{ pct: 0, text: 'start' }];
+  for (const st of plan.stages) {
+    at += Math.max(st.hours, 1);
+    const pct = (at / total) * 100;
+    const last = marks[marks.length - 1];
+    const mark = { pct, text: `day ${Math.round(at / 24)}` };
+    if (at === total) { if (pct - last.pct < 7 && marks.length > 1) marks.pop(); marks.push(mark); } else if (pct - last.pct >= 7 && total - at >= total * 0.07) marks.push(mark);
+  }
   return (
     <React.Fragment>
       <div className="lv-sums">
@@ -133,8 +166,8 @@ function LvSummary({ plan, start }) {
       </div>
       {plan.stages.length > 0 && days > 0 && (
         <div>
-          <div className="lv-strip">{strip.map(({ i, st, grow }) => <span key={i} className={LV_STAGE_CLASSES[i % 4]} style={{ flex: grow }} title={`Ranks ${st.fromRank}–${st.toRank}: ${lvDays(st.hours)}`}>{st.fromRank}–{st.toRank}</span>)}</div>
-          <div className="lv-scale">{marks.map((h, i) => <span key={i}>{i === 0 ? 'start' : `day ${Math.round(h / 24)}`}</span>)}</div>
+          <div className="lv-strip">{strip.map(({ i, st, grow, label }) => <span key={i} className={LV_STAGE_CLASSES[i % 4]} style={{ flex: grow }} title={`${st.toRank > st.fromRank ? `Ranks ${st.fromRank}–${st.toRank}` : `Rank ${st.fromRank}`}: ${lvDays(st.hours)}${st.toOpen ? ' (to open a sector)' : ''}`}>{label}</span>)}</div>
+          <div className="lv-scale">{marks.map((m, i) => <span key={i} style={{ left: `${m.pct}%` }} className={i === 0 ? 'first' : m.pct >= 99.99 ? 'last' : ''}>{m.text}</span>)}</div>
         </div>
       )}
     </React.Fragment>
@@ -158,6 +191,8 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const [standardOnly, setStandardOnly] = useState(false);
   const [fcId, setFcId] = useState(null);
   const [everySector, setEverySector] = useState(false);
+  // The chance (%) a voyage through a sector opens each sector it leads to (Pepper's guide: 20-30%).
+  const [unlockPct, setUnlockPct] = useState(25);
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -182,24 +217,48 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   // A sub's own target, while it's still above its rank (else the default).
   const targetOf = (s) => (targets[keyOf(s)] > s.rank ? targets[keyOf(s)] : defaultTarget(s, s.rank));
 
+  // A refresh (Auto-Refresh, the Refresh button) reloads the subs: the chosen sub's rank, experience and parts follow
+  // its new ones, unless they were changed here (Change parts or rank).
+  useEffect(() => {
+    if (!base || !chosen) return;
+    const now = base.subs.find((s) => keyOf(s) === keyOf(chosen));
+    if (!now || (now.rank === chosen.rank && (now.exp || 0) === (chosen.exp || 0) && now.parts.join('') === chosen.parts.join(''))) return;
+    if (rank !== chosen.rank || exp !== (chosen.exp || 0) || parts.join('') !== chosen.parts.join('')) return;
+    setChosen(now);
+    setRank(now.rank);
+    setExp(now.exp || 0);
+    setParts(now.parts);
+  }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const latest = useRef(0);
+  // What the shown (or coming) plan was asked with: a refresh that changes nothing the plan uses doesn't plan again.
+  const asked = useRef(null);
   useEffect(() => {
     if (!base || base.missingGameData) return undefined;
     const subs = mode === 'one'
       ? [{ key: 'one', rank, exp, target: goal, parts, cid: chosen ? chosen.cid : null }]
       : fcSubs.filter((s) => s.rank < base.maxRank).map((s) => ({ key: keyOf(s), rank: s.rank, exp: s.exp, target: targetOf(s), parts: s.parts, cid: s.cid }));
-    if (!subs.length) { setAnswer(null); latest.current += 1; setBusy(false); return undefined; }
+    if (!subs.length) { setAnswer(null); latest.current += 1; asked.current = null; setBusy(false); return undefined; }
+    const request = { subs, fcId, everySector, maxHours, suggest, standardOnly, unlockChance: Math.min(100, Math.max(1, Number(unlockPct) || 25)) / 100 };
+    const fcRead = everySector ? null : ((base.fcs || []).find((f) => f.fcId === fcId) || null);
+    const sig = JSON.stringify([request, mode, base.maxRank, fcRead && fcRead.readAt ? [fcRead.readAt, fcRead.sectors] : null]);
+    if (sig === asked.current) return undefined;
+    asked.current = sig;
     const call = ++latest.current;
     setBusy(true);
+    let sent = false;
     const timer = setTimeout(() => {
-      window.api.planSubLevelling({ subs, fcId, everySector, maxHours, suggest, standardOnly }).then((r) => {
+      sent = true;
+      window.api.planSubLevelling(request).then((r) => {
         if (call !== latest.current) return;
         setBusy(false);
+        if (!r.success) asked.current = null; // the next refresh tries again
         setAnswer(r.success ? { ...r, mode } : { error: r.error });
       });
     }, 250);
-    return () => clearTimeout(timer);
-  }, [base, mode, rank, exp, goal, parts, chosen, fcId, everySector, maxHours, suggest, standardOnly, targets, nextBuilds, refreshKey]);
+    // Not sent yet: it's dropped, so the next run asks again even with the same request.
+    return () => { if (!sent) { clearTimeout(timer); asked.current = null; } };
+  }, [base, mode, rank, exp, goal, parts, chosen, fcId, everySector, unlockPct, maxHours, suggest, standardOnly, targets, nextBuilds, refreshKey]);
 
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
   if (!base) return <div className="status">Loading...</div>;
@@ -221,7 +280,12 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   const nextRank = chosen ? nextBuilds.get(keyOf(chosen)) : null;
   const fcSelect = <FcPicker fcs={base.fcs} value={fcId} onChange={setFcId} />;
   const everyBox = <label className="finder-check" title="Plan as if every sector were discovered: how long it takes once the Free Company has found them"><input type="checkbox" checked={everySector} onChange={(e) => setEverySector(e.target.checked)} /> Use every sector</label>;
-  const fcNote = <span className="dim lv-note">{everySector ? 'Every sector, as if all were discovered.' : fc && fc.readAt ? `Only sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}).` : 'Not read yet: every sector is allowed.'}</span>;
+  const reading = !everySector && fc && fc.readAt;
+  const fcNote = <span className="dim lv-note">{everySector ? 'Every sector, as if all were discovered.' : reading ? `From the sectors ${fc.name} has discovered (read at the workshop ${rfWhen(fc.readAt)}), opening more on the way: each voyage through a sector has a chance to open each one it leads to, and the plan counts on the expected number of voyages.` : 'Not read yet: every sector is allowed.'}</span>;
+  const chanceBox = reading ? (
+    <label className="finder-field lv-chance" title="Pepper's guide: about 20-30% for each sector a voyage goes through. The plan counts on the expected number of voyages; the game may open one sooner or later.">
+      Chance to open a sector <input type="number" min="1" max="100" value={unlockPct} onChange={(e) => setUnlockPct(e.target.value)} style={{ width: '56px' }} />%
+    </label>) : null;
   const choices = (
     <div className="finder-row">
       <span className="finder-field">Longest voyage
@@ -279,6 +343,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
               {target !== null && <button className="link-button" onClick={() => setTarget(null)}>Reset target</button>}
               <span className="finder-field">Sectors explored by {fcSelect}</span>
               {everyBox}
+              {chanceBox}
             </div>
             {fcNote}
           </section>
@@ -305,7 +370,7 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
       {mode === 'fc' && (
         <section className="finder-band">
           <h2 className="finder-heading">Every sub in {fcSelect} <span className="count">each to its next build's rank (else the top rank)</span></h2>
-          <div className="finder-row">{everyBox}{fcNote}
+          <div className="finder-row">{everyBox}{chanceBox}{fcNote}
             {Object.keys(targets).length > 0 && <button className="link-button" onClick={() => setTargets({})}>Reset targets</button>}</div>
           {choices}
           <Working busy={busy}>Working out the plans…</Working>
@@ -324,7 +389,9 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
 
       <div className="planner-foot dim">
         Experience with the bonus each sub is sure of (Pepper's guide); routes as the Route Finder ranks them for experience (up to 5 stops, any map);
-        rank-up experience from the game data. A sub out now starts when it's back. Part swaps are tried at the start of each stage, one part at a time.
+        rank-up experience from the game data. A sub out now starts when it's back. Part swaps are tried at the start of each stage, one part at a time,
+        each judged by how much sooner the whole plan reaches the target. With a Free Company's sectors, sectors open as the plan goes (by the expected
+        number of voyages, so the real days can differ), and it goes out of its way to open one when that gets there sooner.
       </div>
     </div>
   );

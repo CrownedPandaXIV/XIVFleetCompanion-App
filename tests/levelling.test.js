@@ -110,3 +110,76 @@ test('a swap shows before the first stage that uses it, even when found inside a
   const by = lv.swapsByStage(plan);
   assert.deepStrictEqual(by.map((l) => l.map((s) => `${s.slot}@${s.showRank}`)), [['2@47'], ['0@51'], ['1@54']]);
 });
+
+test('no cap on swaps: every one that makes the plan shorter (here 8: each slot to W, then to W+ from rank 5)', () => {
+  const value = { S: 0, W: 1, 'W+': 2 };
+  const hoursOf = (parts) => 10 - parts.reduce((n, p) => n + (value[p] || 0), 0) * 0.5;
+  const fly = (rank, parts) => ({ route: [1], hours: hoursOf(parts), exp: 100, expPerHour: 100 / hoursOf(parts) });
+  const score = (rank, parts) => 100 / hoursOf(parts);
+  const many = new Map(Array.from({ length: 40 }, (_, i) => [i + 1, 100]));
+  many.set(40, 0);
+  const plan = lv.levellingPlan({ rank: 1, exp: 0, target: 30, expToNext: many, parts: ['S', 'S', 'S', 'S'], bestAt: fly, score, suggest: true,
+    partRank: (letter) => (letter === 'W+' ? 5 : 0), standardOnly: false });
+  assert.ok(lv.MAX_SWAPS > 4);
+  assert.strictEqual(plan.swaps.length, 8, JSON.stringify(plan.swaps.map((s) => `${s.atRank}:${s.slot}${s.from}>${s.to}`)));
+  assert.ok(plan.stages[plan.stages.length - 1].parts.every((p) => p === 'W+'));
+});
+
+test('a swap that doesn\'t speed up the route it runs but opens a better one is still found (judged on the best route too)', () => {
+  // On route [1] every build is the same; with W+ in the bridge, route [2] fits and gives twice as much an hour.
+  const fly = (rank, parts) => (parts[3] === 'W+' ? { route: [2], hours: 10, exp: 200, expPerHour: 20 } : { route: [1], hours: 10, exp: 100, expPerHour: 10 });
+  const score = () => 10;
+  const plan = lv.levellingPlan({ rank: 1, exp: 0, target: 10, expToNext, parts: ['W', 'S', 'U', 'C'], bestAt: fly, score, suggest: true });
+  assert.deepStrictEqual(plan.swaps.map((s) => [s.atRank, s.slot, s.from, s.to]), [[1, 3, 'C', 'W+']]);
+  assert.ok(plan.hours < plan.keepHours);
+});
+
+// A made-up map for opening sectors: 1 is open; 2 opens from 1 and is far better; 3 is open, better than 1, and doesn't
+// lead to 2. bestAt goes by the open sectors it's given, and `must` forces a sector in.
+const unlockMap = (bestRoute) => (rank, parts, open, must) => {
+  const has = (id) => open.set.has(id);
+  if (must) return { route: [must], hours: 10, exp: 100, expPerHour: 10 };
+  return has(2) ? { route: [2], hours: 10, exp: 400, expPerHour: 40 } : bestRoute(has);
+};
+const unlockOf = (extra = {}) => ({ open: new Set([1, 3]), chance: 0.25, opens: new Map([[1, [2]]]), openerOf: new Map([[2, 1]]), rankOf: new Map([[1, 1], [2, 1], [3, 1]]),
+  targets: [[2, 1]], lookahead: null, ...extra });
+const longExp = new Map(Array.from({ length: 60 }, (_, i) => [i + 1, 400]));
+longExp.set(60, 0);
+
+test('opening sectors: each voyage through a sector adds its chance; one opens when they add up to a whole (4 voyages at 25%)', () => {
+  const p = lv.simulate({ rank: 1, exp: 0, target: 6, expToNext: longExp, partsAt: () => ['S', 'S', 'S', 'S'], bestAt: unlockMap(() => ({ route: [1], hours: 10, exp: 100, expPerHour: 10 })),
+    unlock: unlockOf({ open: new Set([1]) }) });
+  assert.deepStrictEqual(p.stages.map((s) => [s.route.join('-'), s.voyages, s.discovers]), [['1', 4, [2]], ['2', 4, []]]);
+  // At 100%, one voyage is enough.
+  const sure = lv.simulate({ rank: 1, exp: 0, target: 6, expToNext: longExp, partsAt: () => ['S', 'S', 'S', 'S'], bestAt: unlockMap(() => ({ route: [1], hours: 10, exp: 100, expPerHour: 10 })),
+    unlock: unlockOf({ open: new Set([1]), chance: 1 }) });
+  assert.deepStrictEqual(sure.stages.map((s) => [s.route.join('-'), s.voyages]), [['1', 1], ['2', 5]]); // 100 + 5 x 400 for 2,000
+});
+
+test('opening sectors: the plan goes out of its way to open a better one when that gets there sooner, and says so', () => {
+  const via3 = unlockMap(() => ({ route: [3], hours: 10, exp: 150, expPerHour: 15 }));
+  // Never going through 1, 2 never opens: 150 a voyage the whole way.
+  const stay = lv.simulate({ rank: 1, exp: 0, target: 30, expToNext: longExp, partsAt: () => ['S', 'S', 'S', 'S'], bestAt: via3, unlock: unlockOf() });
+  assert.ok(stay.stages.every((s) => s.route.join() === '3'));
+  // Going through 1 four times opens 2 (400 a voyage): the plan picks that, and the stage says why.
+  const plan = lv.levellingPlan({ rank: 1, exp: 0, target: 30, expToNext: longExp, parts: ['S', 'S', 'S', 'S'], bestAt: via3, unlock: unlockOf() });
+  assert.strictEqual(plan.lookahead, Infinity);
+  assert.deepStrictEqual(plan.stages[0].toOpen, { via: 1, next: 2, target: 2 });
+  assert.deepStrictEqual(plan.stages.map((s) => [s.route.join('-'), s.voyages]).slice(0, 2), [['1', 4], ['2', plan.stages[1].voyages]]);
+  assert.ok(plan.hours < stay.hours);
+});
+
+test('a sector the plan opens itself later says by when, not what it would add', () => {
+  const read = new Map([[1, { unlocked: true }]]);
+  const every = { bestAt: () => ({ route: [1, 9], expPerHour: 100 }) };
+  const plan = { stages: [
+    { fromRank: 5, toRank: 6, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [] },
+    { fromRank: 6, toRank: 8, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [9] },
+  ] };
+  lv.markBetter(plan, every, read);
+  assert.strictEqual(plan.stages[0].better.opensBy, 8);
+  // One it never opens: what it would add, as before.
+  const never = { stages: [{ fromRank: 5, toRank: 6, parts: ['S', 'S', 'S', 'S'], expPerHour: 50, discovers: [] }] };
+  lv.markBetter(never, every, read);
+  assert.strictEqual(never.stages[0].better.opensBy, null);
+});
