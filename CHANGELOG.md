@@ -21,6 +21,11 @@ All notable changes to the app are recorded here. Versions follow
   "96 → 96"); and the day strip labels only the stages with room, with the days under it where the stages end and
   never crowded (every stage's ranks and days on hover).
 
+### Fixed
+- **The Levelling Plan worked its plan out again at every auto-refresh**, even when nothing had changed. It now plans
+  again only when something the plan uses changed: a sub's rank, experience or parts, or the Free Company's sectors. A
+  chosen sub now follows its new rank, experience and parts after a refresh (unless they were changed on the page).
+
 ## 1.13.3 - 2026-11-25
 
 ### New

@@ -217,23 +217,47 @@ function LevellingView({ refreshKey, onOpenPlanner }) {
   // A sub's own target, while it's still above its rank (else the default).
   const targetOf = (s) => (targets[keyOf(s)] > s.rank ? targets[keyOf(s)] : defaultTarget(s, s.rank));
 
+  // A refresh (Auto-Refresh, the Refresh button) reloads the subs: the chosen sub's rank, experience and parts follow
+  // its new ones, unless they were changed here (Change parts or rank).
+  useEffect(() => {
+    if (!base || !chosen) return;
+    const now = base.subs.find((s) => keyOf(s) === keyOf(chosen));
+    if (!now || (now.rank === chosen.rank && (now.exp || 0) === (chosen.exp || 0) && now.parts.join('') === chosen.parts.join(''))) return;
+    if (rank !== chosen.rank || exp !== (chosen.exp || 0) || parts.join('') !== chosen.parts.join('')) return;
+    setChosen(now);
+    setRank(now.rank);
+    setExp(now.exp || 0);
+    setParts(now.parts);
+  }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const latest = useRef(0);
+  // What the shown (or coming) plan was asked with: a refresh that changes nothing the plan uses doesn't plan again.
+  const asked = useRef(null);
   useEffect(() => {
     if (!base || base.missingGameData) return undefined;
     const subs = mode === 'one'
       ? [{ key: 'one', rank, exp, target: goal, parts, cid: chosen ? chosen.cid : null }]
       : fcSubs.filter((s) => s.rank < base.maxRank).map((s) => ({ key: keyOf(s), rank: s.rank, exp: s.exp, target: targetOf(s), parts: s.parts, cid: s.cid }));
-    if (!subs.length) { setAnswer(null); latest.current += 1; setBusy(false); return undefined; }
+    if (!subs.length) { setAnswer(null); latest.current += 1; asked.current = null; setBusy(false); return undefined; }
+    const request = { subs, fcId, everySector, maxHours, suggest, standardOnly, unlockChance: Math.min(100, Math.max(1, Number(unlockPct) || 25)) / 100 };
+    const fcRead = everySector ? null : ((base.fcs || []).find((f) => f.fcId === fcId) || null);
+    const sig = JSON.stringify([request, mode, base.maxRank, fcRead && fcRead.readAt ? [fcRead.readAt, fcRead.sectors] : null]);
+    if (sig === asked.current) return undefined;
+    asked.current = sig;
     const call = ++latest.current;
     setBusy(true);
+    let sent = false;
     const timer = setTimeout(() => {
-      window.api.planSubLevelling({ subs, fcId, everySector, maxHours, suggest, standardOnly, unlockChance: Math.min(100, Math.max(1, Number(unlockPct) || 25)) / 100 }).then((r) => {
+      sent = true;
+      window.api.planSubLevelling(request).then((r) => {
         if (call !== latest.current) return;
         setBusy(false);
+        if (!r.success) asked.current = null; // the next refresh tries again
         setAnswer(r.success ? { ...r, mode } : { error: r.error });
       });
     }, 250);
-    return () => clearTimeout(timer);
+    // Not sent yet: it's dropped, so the next run asks again even with the same request.
+    return () => { if (!sent) { clearTimeout(timer); asked.current = null; } };
   }, [base, mode, rank, exp, goal, parts, chosen, fcId, everySector, unlockPct, maxHours, suggest, standardOnly, targets, nextBuilds, refreshKey]);
 
   if (error && !base) return <div className="error">Failed to load: {error}</div>;
