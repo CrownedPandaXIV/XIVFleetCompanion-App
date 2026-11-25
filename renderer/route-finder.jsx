@@ -14,9 +14,11 @@ function rfWhen(ms) {
 }
 
 // A sector letter as a tag: green explored, amber to explore, blue dashed could open, grey not yet; outlined when a must.
+// Its hover: the sector's name, its map and the rank it needs ("Ivory Shoals · Deep-sea Site · rank 1").
+const rfSectorTitle = (sector) => (sector ? [sector.name, sector.mapName, sector.rankReq ? `rank ${sector.rankReq}` : ''].filter(Boolean).join(' · ') : '');
 function RfLetter({ sector, state, must, title }) {
   const cls = state === 'explored' ? 'g' : state === 'discovered' ? 'a' : state === 'chance' ? 'c' : state === 'locked' ? 'l' : '';
-  return <span className={`rf-letter ${cls}${must ? ' must' : ''}`} title={title || (sector ? sector.name : '')}>{sector ? sector.letter : '?'}</span>;
+  return <span className={`rf-letter ${cls}${must ? ' must' : ''}`} title={title ? `${title}\n${rfSectorTitle(sector)}` : rfSectorTitle(sector)}>{sector ? sector.letter : '?'}</span>;
 }
 
 // A bar out of the best shown.

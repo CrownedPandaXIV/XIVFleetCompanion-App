@@ -3,6 +3,20 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.4 - 2026-11-25
+
+### Changed
+- **Levelling Plan: the fewest days.** Part swaps are now judged by how much sooner the whole plan reaches the target,
+  both on the route being run and on the best route the new part allows (a part that opens a better route was missed
+  before), with no cap on how many. A rank 96 Whale-Shark-Unkiu-Coelacanth sub to rank 145 went from 145 days with no
+  swaps suggested to 106. Several parts can change at the same rank.
+- **Levelling Plan with a Free Company's sectors: sectors open on the way.** Each voyage through a sector has a chance
+  to open each sector it leads to (25% to start with, from Pepper's guide; change it on the page), and the plan counts
+  on the expected number of voyages. Stages say what they're expected to open ("opens C, D"), and a stage that goes out
+  of its way to open a better sector says so ("to open J"). Before, an FC that had found only A and B was planned on A-B
+  forever.
+- **Hovering a sector letter shows its name, map and rank**, on every page that shows them.
+
 ## 1.13.3 - 2026-11-25
 
 ### New

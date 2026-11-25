@@ -26,6 +26,10 @@ module.exports = async (t) => {
   await ev(`[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Refresh').click()`);
   await waitFor(`/read at the workshop/.test(document.querySelector('.lv').innerText) && document.querySelectorAll('.lv-stage').length > 0 && ${settled}`, 'the read sectors', 30000);
   await t.shot('levelling');
+  // The chance a voyage opens a sector, shown with the FC's own sectors; a sector's hover names its map and rank.
+  t.check(await ev(`document.querySelector('.lv .lv-chance input') && document.querySelector('.lv .lv-chance input').value === '25'`), 'the chance to open a sector shows, 25% to start with');
+  const hover = await ev(`document.querySelector('.lv .lv-table .rf-letter').title`);
+  t.check(/ · Deep-sea Site · rank \d+$/.test(hover), `a sector's hover names its map and rank (${hover})`);
 
   const ranks = await ev(`document.querySelectorAll('.lv-sum .v')[0].innerText`);
   check(new RegExp(`^${level} → \\d+$`).test(ranks), `the plan runs from the sub's rank (${ranks})`);
