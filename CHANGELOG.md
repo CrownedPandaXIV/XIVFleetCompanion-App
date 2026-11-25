@@ -3,6 +3,24 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.3 - 2026-11-25
+
+### New
+- **Settings → Database → Connections in Use:** how many of the database's connection slots are taken (when they run
+  out, the plugins can't sync), split into this app, the plugins and anything else, and from which PC. A warning from
+  80% of the slots. Connections from another login (pgAdmin signed in as postgres, say) are counted, without their PC.
+- **Settings → Data → Sub Calculator Data:** which copy of the Sub Calculator's data is in use (the one this version
+  came with, or a newer one downloaded by the daily check), when it was last checked, and Check now.
+
+### Changed
+- **A quiet note when live prices fall back:** the Summary's Venture Income, the Route Finder and Compare Builds now say
+  in small grey text when live prices didn't arrive this time (vendor prices shown) or some are from an earlier check;
+  the reason is on hover. The other pages with live prices already said so.
+
+### Fixed
+- **"Choose one of your subs…" opened at the bottom of the page** on the Levelling Plan and Route Finder (once a sub's
+  results were showing), and could on Compare Builds and Build Finder. It now opens right under its button everywhere.
+
 ## 1.13.2 - 2026-11-25
 
 ### Fixed

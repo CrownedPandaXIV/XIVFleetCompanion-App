@@ -91,6 +91,16 @@ const LOOT_ROUTE_MARKET_DEFS = marketColumnDefs('perVoyage', '/ voyage');
 const VENTURE_MARKET_DEFS = marketColumnDefs('perDay', '/ day');
 
 // Universalis did not answer this time, so some prices are from an earlier check.
+// A quiet note after a "market prices" line when live prices fell back this time (Summary, Route Finder, Compare): none
+// came (vendor prices shown) or some are from an earlier check. The reason is on hover. market: { error } or { stale }.
+function LivePricesNote({ market }) {
+  if (!market) return null;
+  if (market.error) return <span className="dim live-prices-note" title={market.error}> · live prices didn't arrive this time, vendor prices shown</span>;
+  if (!market.stale) return null;
+  const at = market.stale.since ? new Date(market.stale.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier';
+  return <span className="dim live-prices-note" title={market.stale.problem}> · some live prices are from {at}</span>;
+}
+
 function MarketStaleNote({ stale }) {
   if (!stale) return null;
   const at = new Date(stale.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

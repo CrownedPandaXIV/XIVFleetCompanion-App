@@ -5,6 +5,12 @@ const { databaseStatus } = require('../db');
 
 ipcMain.handle('get-database-status', () => databaseStatus());
 
+// Settings → Database → Connections in use (db/connections-in-use.js).
+const { withClient } = require('../db');
+const { connectionsInUse } = require('../db/connections-in-use');
+ipcMain.handle('database:connections', () => withClient(async (client) => ({ success: true, connections: await connectionsInUse(client) }),
+  (err) => ({ success: false, error: err.message })));
+
 // Settings → Database → Speed check (db/speed-check.js): the database side, measured here. The window then
 // times each tab's loading and sends both back for the findings and a copyable report.
 const fs = require('fs');

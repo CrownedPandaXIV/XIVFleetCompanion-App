@@ -346,7 +346,7 @@ function CompareView({ refreshKey, state, setState, onOpenPlanner }) {
                     );
                   })}
                 </tr>
-                {group(`Voyage${answer && answer.pricing && answer.pricing.source === 'market' ? ` · gil at market prices (${answer.pricing.place})` : ' · gil at vendor prices'}`)}
+                {group(<>Voyage{answer && answer.pricing && answer.pricing.source === 'market' ? ` · gil at market prices (${answer.pricing.place})` : ' · gil at vendor prices'}<LivePricesNote market={answer && answer.pricing} /></>)}
                 {CMP_VOYAGE_ROWS.map(numberRow)}
                 {group('Each stop')}
                 {stopRows}

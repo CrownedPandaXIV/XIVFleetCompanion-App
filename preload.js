@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('api', {
   getFileGameDataStatus: () => invoke('fleet-file:game-data-status'),
   updateFileGameData: () => invoke('fleet-file:game-data-update'),
   checkDatabaseSpeed: () => invoke('database:speed-check'),
+  getConnectionsInUse: () => invoke('database:connections'),
   getSpeedDetail: () => invoke('database:speed-detail'),
   getSpeedFindings: (input) => invoke('database:speed-findings', input),
   onDatabaseStatus: (callback) => {
@@ -107,6 +108,8 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => invoke('install-update'),
   getUpdateStatus: () => invoke('updates:status'),
   checkForUpdates: () => invoke('updates:check'),
+  getSubDataStatus: () => invoke('sub-data:status'),
+  checkSubDataNow: () => invoke('sub-data:check'),
   setTestVersions: (on) => invoke('updates:set-testing', on),
   // What's new (ipc/updates.js): { current, versions } not yet shown on this PC; marking them seen; the recent ones.
   getWhatsNew: () => invoke('whats-new:get'),

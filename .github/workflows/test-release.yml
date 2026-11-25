@@ -1,7 +1,8 @@
 name: Test release
 
 # A test version of the app, for trying before everyone gets it: pushing to the testing branch builds the
-# installer as "<version>-test.<run number>" (package.json's version, so 1.6.0-test.12 for 1.6.0) and puts it on
+# installer as "<version>-test.<n>" (package.json's version, n counting that version's test versions from 1, so
+# 1.6.0-test.1, 1.6.0-test.2, ...; test-version.sh) and puts it on
 # the "testing" pre-release of CrownedPandaXIV/XIVFleetCompanion-Releases. Only copies of the app with Settings →
 # General → Updates → Get test versions on look there (update-feed.js). Normal releases (release.yml) are unchanged,
 # and also go to the testing release when they're newer, so testers get every normal update too.
@@ -38,16 +39,36 @@ jobs:
     # The Sub Calculator's data ships as committed: the copy the tests ran on and the plugin has too. Newer XIVStats
     # and Pepper data is published each day by sub-data.yml, and the app downloads it (sub-data-update.js).
 
+    # One above the test version of this version the testing release has (-test.1 for a new version). If it can't be
+    # read (other than there being no testing release yet), stop: guessing -test.1 could number it below the testers'
+    # version. Runs before installing, so the token never meets the packages' code. One run at a time (concurrency
+    # above), so two never get the same number.
+    - name: Work out the test version
+      id: build
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      run: |
+        base=$(node -p "require('./package.json').version")
+        current=""
+        if [ -n "$GH_TOKEN" ] && gh release view testing -R CrownedPandaXIV/XIVFleetCompanion-Releases >/dev/null 2> view-error.txt; then
+          if ! current="$(gh release download testing -R CrownedPandaXIV/XIVFleetCompanion-Releases -p latest.yml -O - | sed -n 's/^version: *//p' | tr -d "'\"\r")"; then
+            echo "::error::Couldn't read the testing release's latest.yml."; exit 1
+          fi
+        elif [ -n "$GH_TOKEN" ] && ! grep -qi 'not found\|HTTP 404' view-error.txt; then
+          echo "::error::Couldn't read the testing release: $(cat view-error.txt)"; exit 1
+        fi
+        rm -f view-error.txt
+        version=$(bash .github/scripts/test-version.sh "$base" "$current")
+        echo "Test version: ${version} (the testing release had ${current:-nothing})"
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+
     # No token here: installing and building run other people's code (every package's install scripts), which must not
     # reach the one that publishes updates.
     - name: Build the test version
-      id: build
       shell: bash
       run: |
-        base=$(node -p "require('./package.json').version")
-        version="${base}-test.${GITHUB_RUN_NUMBER}"
-        echo "Test version: ${version}"
-        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        version="${{ steps.build.outputs.version }}"
         npm ci
         npm version "$version" --no-git-tag-version
         npm run dist

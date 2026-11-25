@@ -95,4 +95,11 @@ function adopt(data) {
   return true;
 }
 
-module.exports = { FILE, BREAKPOINTS, problems, load, useFolder, adopt, madeAt };
+// The data in use, for Settings → Data: { made (ISO), downloaded: true when it is a downloaded copy, else the one this
+// version shipped with }.
+function inUse() {
+  const data = load();
+  return { made: data.about && data.about.made ? data.about.made : null, downloaded: data !== shipped };
+}
+
+module.exports = { FILE, BREAKPOINTS, problems, load, useFolder, adopt, madeAt, inUse };

@@ -124,7 +124,7 @@ function RetainerSummarySection({ refreshKey, onNavigate }) {
         <SummaryTile className="retainers-income-tile" label="Venture Income"
           value={v ? <><span className="gil">{summaryGil(v.ventureTotals.perDay)} gil</span> a day</> : '—'}
           note={v ? <>last {v.windowDays} days, at what a vendor pays{v.market && v.market.ventures
-            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(v.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}</>
+            ? <> · market: {['world', 'dc', 'region'].map((sc, i) => <React.Fragment key={sc}>{i > 0 ? ', ' : ''}<span className="gil">{summaryGil(v.market.ventures[sc].perDay)}</span> ({{ world: 'World', dc: 'DC', region: 'Region' }[sc]})</React.Fragment>)}</> : ''}<LivePricesNote market={v.market} /></>
             : ventures === false ? needs008 : failed(ventures)}>
           <button onClick={() => onNavigate('income')} style={{ marginTop: '8px' }}>View Income</button>
         </SummaryTile>
