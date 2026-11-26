@@ -3,6 +3,22 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.5 - 2026-11-26
+
+### Changed
+- **Sub and retainer statuses read as the plugin's.** The Subs page says "In port", "Back" (waiting to be collected) or
+  the time until it's back, and both the Subs and Retainers pages show that time as the plugin does: "45:10" under an
+  hour, "3:05:09" in hours, "2d 4:00:00" over a day (before: "In Port", "Returned / Awaiting Collection" and always
+  "03:05:09", with hours past a day as "52:00:00").
+- **Supplies: held ceruleum and repair kits follow the low-supply warnings** (Settings → General → Warnings), as the
+  Roster does: amber under the warning, red under half of it, green otherwise, the warning on hover. They weren't
+  coloured before.
+- **Supplies: what to buy follows days left,** as days left does: red under 3 days, amber under 7, green otherwise.
+  Days left is now green when none are used and grey without enough history, as the plugin's.
+- **Newer Sub Calculator data is looked for every 6 hours instead of once a day.** GitHub sometimes starts its daily
+  run hours late or skips it; now the next run catches up. Nothing changes in the app: it still downloads a newer copy
+  once a day.
+
 ## 1.13.4 - 2026-11-25
 
 ### Changed

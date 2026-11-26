@@ -10,9 +10,10 @@ function supplyDaysText(days) {
   return `${days < 10 ? days.toFixed(1) : Math.round(days)} days`;
 }
 
-// Red under 3 days, amber under 7.
+// Red under 3 days, amber under 7, green otherwise or when none are used; dim without enough history (as the plugin's).
 function supplyDaysClass(days) {
-  if (typeof days !== 'number') return '';
+  if (days === 'never') return 'tone-good';
+  if (typeof days !== 'number') return 'dim';
   if (days < 3) return 'supply-danger';
   if (days < 7) return 'supply-warn';
   return 'tone-good';
@@ -21,17 +22,22 @@ function supplyDaysClass(days) {
 const supplyPerDayText = (perDay) => (perDay === null || perDay === undefined ? '—' : perDay < 100 ? perDay.toFixed(1) : Math.round(perDay).toLocaleString());
 const supplyRunsOut = (at) => (at ? `Runs out about ${new Date(at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '');
 
-// Four columns per supply: held, used per day, days left (amber/red, the date on hover) and how many to buy.
+// Below the low-supply warning, on hover (Settings → General → Warnings).
+const supplyLowTitle = (s, what) => (s.tone === 'danger' || s.tone === 'warn' ? `Below the low-${what} warning of ${s.warning.toLocaleString()} (Settings → General → Warnings)` : undefined);
+
+// Four columns per supply: held (coloured against the low-supply warning, as the Roster), used per day, days left and
+// how many to buy (both coloured by days left: amber under 7, red under 3; the date on hover).
 function supplyColumnDefs(metric, label) {
+  const what = metric === 'ceruleum' ? 'ceruleum' : 'repair-kit';
   return [
-    { key: `${metric}_have`, label, td: (r) => <td className="num">{r[metric].have.toLocaleString()}</td>, sort: (r) => r[metric].have },
+    { key: `${metric}_have`, label, td: (r) => <td className={`num ${toneClass(r[metric].tone) || 'dim'}`} title={supplyLowTitle(r[metric], what)}>{r[metric].have.toLocaleString()}</td>, sort: (r) => r[metric].have },
     { key: `${metric}_per_day`, label: `${label} / day`, cell: (r) => supplyPerDayText(r[metric].perDay), sort: (r) => r[metric].perDay },
     {
       key: `${metric}_days`, label: `${label}: days left`,
       td: (r) => <td className={supplyDaysClass(r[metric].days)} title={supplyRunsOut(r[metric].runsOutAt)}>{supplyDaysText(r[metric].days)}</td>,
       sort: (r) => (r[metric].days === 'never' ? Number.MAX_SAFE_INTEGER : r[metric].days),
     },
-    { key: `${metric}_buy`, label: `Buy ${label.toLowerCase()}`, cell: (r) => (r[metric].restock ? r[metric].restock.toLocaleString() : ''), sort: (r) => r[metric].restock || null },
+    { key: `${metric}_buy`, label: `Buy ${label.toLowerCase()}`, td: (r) => <td className={r[metric].restock ? supplyDaysClass(r[metric].days) : undefined} title={supplyRunsOut(r[metric].runsOutAt)}>{r[metric].restock ? r[metric].restock.toLocaleString() : ''}</td>, sort: (r) => r[metric].restock || null },
   ];
 }
 

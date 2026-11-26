@@ -1,15 +1,18 @@
 name: Sub Calculator data
 
-# Each day (and by hand): makes the Sub Calculator's data afresh from XIVStats and Pepper's guide, and when it differs
+# Four times a day (and by hand): makes the Sub Calculator's data afresh from XIVStats and Pepper's guide, and when it differs
 # from the copy published in XIVFleetCompanion-Releases (sub-data/calculator-data-v1.json) and passes the checks
 # (.github/scripts/check-sub-data.js), publishes it there. The app (sub-data-update.js) and the plugin
 # (SubCalculatorData.Update) download that copy once a day, or when they next open after a day missed, and use it when
 # it is newer than the copy they shipped with. Nothing is published when a source can't be read or the checks fail.
 # Publishing needs the RELEASES_TOKEN secret (as release.yml): a fine-grained token allowed only "Contents: read and
 # write" on XIVFleetCompanion-Releases.
+# GitHub starts scheduled runs late (hours, at busy times) or now and then not at all, so it runs every 6 hours: a
+# late or skipped run is caught by the next. A run that finds nothing new publishes nothing. Off the hour, when
+# GitHub is less busy.
 on:
   schedule:
-    - cron: '17 5 * * *'
+    - cron: '43 */6 * * *'
   workflow_dispatch:
 
 permissions:

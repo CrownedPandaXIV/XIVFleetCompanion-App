@@ -57,6 +57,11 @@ module.exports = async (t) => {
   const iRoute = heads.indexOf('current route');
   check(sub1 && sub1[iRoute].text === '1 · O-J' && sub1[iRoute].title === 'Deep-sea Site', 'the route has its map: ' + (sub1 && `${sub1[iRoute].text} (${sub1[iRoute].title})`));
 
+  // Statuses as the plugin's: under an hour as minutes, over a day with the days, Back when waiting to be collected.
+  const bex = async (name) => { const r = await subRow('Bex Kitteh 1', name); const i = heads.indexOf('status'); return r ? r[i].text : null; };
+  const [s1, s3, s4] = [await bex('Sub1'), await bex('Sub3'), await bex('Sub4')];
+  check(/^\d{1,2}:\d\d$/.test(s1 || '') && /^4d 23:\d\d:\d\d$/.test(s4 || '') && s3 === 'Back', `statuses as the plugin's: "${s1}" (under an hour), "${s4}" (over a day), "${s3}" (waiting)`);
+
   // Sorting by Status: by when each sub is back, across the fleet. Back and waiting first, then out at
   // sea soonest first, then in port.
   await ev(`[...document.querySelector('thead').querySelectorAll('th')].find(th => th.innerText.trim().toLowerCase().startsWith('status')).querySelector('span').click()`);
@@ -65,12 +70,15 @@ module.exports = async (t) => {
     const i = [...document.querySelector('thead').querySelectorAll('th')].findIndex(th => th.innerText.trim().toLowerCase().startsWith('status'));
     return [...document.querySelectorAll('tbody tr')].map(r => r.children[i].innerText.trim());
   })()`);
-  const kind = (s) => (s.startsWith('Returned') ? 0 : /^\d+:\d\d:\d\d$/.test(s) ? 1 : 2);
-  const secs = (s) => s.split(':').reduce((a, n) => a * 60 + Number(n), 0);
+  // As the plugin's: Back, a countdown ("45:10", "3:05:09", "2d 4:00:00"), or In port.
+  const countdown = /^(\d+d )?\d+(:\d\d){1,2}$/;
+  const kind = (s) => (s === 'Back' ? 0 : countdown.test(s) ? 1 : s === 'In port' ? 2 : 3);
+  const secs = (s) => { const [d, rest] = s.includes('d ') ? s.split('d ') : ['0', s]; return Number(d) * 86400 + rest.split(':').reduce((a, n) => a * 60 + Number(n), 0); };
   const ordered = statuses.every((s, i) => i === 0 || kind(statuses[i - 1]) < kind(s)
     || (kind(statuses[i - 1]) === kind(s) && (kind(s) !== 1 || secs(statuses[i - 1]) <= secs(s))));
   check(statuses.length > 0 && kind(statuses[0]) === 0 && kind(statuses[statuses.length - 1]) === 2 && ordered,
     'Status sorts by return: waiting first, then soonest back, in port last: ' + statuses.slice(0, 4).join(', ') + ' ... ' + statuses.slice(-2).join(', '));
+  check(statuses.every((x) => kind(x) < 3), 'every status is Back, a countdown or In port, as the plugin shows them: ' + [...new Set(statuses.filter((x) => kind(x) === 3))].join(', '));
 
   // Every countdown runs off one clock, so subs back at the same moment always show the same time: read over a few
   // seconds, there are never more different countdowns than different return times (the test data has 80
@@ -81,7 +89,7 @@ module.exports = async (t) => {
   for (let i = 0; i < 12; i++) {
     const shown = await ev(`(() => {
       const i = [...document.querySelector('thead').querySelectorAll('th')].findIndex(th => th.innerText.trim().toLowerCase().startsWith('status'));
-      return new Set([...document.querySelectorAll('tbody tr')].map(r => r.children[i].innerText.trim()).filter(s => /^\\d+:\\d\\d:\\d\\d$/.test(s))).size;
+      return new Set([...document.querySelectorAll('tbody tr')].map(r => r.children[i].innerText.trim()).filter(s => /^(\\d+d )?\\d+(:\\d\\d){1,2}$/.test(s))).size;
     })()`);
     mostShown = Math.max(mostShown, shown);
     await new Promise((r) => setTimeout(r, 250));
