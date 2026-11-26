@@ -1,11 +1,15 @@
 // Subs page: each submarine's status, build, rank and route, with the Fight Club builds toggle (once Craft?).
 
 function formatCountdown(secondsRemaining) {
-  const clamped = Math.max(0, secondsRemaining);
-  const h = Math.floor(clamped / 3600);
-  const m = Math.floor((clamped % 3600) / 60);
-  const s = Math.floor(clamped % 60);
-  return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
+  // As the plugin's (FleetReader.Countdown): "45:10", "3:05:09" or "2d 4:00:00". Subs and retainers alike.
+  const t = Math.max(0, Math.floor(secondsRemaining));
+  const d = Math.floor(t / 86400);
+  const h = Math.floor((t % 86400) / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = t % 60;
+  const two = (n) => String(n).padStart(2, '0');
+  if (d >= 1) return `${d}d ${h}:${two(m)}:${two(sec)}`;
+  return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
 }
 
 // One clock for every countdown on the tab: a single timer that ticks once a second while any countdown is
@@ -28,9 +32,8 @@ function subscribeSubsClock(listener) {
 }
 const noSubscription = () => () => {};
 
-// Status cell for a sub row: In Port, Returned / Awaiting Collection, or
-// while it is out, a live HH:MM:SS countdown to return_time. Only ticks
-// while it is out - no clock runs for In Port or Returned rows.
+// Status cell for a sub row, as the plugin's: In port, Back (waiting to be collected), or while it is out, a live
+// countdown to return_time. Only ticks while it is out - no clock runs for In port or Back rows.
 function SubStatusCell({ returnTime }) {
   const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
   const returnEpoch = returnTime ? Number(returnTime) : 0;
@@ -40,8 +43,8 @@ function SubStatusCell({ returnTime }) {
   const isDeployed = returnEpoch > 0 && returnEpoch > nowEpoch;
 
   // Back in green, in port softer (as the plugin's).
-  if (!returnEpoch) return <span className="dim">In Port</span>;
-  if (!isDeployed) return <span className="tone-good">Returned / Awaiting Collection</span>;
+  if (!returnEpoch) return <span className="dim">In port</span>;
+  if (!isDeployed) return <span className="tone-good" title="Back and waiting to be collected">Back</span>;
   return formatCountdown(returnEpoch - nowEpoch);
 }
 

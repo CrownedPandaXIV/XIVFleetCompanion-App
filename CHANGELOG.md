@@ -3,6 +3,14 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.5 - 2026-11-26
+
+### Changed
+- **Sub and retainer statuses read as the plugin's.** The Subs page says "In port", "Back" (waiting to be collected) or
+  the time until it's back, and both the Subs and Retainers pages show that time as the plugin does: "45:10" under an
+  hour, "3:05:09" in hours, "2d 4:00:00" over a day (before: "In Port", "Returned / Awaiting Collection" and always
+  "03:05:09", with hours past a day as "52:00:00").
+
 ## 1.13.4 - 2026-11-25
 
 ### Changed
