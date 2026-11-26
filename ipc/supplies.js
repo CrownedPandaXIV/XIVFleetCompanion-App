@@ -5,6 +5,8 @@ const { ipcMain } = require('electron');
 const { withClient, snapshotFragments, inTransaction } = require('../db');
 const { metricWindow } = require('../db/metric-window');
 const { loadFcDirectory } = require('../characters/fc-directory');
+const { notSyncedCharacters, readBehindMinutes, readLoginPcs } = require('../characters/not-synced');
+const { supplyTone } = require('../characters/roster-warnings');
 const { DEFAULT_TANK_COST, MAX_TANK_COST, creditPlan } = require('../subs/fc-credits');
 const {
   DEFAULT_WINDOW_DAYS, DEFAULT_TARGET_DAYS, WINDOW_CHOICES, DAY, usageRate, runway, restockAmount, clampDays,
@@ -23,7 +25,7 @@ const TANK_COST_KEY = 'fc_credit_tank_cost';
 async function readSettings(client) {
   const { rows } = await client.query(
     'SELECT setting_key, setting_value FROM fleet_economics_settings WHERE setting_key = ANY($1)',
-    [[WINDOW_KEY, TARGET_KEY, TANK_COST_KEY, 'repair_kit_cost']]);
+    [[WINDOW_KEY, TARGET_KEY, TANK_COST_KEY, 'repair_kit_cost', 'low_ceruleum_threshold', 'low_repair_kit_threshold']]);
   const byKey = Object.fromEntries(rows.map((r) => [r.setting_key, r.setting_value]));
   const windowDays = WINDOW_CHOICES.includes(Number(byKey[WINDOW_KEY])) ? Number(byKey[WINDOW_KEY]) : DEFAULT_WINDOW_DAYS;
   return {
@@ -31,6 +33,8 @@ async function readSettings(client) {
     targetDays: clampDays(byKey[TARGET_KEY], DEFAULT_TARGET_DAYS, MAX_TARGET_DAYS),
     repairKitCost: Number(byKey.repair_kit_cost) || 0,
     tankCost: clampDays(byKey[TANK_COST_KEY], DEFAULT_TANK_COST, MAX_TANK_COST),
+    // The low-supply warnings (Settings → General → Warnings; 0: off), as the Roster's.
+    warnings: { ceruleum: Number(byKey.low_ceruleum_threshold) || 0, repair_kits: Number(byKey.low_repair_kit_threshold) || 0 },
   };
 }
 
@@ -46,6 +50,8 @@ async function loadSupplies(client) {
     FROM ${latestCharacter} c
     LEFT JOIN character_sort_order so ON so.cid = c.cid`)).rows;
   const withSubs = characters.filter((c) => c.subs_built > 0);
+  // Characters the plugin no longer syncs aren't coloured against the warnings, as on the Roster.
+  const behind = notSyncedCharacters(characters.map((c) => ({ ...c, last_synced_at: c.snapshot_at })), await readBehindMinutes(client), await readLoginPcs(client));
 
   // Each character's history in the window, plus the last value at or before its start.
   const now = Date.now();
@@ -71,6 +77,9 @@ async function loadSupplies(client) {
         days: left.days === Infinity ? 'never' : left.days,
         runsOutAt: left.runsOutAt,
         restock: restockAmount(have, rate.perDay, settings.targetDays),
+        // Against the low-supply warning, as the Roster: 'danger' under half of it, 'warn' under it, 'good' otherwise.
+        tone: supplyTone(have, settings.warnings[metric], !behind.has(String(c.cid))),
+        warning: settings.warnings[metric],
       };
     }
     return entry;

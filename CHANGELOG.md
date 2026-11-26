@@ -10,6 +10,11 @@ All notable changes to the app are recorded here. Versions follow
   the time until it's back, and both the Subs and Retainers pages show that time as the plugin does: "45:10" under an
   hour, "3:05:09" in hours, "2d 4:00:00" over a day (before: "In Port", "Returned / Awaiting Collection" and always
   "03:05:09", with hours past a day as "52:00:00").
+- **Supplies: held ceruleum and repair kits follow the low-supply warnings** (Settings → General → Warnings), as the
+  Roster does: amber under the warning, red under half of it, green otherwise, the warning on hover. They weren't
+  coloured before.
+- **Supplies: what to buy follows days left,** as days left does: red under 3 days, amber under 7, green otherwise.
+  Days left is now green when none are used and grey without enough history, as the plugin's.
 
 ## 1.13.4 - 2026-11-25
 

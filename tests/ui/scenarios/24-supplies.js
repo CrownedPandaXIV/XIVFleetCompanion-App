@@ -21,6 +21,10 @@ module.exports = async (t) => {
     'over 14 days: 60 ceruleum, 10.4 a day, 5.8 days left: ' + (row && row.slice(1, 5).map((c) => c.text).join(' | ')));
   check(row && row[3].cls.includes('supply-warn') && /^Runs out about /.test(row[3].title), 'under a week shows amber, with the date on hover');
   check(row && row[5].text === '300' && row[7].text === 'Not enough history' && row[8].text === '', 'no repair kit history: not enough to say');
+  // Held counts against the low-supply warnings (100 ceruleum, 1,000 repair kits for this run), as the Roster: 60 is
+  // under 100 (amber), 300 under half of 1,000 (red), each with the warning on hover.
+  check(row && row[1].cls.includes('tone-warn') && /low-ceruleum warning of 100 /.test(row[1].title), 'held ceruleum under its warning shows amber, the warning on hover: ' + (row && `${row[1].cls} / ${row[1].title}`));
+  check(row && row[5].cls.includes('tone-danger') && /low-repair-kit warning of 1,000 /.test(row[5].title), 'held repair kits under half their warning show red: ' + (row && row[5].cls));
   const groups = await ev(`[...document.querySelectorAll('.supplies .account-group > h1')].map(h => h.innerText.trim())`);
   check(groups.length > 1 && groups[0] === 'acct0', 'grouped by account: ' + groups.join(', '));
   const firstRows = await ev(`[...document.querySelectorAll('.supplies .account-group')].find(g => g.querySelector('h1')?.innerText.trim() === 'acct1').querySelectorAll('tbody tr')[0].children[0].innerText.trim()`);
@@ -43,6 +47,7 @@ module.exports = async (t) => {
   })()`);
   for (let i = 0; i < 100 && !((row = await bex()) && row[4].text === '48'); i++) await sleep(150);
   check(row && row[4].text === '48', 'buy enough for 10 days: 48 ceruleum: ' + (row && row[4].text));
+  check(row && row[4].cls.includes('supply-warn'), 'what to buy follows the days left (5.6 days: amber): ' + (row && row[4].cls));
   check(/To last 10 days, buy/.test(await ev(`document.querySelector('.supplies-summary').innerText`)), 'the fleet card follows the setting');
   const saved = await t.query(`SELECT setting_key, setting_value FROM fleet_economics_settings WHERE setting_key IN ('supply_window_days', 'restock_target_days') ORDER BY 1`);
   check(JSON.stringify(saved.map((r) => [r.setting_key, Number(r.setting_value)])) === JSON.stringify([['restock_target_days', 10], ['supply_window_days', 7]]), 'both settings are saved: ' + JSON.stringify(saved));
@@ -79,6 +84,8 @@ module.exports.before = async (db) => {
     (now() - interval '10 days', 'character', ${CID}, 'ceruleum', 175),
     (now() - interval '7 days' - interval '1 minute', 'character', ${CID}, 'ceruleum', 135),
     (now(), 'character', ${CID}, 'ceruleum', 60)`);
+  await db.query(`INSERT INTO fleet_economics_settings (setting_key, setting_value, updated_at) VALUES ('low_ceruleum_threshold', 100, now()),
+    ('low_repair_kit_threshold', 1000, now()) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value`);
 };
 
 module.exports.after = async (db) => {
@@ -88,5 +95,5 @@ module.exports.after = async (db) => {
                   FROM ui_supplies_current b WHERE c.cid = b.cid`);
   await db.query('DROP TABLE ui_supplies_backup');
   await db.query('DROP TABLE ui_supplies_current');
-  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key IN ('supply_window_days', 'restock_target_days')`);
+  await db.query(`DELETE FROM fleet_economics_settings WHERE setting_key IN ('supply_window_days', 'restock_target_days', 'low_ceruleum_threshold', 'low_repair_kit_threshold')`);
 };
