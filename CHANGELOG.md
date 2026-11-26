@@ -15,6 +15,9 @@ All notable changes to the app are recorded here. Versions follow
   coloured before.
 - **Supplies: what to buy follows days left,** as days left does: red under 3 days, amber under 7, green otherwise.
   Days left is now green when none are used and grey without enough history, as the plugin's.
+- **Newer Sub Calculator data is looked for every 6 hours instead of once a day.** GitHub sometimes starts its daily
+  run hours late or skips it; now the next run catches up. Nothing changes in the app: it still downloads a newer copy
+  once a day.
 
 ## 1.13.4 - 2026-11-25
 

@@ -7,7 +7,7 @@
 //
 //   node .github/scripts/refresh-sub-data.js [file ...]
 //
-// Writes subs/calculator-data.json, or the files named (the plugin's copy). Run by hand, or each day by sub-data.yml,
+// Writes subs/calculator-data.json, or the files named (the plugin's copy). Run by hand, or every 6 hours by sub-data.yml,
 // which publishes what it makes for the app and plugin to download. Releases ship the committed copy.
 // Nothing here stops a release: when XIVStats can't be read, or what comes back doesn't pass the checks, the file
 // stays as it is; when Pepper's sheet can't be read, Pepper's breakpoints stay as they were. Each is said on a

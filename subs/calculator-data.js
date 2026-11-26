@@ -1,7 +1,7 @@
 // The Sub Calculator's outside data (subs/calculator-data.json): per sector, the loot each tier can give and the
 // breakpoints, from XIVStats (MIT licence, collected from players running the Tracky plugin) with Pepper's FFXIV Ship
 // Guide's breakpoints beside them. Sector names, ranks, positions and parts come from the game's own files, not this.
-// .github/scripts/refresh-sub-data.js makes the file. The copy shipped is the one in the repository; each day
+// .github/scripts/refresh-sub-data.js makes the file. The copy shipped is the one in the repository; every 6 hours
 // .github/workflows/sub-data.yml makes it afresh and, when it changed and passes .github/scripts/check-sub-data.js,
 // publishes it in the Releases repository, where the app (sub-data-update.js) downloads it to its own folder. The newer
 // of the two is used (by about.made). No Electron here.
