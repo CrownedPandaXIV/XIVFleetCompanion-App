@@ -395,6 +395,10 @@ function SubmarinesView({ refreshKey, onOpenPlanner }) {
           </button>
         )}
         <span style={{ marginLeft: '16px' }}><ColumnPicker cols={subCols} /></span>
+        {/* How many subs follow Fight Club's builds (the Fight Club builds column), as the plugin's Subs tab. */}
+        <span className="dim subs-fc-count" style={{ marginLeft: '16px' }} title="Subs with Fight Club builds ticked: from rank 85 they follow Fight Club's best build after repair kits">
+          Fight Club builds: {rows.filter((r) => r.craft_enabled).length.toLocaleString()} of {rows.length.toLocaleString()} subs
+        </span>
         <span style={{ marginLeft: 'auto' }}><ForecastAccuracy refreshKey={refreshKey} /></span>
       </div>
 

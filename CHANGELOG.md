@@ -3,6 +3,12 @@
 All notable changes to the app are recorded here. Versions follow
 [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
+## 1.13.6 - 2026-11-28
+
+### New
+- **Subs: how many subs follow Fight Club's builds,** above the table: "Fight Club builds: 212 of 320 subs" (the subs with
+  Fight Club builds ticked, of all your built subs), in the app and the plugin alike.
+
 ## 1.13.5 - 2026-11-26
 
 ### Changed

@@ -38,6 +38,12 @@ module.exports = async (t) => {
     return tr ? [...tr.children].map(td => ({ text: td.innerText.trim(), title: (td.querySelector('[title]') || td).title })) : null;
   })()`);
 
+  // How many subs follow Fight Club's builds, of the built subs.
+  const fc = (await t.query(`SELECT count(*) FILTER (WHERE t.craft_enabled)::int AS ticked, count(*)::int AS subs
+    FROM companion_submarine_snapshot s LEFT JOIN sub_craft_toggle t ON t.cid = s.cid AND t.sub_name = s.sub_name WHERE s.level > 0`))[0];
+  const fcText = await ev(`(document.querySelector('.subs-fc-count') || {}).innerText`);
+  check(fcText === `Fight Club builds: ${fc.ticked.toLocaleString()} of ${fc.subs.toLocaleString()} subs`, `the Fight Club builds count: "${fcText}" (${fc.ticked} of ${fc.subs})`);
+
   const sub1 = await subRow('Bex Kitteh 1', 'Sub1');
   check(sub1 && sub1[iRank].text === '≈ in 1d 6h', 'calculated from the route, marked ≈: ' + (sub1 && sub1[iRank].text));
   check(sub1 && /^Rank 83 about .*\(3 voyages\)\. Calculated from its route: 3,000 experience per 14\.\dh voyage/.test(sub1[iRank].title),
